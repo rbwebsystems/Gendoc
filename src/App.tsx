@@ -419,6 +419,25 @@ function companyInfoLines(c: CompanyProfile): { label: string; value: string }[]
   ].filter((x) => x.value.trim());
 }
 
+function parseDatetimeLocal(s: string): number | null {
+  const v = (s || "").trim();
+  if (!v) return null;
+  // datetime-local: YYYY-MM-DDTHH:mm (seconds optional)
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const [, yyS, mmS, ddS, hhS, minS, secS] = m;
+  const y = Number(yyS);
+  const mo = Number(mmS) - 1;
+  const d = Number(ddS);
+  const h = Number(hhS);
+  const mi = Number(minS);
+  const se = secS ? Number(secS) : 0;
+  if (![y, mo, d, h, mi, se].every((x) => Number.isFinite(x))) return null;
+  const dt = new Date(y, mo, d, h, mi, se, 0);
+  const t = dt.getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 export default function App() {
   const [workspace, setWorkspace] = useState<DocWorkspace>(() => normalizeWorkspace(loadWorkspace()));
   const [module, setModule] = useState<SidebarModule>("companies");
@@ -479,8 +498,8 @@ export default function App() {
       const due = (workspace.notes ?? []).filter((n) => {
         if (!n || n.done) return false;
         if (!n.remindAt) return false;
-        const t = Date.parse(n.remindAt);
-        if (!Number.isFinite(t)) return false;
+        const t = parseDatetimeLocal(n.remindAt);
+        if (!t) return false;
         if (t > now) return false;
         return !n.remindedAt;
       });
