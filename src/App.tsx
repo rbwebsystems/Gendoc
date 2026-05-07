@@ -488,6 +488,8 @@ export default function App() {
   } | null>(null);
   const promptResolverRef = useRef<((v: string | null) => void) | null>(null);
   const promptInputRef = useRef<HTMLInputElement>(null);
+  const reminderDialogRef = useRef<HTMLDialogElement>(null);
+  const [reminderNote, setReminderNote] = useState<NoteRecord | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => saveWorkspace(workspace), 420);
@@ -507,8 +509,8 @@ export default function App() {
         return !n.remindedAt;
       });
       if (due.length === 0) return;
-      softBeep();
-      flash(setToast, `Reminder: ${due[0].title || "Qeyd"}`);
+      const first = due[0];
+      setReminderNote(first);
       const markIds = new Set(due.map((d) => d.id));
       setWorkspace((w) => ({
         ...w,
@@ -583,6 +585,15 @@ export default function App() {
       el.showModal();
     } else el.close();
   }, [noteDialogOpen]);
+
+  useEffect(() => {
+    const el = reminderDialogRef.current;
+    if (!el) return;
+    if (reminderNote) {
+      softBeep();
+      el.showModal();
+    } else el.close();
+  }, [reminderNote]);
 
   useEffect(() => {
     const onResize = () => {
@@ -1765,11 +1776,7 @@ export default function App() {
                 <div className="dg-folders-toolbar-left">
                   <input className="dg-input dg-folders-search" type="search" placeholder="Qovluqlarda axtar..." aria-label="Qovluqlarda axtar" />
                 </div>
-                <div className="dg-folders-toolbar-right">
-                  <button type="button" className="dg-btn dg-btn-primary" onClick={() => createCustomFolder()}>
-                    Yeni qovluq
-                  </button>
-                </div>
+                <div className="dg-folders-toolbar-right" />
               </div>
 
               {!anyFoldersExist ? (
@@ -2012,7 +2019,14 @@ export default function App() {
         ...w,
         notes: (w.notes ?? []).map((n) =>
           n.id === noteEditId
-            ? { ...n, title, body, remindAt, updatedAt: now, remindedAt: remindAt ? n.remindedAt : undefined }
+            ? {
+                ...n,
+                title,
+                body,
+                remindAt,
+                updatedAt: now,
+                remindedAt: remindAt && remindAt === n.remindAt ? n.remindedAt : undefined,
+              }
             : n,
         ),
       }));
@@ -2069,11 +2083,7 @@ export default function App() {
         <div className="dg-form-page-body">
           <div className="dg-folders-toolbar" aria-label="Qeydlər alət paneli">
             <div className="dg-folders-toolbar-left" />
-            <div className="dg-folders-toolbar-right">
-              <button type="button" className="dg-btn dg-btn-primary" onClick={openNewNoteDialog}>
-                Yeni qeyd
-              </button>
-            </div>
+            <div className="dg-folders-toolbar-right" />
           </div>
 
           {notes.length === 0 ? (
@@ -2118,6 +2128,10 @@ export default function App() {
       ? { label: "Yeni şirkət", onClick: startNewCompany }
       : module === "projects" && projectMode === "list"
         ? { label: "Yeni təklif", onClick: startNewProject }
+        : module === "folders" && folderView === "grid" && workspace.companies.length > 0
+          ? { label: "Yeni qovluq", onClick: () => createCustomFolder() }
+          : module === "notes"
+            ? { label: "Yeni qeyd", onClick: openNewNoteDialog }
         : null;
 
   const modalLayer = (
@@ -2399,6 +2413,21 @@ export default function App() {
               </button>
             </div>
           </form>
+        </dialog>
+      ) : null}
+
+      {reminderNote ? (
+        <dialog ref={reminderDialogRef} className="dg-modal" onClose={() => setReminderNote(null)}>
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">Reminder</h2>
+            <p className="dg-modal-hint">{reminderNote.title || "Qeyd"}</p>
+            {reminderNote.body ? <p className="dg-modal-hint">{reminderNote.body}</p> : null}
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-primary" onClick={() => setReminderNote(null)}>
+                Bağla
+              </button>
+            </div>
+          </div>
         </dialog>
       ) : null}
     </>
