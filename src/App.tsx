@@ -490,6 +490,8 @@ export default function App() {
   const promptInputRef = useRef<HTMLInputElement>(null);
   const reminderDialogRef = useRef<HTMLDialogElement>(null);
   const [reminderNote, setReminderNote] = useState<NoteRecord | null>(null);
+  const noteInfoDialogRef = useRef<HTMLDialogElement>(null);
+  const [noteInfoId, setNoteInfoId] = useState<string | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => saveWorkspace(workspace), 420);
@@ -594,6 +596,13 @@ export default function App() {
       el.showModal();
     } else el.close();
   }, [reminderNote]);
+
+  useEffect(() => {
+    const el = noteInfoDialogRef.current;
+    if (!el) return;
+    if (noteInfoId) el.showModal();
+    else el.close();
+  }, [noteInfoId]);
 
   useEffect(() => {
     const onResize = () => {
@@ -2095,6 +2104,9 @@ export default function App() {
             <div className="dg-notes-list" role="list" aria-label="Qeydlər siyahısı">
               {notes.map((n) => (
                 <div key={n.id} className={`dg-note-row ${n.done ? "is-done" : ""}`} role="listitem">
+                  <button type="button" className="dg-icon-btn dg-icon-btn--compact" onClick={() => setNoteInfoId(n.id)} aria-label="Məlumat">
+                    <IconInfo />
+                  </button>
                   <button type="button" className="dg-note-check" onClick={() => toggleNoteDone(n.id)} aria-label="Tamamlandı">
                     {n.done ? "✓" : ""}
                   </button>
@@ -2137,7 +2149,7 @@ export default function App() {
   const modalLayer = (
     <>
       {printProjectId ? (
-        <dialog ref={printDialogRef} className="dg-modal" onClose={() => setPrintProjectId(null)}>
+        <dialog ref={printDialogRef} className="dg-modal dg-modal--wide" onClose={() => setPrintProjectId(null)}>
           <div className="dg-modal-body">
             <h2 className="dg-modal-title">Çap — sənəd seçin</h2>
             <p className="dg-modal-hint">Satıcı Ayarlardan, alıcı təklifdə seçilmiş şirkətdən götürülür.</p>
@@ -2328,7 +2340,7 @@ export default function App() {
       </dialog>
 
       {confirmDialog ? (
-        <dialog ref={confirmDialogRef} className="dg-modal" onClose={() => resolveConfirm(false)}>
+        <dialog ref={confirmDialogRef} className="dg-modal dg-modal--alert" onClose={() => resolveConfirm(false)}>
           <div className="dg-modal-body">
             <h2 className="dg-modal-title">{confirmDialog.title}</h2>
             <p className="dg-modal-hint">{confirmDialog.message}</p>
@@ -2349,7 +2361,7 @@ export default function App() {
       ) : null}
 
       {promptDialog ? (
-        <dialog ref={promptDialogRef} className="dg-modal" onClose={() => resolvePrompt(null)}>
+        <dialog ref={promptDialogRef} className="dg-modal dg-modal--alert" onClose={() => resolvePrompt(null)}>
           <form
             className="dg-modal-body"
             onSubmit={(e) => {
@@ -2375,7 +2387,7 @@ export default function App() {
       ) : null}
 
       {noteDialogOpen ? (
-        <dialog ref={noteDialogRef} className="dg-modal" onClose={() => setNoteDialogOpen(false)}>
+        <dialog ref={noteDialogRef} className="dg-modal dg-modal--wide" onClose={() => setNoteDialogOpen(false)}>
           <form
             className="dg-modal-body"
             onSubmit={(e) => {
@@ -2417,7 +2429,7 @@ export default function App() {
       ) : null}
 
       {reminderNote ? (
-        <dialog ref={reminderDialogRef} className="dg-modal" onClose={() => setReminderNote(null)}>
+        <dialog ref={reminderDialogRef} className="dg-modal dg-modal--alert" onClose={() => setReminderNote(null)}>
           <div className="dg-modal-body">
             <h2 className="dg-modal-title">Reminder</h2>
             <p className="dg-modal-hint">{reminderNote.title || "Qeyd"}</p>
@@ -2427,6 +2439,32 @@ export default function App() {
                 Bağla
               </button>
             </div>
+          </div>
+        </dialog>
+      ) : null}
+
+      {noteInfoId ? (
+        <dialog ref={noteInfoDialogRef} className="dg-modal dg-modal--wide" onClose={() => setNoteInfoId(null)}>
+          <div className="dg-modal-body">
+            {(() => {
+              const n = (workspace.notes ?? []).find((x) => x.id === noteInfoId);
+              if (!n) return null;
+              return (
+                <>
+                  <h2 className="dg-modal-title">{n.title || "Qeyd"}</h2>
+                  <p className="dg-modal-hint">
+                    Tarix: {new Date(n.createdAt).toLocaleString("az-AZ")} · Yenilənib: {new Date(n.updatedAt).toLocaleString("az-AZ")}
+                  </p>
+                  {n.remindAt ? <p className="dg-modal-hint">Reminder: {n.remindAt.replace("T", " ")}</p> : null}
+                  {n.body ? <p className="dg-modal-hint">{n.body}</p> : <p className="dg-modal-hint">—</p>}
+                  <div className="dg-modal-actions">
+                    <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setNoteInfoId(null)}>
+                      Bağla
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </dialog>
       ) : null}

@@ -938,7 +938,7 @@ textarea.dg-input::placeholder {
   box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
   padding: 10px 12px;
   display: grid;
-  grid-template-columns: 34px 1fr auto;
+  grid-template-columns: 34px 34px 1fr auto;
   align-items: center;
   gap: 12px;
 }
@@ -1125,6 +1125,16 @@ select.dg-input:focus {
   max-width: min(480px, 96vw);
   background: var(--win-surface);
   box-shadow: var(--win-shadow-flyout);
+}
+
+.dg-modal.dg-modal--wide {
+  max-width: min(860px, 96vw);
+  width: min(860px, 96vw);
+}
+
+.dg-modal.dg-modal--alert {
+  max-width: min(420px, 96vw);
+  width: min(420px, 96vw);
 }
 
 .dg-modal.dg-modal-info {
