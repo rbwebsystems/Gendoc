@@ -1,0 +1,2288 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
+import "./App.css";
+import "./rbsoft-theme.css";
+import {
+  buildDeliveryActHtml,
+  buildDeliveryActNoPriceHtml,
+  buildInvoiceHtml,
+  buildProtocolHtml,
+  openPrintableDocument,
+  computeTotals,
+} from "./documents/generateDocuments";
+import {
+  loadWorkspace,
+  normalizeCompany,
+  normalizeProductRows,
+  normalizeWorkspace,
+  projectsUsingCompany,
+  saveWorkspace,
+  sortProjectsByDate,
+  workspaceToGeneratorState,
+} from "./lib/docStorage";
+import { emptyCompany, emptyMeta, newProductRow } from "./lib/defaults";
+import { formatDateAzLong, formatMoney } from "./lib/text";
+import type {
+  CompanyProfile,
+  DocWorkspace,
+  DocumentMeta,
+  ProductRow,
+  ProjectRecord,
+  SavedCompanyRecord,
+  WorkspaceFolderRecord,
+} from "./types";
+import html2pdf from "html2pdf.js";
+
+async function downloadPdfFromHtml(html: string, filename: string): Promise<void> {
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-2000px";
+  iframe.style.top = "0";
+  // PDF üçün layout düzgün hesablansın deyə real ölçü veririk
+  iframe.style.width = "1200px";
+  iframe.style.height = "900px";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.setAttribute("aria-hidden", "true");
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument;
+  if (!doc) {
+    iframe.remove();
+    return;
+  }
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  await new Promise<void>((resolve) => {
+    const w = iframe.contentWindow;
+    if (!w) return resolve();
+    if (doc.readyState === "complete") return resolve();
+    w.addEventListener("load", () => resolve(), { once: true });
+    setTimeout(() => resolve(), 1500);
+  });
+
+  // Tailwind/şrift yüklənməsi üçün əlavə gözləmə
+  try {
+    const anyDoc = doc as unknown as { fonts?: { ready?: Promise<void> } };
+    if (anyDoc.fonts?.ready) await anyDoc.fonts.ready;
+  } catch {
+    /* ignore */
+  }
+  await new Promise((r) => setTimeout(r, 500));
+
+  try {
+    const rootEl = (doc.querySelector(".page-container") as HTMLElement | null) ?? doc.body;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (html2pdf as any)()
+      .set({
+        margin: 0,
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          windowWidth: 1200,
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        pagebreak: { mode: ["css", "legacy"] },
+      })
+      .from(rootEl)
+      .save();
+  } finally {
+    iframe.remove();
+  }
+}
+
+function pad3(n: number): string {
+  const v = Math.max(0, Math.trunc(n));
+  return String(v).padStart(3, "0");
+}
+
+function yy(iso: string): string {
+  const y = (iso || "").slice(2, 4);
+  return y && y.length === 2 ? y : new Date().getFullYear().toString().slice(2);
+}
+
+function mm(iso: string): string {
+  const m = (iso || "").slice(5, 7);
+  return m && m.length === 2 ? m : String(new Date().getMonth() + 1).padStart(2, "0");
+}
+
+type SidebarModule = "companies" | "projects" | "folders" | "settings";
+
+type CompanyFormMode = "list" | "form";
+type ProjectFormMode = "list" | "form";
+
+type ProjectDraft = {
+  title: string;
+  companyId: string;
+  rows: ProductRow[];
+  meta: DocumentMeta;
+  vatPercent: number;
+};
+
+function emptyProjectDraft(): ProjectDraft {
+  return {
+    title: "",
+    companyId: "",
+    rows: [],
+    meta: emptyMeta(),
+    vatPercent: 0,
+  };
+}
+
+type ReqFieldSpec = {
+  key: keyof CompanyProfile;
+  label: string;
+  placeholder?: string;
+  /** İki sütunda tam en və ya yarım */
+  span?: "full" | "half";
+};
+
+const COMPANY_FIELD_GROUPS: { title: string; fields: ReqFieldSpec[] }[] = [
+  {
+    title: "Bank rekvizitləri",
+    fields: [
+      { key: "currency", label: "Valyuta", placeholder: "AZN", span: "half" },
+      { key: "branchCode", label: "Filialın kodu", span: "half" },
+      { key: "bankVoen", label: "Bankın VÖEN-i", placeholder: "9900003611", span: "half" },
+      { key: "bankSwift", label: "SWIFT kodu", placeholder: "AIIBAZ2XXXX", span: "half" },
+      { key: "bankName", label: "Benefisiarın bankı", span: "full" },
+      { key: "correspondentAccount", label: "Müxbir hesab", placeholder: "İBAN", span: "full" },
+    ],
+  },
+  {
+    title: "Benefisiar",
+    fields: [
+      { key: "name", label: "Benefisiarın adı", placeholder: '"ABC" MMC', span: "full" },
+      { key: "voen", label: "Benefisiarın VÖEN-i", placeholder: "1234567891", span: "half" },
+      { key: "accountManat", label: "Benefisiarın hesabı", placeholder: "İBAN", span: "half" },
+      { key: "address", label: "Ünvan", span: "full" },
+    ],
+  },
+  {
+    title: "Əlaqə və direktor",
+    fields: [
+      { key: "phone", label: "Telefon", span: "half" },
+      { key: "fax", label: "Faks", span: "half" },
+      { key: "email", label: "E-poçt", span: "half" },
+      { key: "director", label: "Direktor", placeholder: "Tam ad (imza)", span: "half" },
+    ],
+  },
+];
+
+const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
+  { id: "companies", label: "Şirkətlər" },
+  { id: "projects", label: "Təkliflər" },
+  { id: "folders", label: "Qovluqlar" },
+  { id: "settings", label: "Ayarlar" },
+];
+
+const SIDEBAR_MAIN_IDS: SidebarModule[] = ["companies", "projects", "folders"];
+
+const MODULE_TAGLINE: Record<SidebarModule, string> = {
+  companies: "",
+  projects: "",
+  folders: "",
+  settings: "",
+};
+
+function flash(setter: (s: string | null) => void, msg: string) {
+  setter(msg);
+  window.setTimeout(() => setter(null), 2600);
+}
+
+function softBeep(): void {
+  try {
+    const Ctx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.05, t + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+    osc.start(t);
+    osc.stop(t + 0.12);
+    osc.onended = () => ctx.close().catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
+function SvgIcon(props: { children: ReactNode }) {
+  return (
+    <svg
+      className="dg-icon-svg"
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {props.children}
+    </svg>
+  );
+}
+
+function IconInfo() {
+  return (
+    <SvgIcon>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </SvgIcon>
+  );
+}
+
+function IconEdit() {
+  return (
+    <SvgIcon>
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7 21l-4 1 1-4 12.5-12.5Z" />
+      <path d="m15 5 4 4" />
+    </SvgIcon>
+  );
+}
+
+function IconTrash() {
+  return (
+    <SvgIcon>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6M14 11v6" />
+    </SvgIcon>
+  );
+}
+
+function IconPrint() {
+  return (
+    <SvgIcon>
+      <path d="M6 9V3h12v6" />
+      <path d="M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+      <path d="M6 14h12v7H6z" />
+    </SvgIcon>
+  );
+}
+
+function SidebarNavIcon(props: { mod: SidebarModule }) {
+  const cls = "dg-nav-icon";
+  switch (props.mod) {
+    case "companies":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+          />
+        </svg>
+      );
+    case "projects":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      );
+    case "folders":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7z"
+          />
+          <path strokeWidth="2" strokeLinecap="round" d="M3 10h18" />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+          />
+          <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
+function IconMenuBars() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
+function IconSearchSidebar() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="11" cy="11" r="7" />
+      <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+    </svg>
+  );
+}
+
+function IconLogout() {
+  return (
+    <SvgIcon>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </SvgIcon>
+  );
+}
+
+function IconFolder() {
+  return (
+    <svg width="62" height="50" viewBox="0 0 62 50" fill="none" aria-hidden>
+      <path
+        d="M6 10.5C6 7.74 8.24 5.5 11 5.5H25.4c1.2 0 2.35.48 3.2 1.33l2.55 2.55c.7.7 1.65 1.1 2.64 1.1H51c2.76 0 5 2.24 5 5v21c0 4.14-3.36 7.5-7.5 7.5H13.5C9.36 44 6 40.64 6 36.5v-26Z"
+        fill="#F4C542"
+      />
+      <path
+        d="M6 16.5c0-2.76 2.24-5 5-5h40c2.76 0 5 2.24 5 5v20c0 4.14-3.36 7.5-7.5 7.5H13.5C9.36 44 6 40.64 6 36.5v-20Z"
+        fill="#F6D365"
+      />
+      <path
+        d="M10.5 14.5h41"
+        stroke="#D3A22B"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+    </svg>
+  );
+}
+
+function companyInfoLines(c: CompanyProfile): { label: string; value: string }[] {
+  return [
+    { label: "Valyuta", value: c.currency },
+    { label: "Benefisiarın bankı", value: c.bankName },
+    { label: "Filialın kodu", value: c.branchCode },
+    { label: "Bankın VÖEN-i", value: c.bankVoen },
+    { label: "SWIFT kodu", value: c.bankSwift },
+    { label: "Müxbir hesab", value: c.correspondentAccount },
+    { label: "Benefisiarın adı", value: c.name },
+    { label: "Benefisiarın hesabı", value: c.accountManat },
+    { label: "Benefisiarın VÖEN-i", value: c.voen },
+    { label: "Ünvan", value: c.address },
+    { label: "Telefon", value: c.phone },
+    { label: "Faks", value: c.fax },
+    { label: "E-poçt", value: c.email },
+    { label: "Direktor", value: c.director },
+  ].filter((x) => x.value.trim());
+}
+
+export default function App() {
+  const [workspace, setWorkspace] = useState<DocWorkspace>(() => normalizeWorkspace(loadWorkspace()));
+  const [module, setModule] = useState<SidebarModule>("companies");
+  const [toast, setToast] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navSearch, setNavSearch] = useState("");
+  const navSearchRef = useRef<HTMLInputElement>(null);
+  const [projectProductSearch, setProjectProductSearch] = useState("");
+
+  const [companyMode, setCompanyMode] = useState<CompanyFormMode>("list");
+  const [companyEditId, setCompanyEditId] = useState<string | null>(null);
+  const [companyDraft, setCompanyDraft] = useState<CompanyProfile>(() => emptyCompany());
+
+  const [projectMode, setProjectMode] = useState<ProjectFormMode>("list");
+  const [projectEditId, setProjectEditId] = useState<string | null>(null);
+  const [projectDraft, setProjectDraft] = useState<ProjectDraft>(() => emptyProjectDraft());
+
+  const [infoDialog, setInfoDialog] = useState<{ kind: "company" | "project"; id: string } | null>(null);
+  const printDialogRef = useRef<HTMLDialogElement>(null);
+  const [printProjectId, setPrintProjectId] = useState<string | null>(null);
+  const infoDialogRef = useRef<HTMLDialogElement>(null);
+  const confirmDialogRef = useRef<HTMLDialogElement>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    danger?: boolean;
+  } | null>(null);
+  const confirmResolverRef = useRef<((v: boolean) => void) | null>(null);
+  const promptDialogRef = useRef<HTMLDialogElement>(null);
+  const [promptDialog, setPromptDialog] = useState<{
+    title: string;
+    label: string;
+    defaultValue?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  } | null>(null);
+  const promptResolverRef = useRef<((v: string | null) => void) | null>(null);
+  const promptInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => saveWorkspace(workspace), 420);
+    return () => window.clearTimeout(id);
+  }, [workspace]);
+
+  // Hər şirkət üçün avtomatik qovluq olsun
+  useEffect(() => {
+    const existing = new Set((workspace.folders ?? []).filter((f) => (f as WorkspaceFolderRecord).kind === "company").map((f) => (f as WorkspaceFolderRecord).companyId));
+    const missing = workspace.companies.filter((c) => !existing.has(c.id));
+    if (missing.length === 0) return;
+    setWorkspace((w) => ({
+      ...w,
+      folders: [
+        ...(w.folders ?? []),
+        ...missing.map((c) => ({
+          id: crypto.randomUUID(),
+          kind: "company" as const,
+          companyId: c.id,
+          name: c.profile.name || "Şirkət",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          files: [],
+        })),
+      ],
+    }));
+  }, [workspace.companies, workspace.folders]);
+
+  useEffect(() => {
+    const el = printDialogRef.current;
+    if (!el) return;
+    if (printProjectId) el.showModal();
+    else el.close();
+  }, [printProjectId]);
+
+  useEffect(() => {
+    const el = infoDialogRef.current;
+    if (!el) return;
+    if (infoDialog) el.showModal();
+    else el.close();
+  }, [infoDialog]);
+
+  useEffect(() => {
+    const el = confirmDialogRef.current;
+    if (!el) return;
+    if (confirmDialog) {
+      softBeep();
+      el.showModal();
+    } else el.close();
+  }, [confirmDialog]);
+
+  useEffect(() => {
+    const el = promptDialogRef.current;
+    if (!el) return;
+    if (promptDialog) {
+      softBeep();
+      el.showModal();
+      window.setTimeout(() => promptInputRef.current?.focus(), 0);
+    } else el.close();
+  }, [promptDialog]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 768) setSidebarOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    const fn = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        navSearchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", fn);
+    return () => window.removeEventListener("keydown", fn);
+  }, []);
+
+  const sortedCompanies = useMemo(() => {
+    return [...workspace.companies].sort((a, b) =>
+      (a.profile.name || "").localeCompare(b.profile.name || "", "az", { sensitivity: "base" }),
+    );
+  }, [workspace.companies]);
+
+  const sortedProjects = useMemo(() => sortProjectsByDate(workspace.projects), [workspace.projects]);
+
+  const filteredMainNavIds = useMemo(() => {
+    const q = navSearch.trim().toLowerCase();
+    return SIDEBAR_MAIN_IDS.filter((id) => {
+      const label = SIDEBAR_MODULES.find((m) => m.id === id)?.label ?? "";
+      return !q || label.toLowerCase().includes(q);
+    });
+  }, [navSearch]);
+
+  const workspaceHeader = useMemo(() => {
+    if (module === "settings") return { title: "Ayarlar", sub: MODULE_TAGLINE.settings };
+    if (module === "companies") {
+      if (companyMode === "list") return { title: "Şirkətlər", sub: MODULE_TAGLINE.companies };
+      return {
+        title: companyEditId ? "Şirkət redaktəsi" : "Yeni şirkət",
+        sub: companyEditId ? "Mövcud şirkət kartını yeniləyin" : "Yeni alıcı və ya tərəf şirkəti əlavə edin",
+      };
+    }
+    if (module === "projects") {
+      if (projectMode === "list") return { title: "Təkliflər", sub: MODULE_TAGLINE.projects };
+      return {
+        title: projectEditId ? "Təklif redaktəsi" : "Yeni təklif",
+        sub: projectEditId ? "Mövcud təklifi yeniləyin" : "Yeni təklif əlavə edin",
+      };
+    }
+    if (module === "folders") {
+      return { title: "Qovluqlar", sub: MODULE_TAGLINE.folders };
+    }
+    return { title: "", sub: "" };
+  }, [module, companyMode, projectMode, companyEditId, projectEditId]);
+
+  const patchSellerSettings = useCallback((key: keyof CompanyProfile, value: string) => {
+    setWorkspace((w) => ({
+      ...w,
+      settings: { ...w.settings, seller: { ...w.settings.seller, [key]: value } },
+    }));
+  }, []);
+
+  const startNewCompany = () => {
+    setCompanyDraft(emptyCompany());
+    setCompanyEditId(null);
+    setCompanyMode("form");
+  };
+
+  const startEditCompany = (c: SavedCompanyRecord) => {
+    setCompanyDraft({ ...emptyCompany(), ...c.profile });
+    setCompanyEditId(c.id);
+    setCompanyMode("form");
+  };
+
+  const cancelCompanyForm = () => {
+    setCompanyMode("list");
+    setCompanyEditId(null);
+    setCompanyDraft(emptyCompany());
+  };
+
+  const saveCompanyForm = () => {
+    const profile = normalizeCompany(companyDraft);
+    if (!profile.name.trim() && !profile.voen.trim()) {
+      flash(setToast, "Ən azı şirkət adı və ya VÖEN daxil edin.");
+      return;
+    }
+    const now = Date.now();
+    if (companyEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        companies: w.companies.map((c) =>
+          c.id === companyEditId ? { ...c, profile, updatedAt: now } : c,
+        ),
+      }));
+      flash(setToast, "Şirkət yeniləndi");
+    } else {
+      const id = crypto.randomUUID();
+      setWorkspace((w) => ({
+        ...w,
+        companies: [...w.companies, { id, profile, createdAt: now, updatedAt: now }],
+        folders: [
+          ...(w.folders ?? []),
+          { id: crypto.randomUUID(), kind: "company" as const, companyId: id, name: profile.name || "Şirkət", createdAt: now, updatedAt: now, files: [] },
+        ],
+      }));
+      flash(setToast, "Şirkət saxlanıldı");
+    }
+    cancelCompanyForm();
+  };
+
+  const askConfirm = useCallback(
+    (opts: { title: string; message: string; confirmLabel?: string; cancelLabel?: string; danger?: boolean }) => {
+      return new Promise<boolean>((resolve) => {
+        confirmResolverRef.current = resolve;
+        setConfirmDialog(opts);
+      });
+    },
+    [],
+  );
+
+  const askPrompt = useCallback(
+    (opts: { title: string; label: string; defaultValue?: string; confirmLabel?: string; cancelLabel?: string }) => {
+      return new Promise<string | null>((resolve) => {
+        promptResolverRef.current = resolve;
+        setPromptDialog(opts);
+      });
+    },
+    [],
+  );
+
+  const resolveConfirm = (v: boolean) => {
+    confirmResolverRef.current?.(v);
+    confirmResolverRef.current = null;
+    setConfirmDialog(null);
+  };
+
+  const resolvePrompt = (v: string | null) => {
+    promptResolverRef.current?.(v);
+    promptResolverRef.current = null;
+    setPromptDialog(null);
+  };
+
+  const deleteCompany = async (c: SavedCompanyRecord) => {
+    const n = projectsUsingCompany(workspace, c.id);
+    if (n > 0) {
+      softBeep();
+      flash(setToast, `Bu şirkət ${n} təklifdə istifadə olunur — əvvəl təklifləri silin və ya dəyişin.`);
+      return;
+    }
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: `«${c.profile.name || "Şirkət"}» silinsin?`,
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, companies: w.companies.filter((x) => x.id !== c.id) }));
+    setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => f.companyId !== c.id) }));
+    flash(setToast, "Şirkət silindi");
+  };
+
+  const startNewProject = () => {
+    if (workspace.companies.length === 0) {
+      flash(setToast, "Əvvəl «Şirkətlər» bölməsində ən azı bir şirkət əlavə edin.");
+      setModule("companies");
+      return;
+    }
+    setProjectDraft({
+      ...emptyProjectDraft(),
+      companyId: workspace.companies[0].id,
+    });
+    setProjectEditId(null);
+    setProjectMode("form");
+  };
+
+  const startEditProject = (p: ProjectRecord) => {
+    setProjectDraft({
+      title: p.title,
+      companyId: p.companyId,
+      rows: normalizeProductRows(p.rows),
+      meta: { ...emptyMeta(), ...p.meta },
+      vatPercent: p.vatPercent,
+    });
+    setProjectEditId(p.id);
+    setProjectMode("form");
+  };
+
+  const cancelProjectForm = () => {
+    setProjectMode("list");
+    setProjectEditId(null);
+    setProjectDraft(emptyProjectDraft());
+    setProjectProductSearch("");
+  };
+
+  const openNewCompanyFromProject = () => {
+    setModule("companies");
+    startNewCompany();
+  };
+
+  const addProductRowFromSearch = () => {
+    const name = projectProductSearch.trim();
+    setProjectDraft((d) => ({
+      ...d,
+      rows: [...d.rows, { ...newProductRow(), ...(name ? { name } : {}) }],
+    }));
+    setProjectProductSearch("");
+  };
+
+  const saveProjectForm = () => {
+    if (!projectDraft.companyId) {
+      flash(setToast, "Şirkət seçin.");
+      return;
+    }
+    const now = Date.now();
+    const rows = normalizeProductRows(projectDraft.rows);
+    const meta = { ...emptyMeta(), ...projectDraft.meta };
+    const title = projectDraft.title.trim() || "Adsız təklif";
+
+    // Sistem nömrələri (təkrar olmamaq şərtilə) avtomatik təyin edir.
+    if (!meta.invoiceNumber?.trim()) {
+      const seq = workspace.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1 };
+      meta.invoiceNumber = `${yy(meta.invoiceDate)}${mm(meta.invoiceDate)}-${pad3(seq.invoice)}`;
+      setWorkspace((w) => ({
+        ...w,
+        settings: { ...w.settings, docSeq: { ...(w.settings.docSeq ?? seq), invoice: (w.settings.docSeq?.invoice ?? seq.invoice) + 1 } },
+      }));
+    }
+
+    if (projectEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        projects: w.projects.map((p) =>
+          p.id === projectEditId
+            ? {
+                ...p,
+                title,
+                companyId: projectDraft.companyId,
+                rows,
+                meta,
+                vatPercent: Number(projectDraft.vatPercent) || 0,
+                updatedAt: now,
+              }
+            : p,
+        ),
+      }));
+      flash(setToast, projectEditId ? "Təklif yeniləndi" : "Təklif saxlanıldı");
+    } else {
+      const id = crypto.randomUUID();
+      setWorkspace((w) => ({
+        ...w,
+        projects: [
+          ...w.projects,
+          {
+            id,
+            title,
+            companyId: projectDraft.companyId,
+            rows,
+            meta,
+            vatPercent: Number(projectDraft.vatPercent) || 0,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      }));
+      flash(setToast, "Təklif saxlanıldı");
+    }
+    cancelProjectForm();
+  };
+
+  const deleteProject = async (p: ProjectRecord) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: `«${p.title}» silinsin?`,
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, projects: w.projects.filter((x) => x.id !== p.id) }));
+    flash(setToast, "Təklif silindi");
+  };
+
+  const closePrintDialog = useCallback(() => {
+    printDialogRef.current?.close();
+    setPrintProjectId(null);
+  }, []);
+
+  const runExport = async (
+    projectId: string,
+    kind: "invoice" | "delivery" | "deliveryNoPrice" | "protocol",
+    mode: "print" | "pdf",
+  ) => {
+    const proj = workspace.projects.find((p) => p.id === projectId);
+    if (!proj) {
+      closePrintDialog();
+      return;
+    }
+
+    // Çap zamanı nömrə dərhal HTML-də görünsün deyə burada sinxron hesablayırıq
+    // və həm workspace-ə, həm də print paketin meta-sına tətbiq edirik.
+    const seq = workspace.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1 };
+    const d = proj.meta.invoiceDate || new Date().toISOString().slice(0, 10);
+    let next = { ...seq };
+    let meta = { ...proj.meta };
+    let changed = false;
+
+    if (kind === "invoice" && !meta.invoiceNumber?.trim()) {
+      meta = { ...meta, invoiceNumber: `${yy(d)}${mm(d)}-${pad3(next.invoice)}` };
+      next.invoice += 1;
+      changed = true;
+    }
+    if ((kind === "delivery" || kind === "deliveryNoPrice") && !meta.deliveryActNumber?.trim()) {
+      meta = { ...meta, deliveryActNumber: `${pad3(next.delivery)}/${yy(d)}` };
+      next.delivery += 1;
+      changed = true;
+    }
+    if (kind === "protocol" && !meta.protocolNumber?.trim()) {
+      meta = { ...meta, protocolNumber: `${pad3(next.protocol)}/${yy(d)}` };
+      next.protocol += 1;
+      changed = true;
+    }
+
+    if (changed) {
+      setWorkspace((w) => ({
+        ...w,
+        settings: { ...w.settings, docSeq: next },
+        projects: w.projects.map((p) => (p.id === projectId ? { ...p, meta, updatedAt: Date.now() } : p)),
+      }));
+    }
+
+    const pack = workspaceToGeneratorState(
+      { ...workspace, settings: { ...workspace.settings, docSeq: changed ? next : seq } },
+      { ...proj, meta },
+    );
+    const html =
+      kind === "invoice"
+        ? buildInvoiceHtml(pack)
+        : kind === "delivery"
+          ? buildDeliveryActHtml(pack)
+          : kind === "deliveryNoPrice"
+            ? buildDeliveryActNoPriceHtml(pack)
+          : buildProtocolHtml(pack);
+    if (mode === "pdf") {
+      const buyerName = workspace.companies.find((c) => c.id === proj.companyId)?.profile?.name?.trim();
+      const base = kind === "invoice" ? "hesab-faktura" : kind === "protocol" ? "protokol" : "tehvil-akti";
+      const no =
+        kind === "invoice"
+          ? meta.invoiceNumber
+          : kind === "protocol"
+            ? meta.protocolNumber
+            : meta.deliveryActNumber;
+      const safeBuyer = buyerName ? buyerName.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") : "";
+      const fname = `${base}${no ? "-" + no : ""}${safeBuyer ? "-" + safeBuyer : ""}.pdf`;
+      await downloadPdfFromHtml(html, fname);
+    } else {
+      const ok = openPrintableDocument(html);
+      if (!ok) {
+        softBeep();
+        flash(setToast, "Pop-up bloklanıb — brauzerdə yeni pəncərəyə icazə verin.");
+      }
+    }
+    closePrintDialog();
+  };
+
+  const draftTotals = useMemo(
+    () =>
+      computeTotals({
+        seller: emptyCompany(),
+        buyer: emptyCompany(),
+        rows: projectDraft.rows,
+        meta: projectDraft.meta,
+        vatPercent: projectDraft.vatPercent,
+      }),
+    [projectDraft.rows, projectDraft.meta, projectDraft.vatPercent],
+  );
+
+  const infoCompany = infoDialog?.kind === "company" ? workspace.companies.find((c) => c.id === infoDialog.id) : undefined;
+  const infoProject = infoDialog?.kind === "project" ? workspace.projects.find((p) => p.id === infoDialog.id) : undefined;
+  const infoProjectBuyer =
+    infoProject && workspace.companies.find((c) => c.id === infoProject.companyId)?.profile;
+
+  const companyProfileFields = (
+    profile: CompanyProfile,
+    patch: (key: keyof CompanyProfile, v: string) => void,
+    groups: { title: string; fields: ReqFieldSpec[] }[] = COMPANY_FIELD_GROUPS,
+  ) => (
+    <div className="dg-req-form">
+      {groups.map((group) => (
+        <fieldset key={group.title} className="pg-fieldset">
+          <legend>{group.title}</legend>
+          <div className="dg-req-grid">
+            {group.fields.map((f) => (
+              <label
+                key={f.key}
+                className={`dg-field dg-req-field ${f.span === "half" ? "" : "dg-req-span-full"}`}
+              >
+                <span className="dg-label">{f.label}</span>
+                <input
+                  className="dg-input dg-input-req"
+                  type="text"
+                  placeholder={f.placeholder}
+                  value={profile[f.key]}
+                  onChange={(e) => patch(f.key, e.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ))}
+    </div>
+  );
+
+  const renderCompaniesModule = () => (
+    <>
+      {companyMode === "list" ? (
+        <div className="dg-form-page pg-panel" aria-label="Şirkətlər siyahısı">
+          <div className="dg-form-page-body">
+            {sortedCompanies.length === 0 ? (
+              <p className="dg-muted dg-form-page-empty">Hələ şirkət yoxdur — «Yeni şirkət» ilə əlavə edin.</p>
+            ) : (
+              <div className="dg-table-wrap pg-grid-host">
+                <table className="dg-table dg-table--sales">
+                  <thead>
+                    <tr>
+                      <th className="dg-th-num">№</th>
+                      <th>Şirkət</th>
+                      <th>VÖEN</th>
+                      <th className="dg-th-actions">Əməliyyatlar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedCompanies.map((c, i) => (
+                      <tr key={c.id}>
+                        <td className="dg-td-num">{i + 1}</td>
+                        <td>{c.profile.name || "—"}</td>
+                        <td>{c.profile.voen || "—"}</td>
+                        <td className="dg-td-actions">
+                          <div className="dg-icon-row">
+                            <button
+                              type="button"
+                              className="dg-icon-btn"
+                              title="Məlumat"
+                              aria-label="Məlumat"
+                              onClick={() => setInfoDialog({ kind: "company", id: c.id })}
+                            >
+                              <IconInfo />
+                            </button>
+                            <button
+                              type="button"
+                              className="dg-icon-btn"
+                              title="Redaktə"
+                              aria-label="Redaktə"
+                              onClick={() => startEditCompany(c)}
+                            >
+                              <IconEdit />
+                            </button>
+                            <button
+                              type="button"
+                              className="dg-icon-btn dg-icon-btn-danger"
+                              title="Sil"
+                              aria-label="Sil"
+                              onClick={() => deleteCompany(c)}
+                            >
+                              <IconTrash />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="dg-form-page pg-panel" aria-label={companyEditId ? "Şirkət redaktəsi" : "Yeni şirkət"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">Şirkətlər</h1>
+              <nav className="dg-form-bc" aria-label="Yol">
+                <span>Sənəd generatoru</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span>Şirkətlər</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span className="dg-form-bc-current">{companyEditId ? "Redaktə" : "Yeni şirkət"}</span>
+              </nav>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelCompanyForm}>
+              Siyahı
+            </button>
+          </header>
+          <div className="dg-form-page-body">
+            <h2 className="rb-company-form-caption">
+              {companyEditId ? "Şirkəti redaktə et" : "Yeni şirkət"}
+            </h2>
+            <div className="rb-company-form-grid">
+              <section className="dg-form-inner-panel rb-company-form-card" aria-label="Rekvizitlər 1">
+                {companyProfileFields(
+                  companyDraft,
+                  (k, v) => setCompanyDraft((d) => ({ ...d, [k]: v })),
+                  COMPANY_FIELD_GROUPS.slice(0, 2),
+                )}
+              </section>
+              <section className="dg-form-inner-panel rb-company-form-card" aria-label="Rekvizitlər 2">
+                {companyProfileFields(
+                  companyDraft,
+                  (k, v) => setCompanyDraft((d) => ({ ...d, [k]: v })),
+                  COMPANY_FIELD_GROUPS.slice(2),
+                )}
+              </section>
+            </div>
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelCompanyForm}>
+                Bağla
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={saveCompanyForm}>
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const patchProjectDraftMeta = (key: keyof DocumentMeta, value: string) => {
+    setProjectDraft((d) => ({ ...d, meta: { ...d.meta, [key]: value } }));
+  };
+
+  const updateDraftRow = (id: string, patch: Partial<ProductRow>) => {
+    setProjectDraft((d) => ({
+      ...d,
+      rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  };
+
+  const removeDraftRow = (id: string) => {
+    setProjectDraft((d) => ({ ...d, rows: d.rows.filter((r) => r.id !== id) }));
+  };
+
+  const renderProjectsModule = () => (
+    <>
+      {projectMode === "list" ? (
+        <div className="dg-form-page pg-panel" aria-label="Təkliflər siyahısı">
+          <div className="dg-form-page-body">
+            {sortedProjects.length === 0 ? (
+              <p className="dg-muted dg-form-page-empty">Hələ təklif yoxdur — «Yeni təklif» ilə yaradın.</p>
+            ) : (
+              <div className="dg-table-wrap pg-grid-host">
+                <table className="dg-table dg-table--sales">
+                  <thead>
+                    <tr>
+                      <th className="dg-th-num">№</th>
+                      <th>Tarix</th>
+                      <th>Şirkət</th>
+                      <th>Təklif</th>
+                      <th className="dg-th-actions">Əməliyyatlar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedProjects.map((p, i) => {
+                      const co = workspace.companies.find((c) => c.id === p.companyId);
+                      return (
+                        <tr key={p.id}>
+                          <td className="dg-td-num">{i + 1}</td>
+                          <td>{formatDateAzLong(p.meta.invoiceDate)}</td>
+                          <td>{co?.profile.name ?? "—"}</td>
+                          <td>{p.title.trim() || "—"}</td>
+                          <td className="dg-td-actions">
+                            <div className="dg-icon-row">
+                              <button
+                                type="button"
+                                className="dg-icon-btn"
+                                title="Məlumat"
+                                aria-label="Məlumat"
+                                onClick={() => setInfoDialog({ kind: "project", id: p.id })}
+                              >
+                                <IconInfo />
+                              </button>
+                              <button
+                                type="button"
+                                className="dg-icon-btn"
+                                title="Redaktə"
+                                aria-label="Redaktə"
+                                onClick={() => startEditProject(p)}
+                              >
+                                <IconEdit />
+                              </button>
+                              <button
+                                type="button"
+                                className="dg-icon-btn dg-icon-btn-danger"
+                                title="Sil"
+                                aria-label="Sil"
+                                onClick={() => deleteProject(p)}
+                              >
+                                <IconTrash />
+                              </button>
+                              <button
+                                type="button"
+                                className="dg-icon-btn"
+                                title="Çap — sənəd seçin"
+                                aria-label="Çap"
+                                onClick={() => setPrintProjectId(p.id)}
+                              >
+                                <IconPrint />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="dg-form-page pg-panel" aria-label={projectEditId ? "Təklif redaktəsi" : "Yeni təklif"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">Təkliflər</h1>
+              <nav className="dg-form-bc" aria-label="Yol">
+                <span>Sənəd generatoru</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span>Təkliflər</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span className="dg-form-bc-current">{projectEditId ? "Redaktə" : "Yeni təklif"}</span>
+              </nav>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelProjectForm}>
+              Siyahı
+            </button>
+          </header>
+
+          <div className="dg-form-page-body dg-project-form-body">
+            <div className="dg-project-form-top-row dg-project-form-top-row--two">
+              <section className="dg-form-inner-panel dg-project-form-top-primary" aria-labelledby="dg-project-base-heading">
+                <h2 id="dg-project-base-heading" className="dg-form-inner-panel-title">
+                  Şirkət və hesab-faktura
+                </h2>
+                <div className="dg-form-meta-grid dg-form-meta-grid--project">
+                  <label className="dg-field">
+                    <span className="dg-label">Şirkət</span>
+                    <div className="dg-meta-with-action">
+                      <select
+                        className="dg-input"
+                        value={projectDraft.companyId}
+                        onChange={(e) => setProjectDraft((d) => ({ ...d, companyId: e.target.value }))}
+                      >
+                        <option value="">— seçin —</option>
+                        {workspace.companies.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.profile.name || c.profile.voen || c.id}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className="dg-btn dg-btn-primary dg-btn-square"
+                        title="Yeni şirkət"
+                        aria-label="Yeni şirkət əlavə et"
+                        onClick={openNewCompanyFromProject}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </label>
+                  <label className="dg-field">
+                    <span className="dg-label">Sənəd tarixi</span>
+                    <input
+                      className="dg-input"
+                      type="date"
+                      value={projectDraft.meta.invoiceDate}
+                      onChange={(e) => patchProjectDraftMeta("invoiceDate", e.target.value)}
+                    />
+                  </label>
+                  <label className="dg-field">
+                    <span className="dg-label">Təklifin adı</span>
+                    <input
+                      className="dg-input"
+                      value={projectDraft.title}
+                      onChange={(e) => setProjectDraft((d) => ({ ...d, title: e.target.value }))}
+                      placeholder="Məs: Yanvar təklifi — MMC «X»"
+                    />
+                  </label>
+                  <label className="dg-field">
+                    <span className="dg-label">Hesab-faktura № (avto)</span>
+                    <input
+                      className="dg-input"
+                      value={projectDraft.meta.invoiceNumber}
+                      readOnly
+                      placeholder="Saxlayanda avtomatik veriləcək"
+                    />
+                  </label>
+                </div>
+
+                <div className="dg-project-subpanel">
+                  <h3 className="dg-form-inner-panel-title dg-form-inner-panel-title--sm">Digər sənəd nömrələri</h3>
+                  <div className="dg-grid dg-grid-2 dg-project-extra-grid">
+                    <label className="dg-field">
+                      <span className="dg-label">Təhvil aktı №</span>
+                      <input
+                        className="dg-input"
+                        value={projectDraft.meta.deliveryActNumber}
+                        readOnly
+                        placeholder="Çap/Saxlama zamanı avtomatik veriləcək"
+                      />
+                    </label>
+                    <label className="dg-field">
+                      <span className="dg-label">Protokol №</span>
+                      <input
+                        className="dg-input"
+                        value={projectDraft.meta.protocolNumber}
+                        readOnly
+                        placeholder="Çap zamanı avtomatik veriləcək"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              <section className="dg-form-inner-panel" aria-labelledby="dg-contract-heading">
+                <h2 id="dg-contract-heading" className="dg-form-inner-panel-title dg-form-inner-panel-title--sm">
+                  ƏDV, müqavilə və təhvil
+                </h2>
+                <div className="dg-grid dg-grid-2 dg-form-split-grid dg-project-contract-grid">
+                  <label className="dg-field">
+                    <span className="dg-label">ƏDV % (0 = yoxdur)</span>
+                    <input
+                      className="dg-input dg-input-short"
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={projectDraft.vatPercent}
+                      onChange={(e) => setProjectDraft((d) => ({ ...d, vatPercent: Number(e.target.value) || 0 }))}
+                    />
+                  </label>
+                  <label className="dg-field">
+                    <span className="dg-label">Müqavilə №</span>
+                    <input
+                      className="dg-input"
+                      value={projectDraft.meta.contractNumber}
+                      onChange={(e) => patchProjectDraftMeta("contractNumber", e.target.value)}
+                    />
+                  </label>
+                  <label className="dg-field dg-field--full-row">
+                    <span className="dg-label">Müqavilə tarixi</span>
+                    <input
+                      className="dg-input"
+                      type="date"
+                      value={projectDraft.meta.contractDate}
+                      onChange={(e) => patchProjectDraftMeta("contractDate", e.target.value)}
+                    />
+                  </label>
+                </div>
+                <label className="dg-field">
+                  <span className="dg-label">Təhvil yeri</span>
+                  <textarea
+                    className="dg-input dg-input-textarea-compact"
+                    rows={2}
+                    value={projectDraft.meta.deliveryPlace}
+                    onChange={(e) => patchProjectDraftMeta("deliveryPlace", e.target.value)}
+                  />
+                </label>
+                <label className="dg-field">
+                  <span className="dg-label">Təhvil əsası</span>
+                  <textarea
+                    className="dg-input dg-input-textarea-compact"
+                    rows={2}
+                    value={projectDraft.meta.deliveryBasis}
+                    onChange={(e) => patchProjectDraftMeta("deliveryBasis", e.target.value)}
+                  />
+                </label>
+              </section>
+
+            </div>
+
+            <section className="dg-form-inner-panel" aria-labelledby="dg-products-heading">
+              <h2 id="dg-products-heading" className="dg-form-inner-panel-title">
+                Məhsullar və qiymətlər
+              </h2>
+              <div className="dg-product-toolbar">
+                <input
+                  type="search"
+                  className="dg-input dg-product-search"
+                  placeholder="Məhsul adı — Enter ilə sətir əlavə edin"
+                  value={projectProductSearch}
+                  onChange={(e) => setProjectProductSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addProductRowFromSearch();
+                    }
+                  }}
+                  aria-label="Məhsul adı ilə yeni sətir"
+                />
+                <button type="button" className="dg-btn dg-btn-primary" onClick={addProductRowFromSearch}>
+                  Əlavə et
+                </button>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => setProjectDraft((d) => ({ ...d, rows: [...d.rows, newProductRow()] }))}
+                >
+                  Boş sətir
+                </button>
+              </div>
+              <div className="dg-table-wrap pg-grid-host dg-project-lines-wrap">
+                <table className="dg-table dg-table--sales">
+                  <thead>
+                    <tr>
+                      <th className="dg-th-num">№</th>
+                      <th>Məhsul</th>
+                      <th>Vahid</th>
+                      <th>Miqdar</th>
+                      <th>Vahid qiymət</th>
+                      <th>Məbləğ</th>
+                      <th className="dg-th-actions" title="Əməliyyatlar">
+                        Sil
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projectDraft.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="dg-empty-cell">
+                          Sətir əlavə edin və ya yuxarıda məhsul adı yazın.
+                        </td>
+                      </tr>
+                    ) : (
+                      projectDraft.rows.map((r, idx) => (
+                        <tr key={r.id}>
+                          <td className="dg-td-num">{idx + 1}</td>
+                          <td>
+                            <input
+                              className="dg-input dg-input-table"
+                              value={r.name}
+                              onChange={(e) => updateDraftRow(r.id, { name: e.target.value })}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="dg-input dg-input-table dg-input-narrow"
+                              value={r.unit}
+                              onChange={(e) => updateDraftRow(r.id, { unit: e.target.value })}
+                            />
+                          </td>
+                          <td>
+                            <div className="dg-qty-wrap">
+                              <button
+                                type="button"
+                                className="dg-qty-btn"
+                                aria-label="Azalt"
+                                onClick={() =>
+                                  updateDraftRow(r.id, { qty: Math.max(0, Number(r.qty) - 1) })
+                                }
+                              >
+                                −
+                              </button>
+                              <input
+                                className="dg-input dg-qty-input"
+                                type="number"
+                                min={0}
+                                step="any"
+                                value={r.qty}
+                                onChange={(e) =>
+                                  updateDraftRow(r.id, { qty: Number(e.target.value) || 0 })
+                                }
+                              />
+                              <button
+                                type="button"
+                                className="dg-qty-btn"
+                                aria-label="Artır"
+                                onClick={() =>
+                                  updateDraftRow(r.id, { qty: Number(r.qty) + 1 })
+                                }
+                              >
+                                +
+                              </button>
+                            </div>
+                          </td>
+                          <td>
+                            <input
+                              className="dg-input dg-input-table dg-input-num"
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={r.unitPrice}
+                              onChange={(e) =>
+                                updateDraftRow(r.id, { unitPrice: Number(e.target.value) || 0 })
+                              }
+                            />
+                          </td>
+                          <td className="dg-num">{formatMoney(r.qty * r.unitPrice)}</td>
+                          <td className="dg-td-actions">
+                            <button
+                              type="button"
+                              className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
+                              aria-label="Sil"
+                              title="Sil"
+                              onClick={() => removeDraftRow(r.id)}
+                            >
+                              <IconTrash />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <aside
+              className="dg-project-summary-aside dg-form-inner-panel dg-project-summary-below-products"
+              aria-label="Yekunlar"
+            >
+              <h2 className="dg-form-inner-panel-title dg-form-inner-panel-title--sm">Yekun</h2>
+              <div className="dg-sales-summary">
+                <div className="dg-sales-summary-row">
+                  <span>Ara cəm</span>
+                  <span>{formatMoney(draftTotals.subtotal)}</span>
+                </div>
+                {draftTotals.vatRate > 0 ? (
+                  <div className="dg-sales-summary-row">
+                    <span>
+                      ƏDV ({draftTotals.vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%)
+                    </span>
+                    <span>{formatMoney(draftTotals.vatAmount)}</span>
+                  </div>
+                ) : null}
+                <div className="dg-sales-summary-row dg-sales-summary-row--grand">
+                  <span>Yekun məbləğ</span>
+                  <span>
+                    {formatMoney(
+                      draftTotals.vatRate > 0 ? draftTotals.grandTotal : draftTotals.subtotal,
+                    )}
+                  </span>
+                </div>
+              </div>
+            </aside>
+
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelProjectForm}>
+                Bağla
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={saveProjectForm}>
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
+  const renderSettingsModule = () => (
+    <div className="dg-form-page pg-panel" aria-label="Ayarlar">
+      <header className="dg-form-page-head">
+        <div>
+          <h1 className="dg-form-page-title">Ayarlar</h1>
+          <nav className="dg-form-bc" aria-label="Yol">
+            <span>Sənəd generatoru</span>
+            <span className="dg-form-bc-sep" aria-hidden>
+              ›
+            </span>
+            <span className="dg-form-bc-current">Ayarlar</span>
+          </nav>
+        </div>
+      </header>
+      <div className="dg-form-page-body">
+        <h2 className="dg-form-inner-panel-title">Satıcı rekvizitləri</h2>
+        <div className="rb-company-form-grid">
+          <section className="dg-form-inner-panel rb-company-form-card" aria-label="Satıcı rekvizitləri 1">
+            {companyProfileFields(workspace.settings.seller, patchSellerSettings, COMPANY_FIELD_GROUPS.slice(0, 2))}
+          </section>
+          <section className="dg-form-inner-panel rb-company-form-card" aria-label="Satıcı rekvizitləri 2">
+            {companyProfileFields(workspace.settings.seller, patchSellerSettings, COMPANY_FIELD_GROUPS.slice(2))}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+
+  const [activeFolderId, setActiveFolderId] = useState<string>("");
+  const [folderView, setFolderView] = useState<"grid" | "folder">("grid");
+  const [folderMenu, setFolderMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    kind: "folder" | "root";
+    folderId?: string;
+    companyId?: string;
+  }>(() => ({
+    open: false,
+    x: 0,
+    y: 0,
+    kind: "folder",
+    folderId: undefined,
+    companyId: undefined,
+  }));
+
+  const foldersByCompany = useMemo(() => {
+    const m = new Map<string, WorkspaceFolderRecord>();
+    for (const f of (workspace.folders ?? []).filter((x) => x.kind === "company" && x.companyId)) {
+      m.set(f.companyId!, f as WorkspaceFolderRecord);
+    }
+    return m;
+  }, [workspace.folders]);
+
+  const folderById = useMemo(() => {
+    const m = new Map<string, WorkspaceFolderRecord>();
+    for (const f of workspace.folders ?? []) m.set(f.id, f as WorkspaceFolderRecord);
+    return m;
+  }, [workspace.folders]);
+
+  const customFolders = useMemo(() => {
+    return (workspace.folders ?? []).filter((f) => (f as WorkspaceFolderRecord).kind === "custom") as WorkspaceFolderRecord[];
+  }, [workspace.folders]);
+
+  const onUploadToFolder = async (folderId: string, filesList: FileList | null) => {
+    if (!folderId || !filesList || filesList.length === 0) return;
+    const files = Array.from(filesList);
+    const reads = await Promise.all(
+      files.map(
+        (f) =>
+          new Promise<{ name: string; mime: string; size: number; dataUrl: string }>((resolve, reject) => {
+            const r = new FileReader();
+            r.onerror = () => reject(new Error("read"));
+            r.onload = () => resolve({ name: f.name, mime: f.type || "application/octet-stream", size: f.size, dataUrl: String(r.result || "") });
+            r.readAsDataURL(f);
+          }),
+      ),
+    );
+    setWorkspace((w) => ({
+      ...w,
+      folders: (w.folders ?? []).map((fold) => {
+        if (fold.id !== folderId) return fold;
+        const now = Date.now();
+        return {
+          ...fold,
+          updatedAt: now,
+          files: [
+            ...(fold.files ?? []),
+            ...reads.map((x) => ({ id: crypto.randomUUID(), name: x.name, mime: x.mime, size: x.size, createdAt: now, dataUrl: x.dataUrl })),
+          ],
+        };
+      }),
+    }));
+    flash(setToast, "Fayllar əlavə olundu");
+  };
+
+  const deleteFolderFile = async (folderId: string, fileId: string) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: "Bu fayl silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({
+      ...w,
+      folders: (w.folders ?? []).map((fold) =>
+        fold.id !== folderId ? fold : { ...fold, updatedAt: Date.now(), files: (fold.files ?? []).filter((x) => x.id !== fileId) },
+      ),
+    }));
+    flash(setToast, "Fayl silindi");
+  };
+
+  const deleteCompanyFolder = async (cid: string) => {
+    const companyName = workspace.companies.find((c) => c.id === cid)?.profile.name || "Qovluq";
+    const ok = await askConfirm({
+      title: "Qovluq silinsin?",
+      message: `«${companyName}» qovluğu və içindəki bütün fayllar silinsin?`,
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => !(f.kind === "company" && f.companyId === cid)) }));
+    setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+    flash(setToast, "Qovluq silindi");
+  };
+
+  const deleteCustomFolder = async (fid: string) => {
+    const name = folderById.get(fid)?.name || "Qovluq";
+    const ok = await askConfirm({
+      title: "Qovluq silinsin?",
+      message: `«${name}» qovluğu və içindəki bütün fayllar silinsin?`,
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => f.id !== fid) }));
+    if (activeFolderId === fid) setActiveFolderId("");
+    setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+    flash(setToast, "Qovluq silindi");
+  };
+
+  const createCustomFolder = async () => {
+    const name = (await askPrompt({
+      title: "Yeni qovluq",
+      label: "Qovluğun adı",
+      defaultValue: "Yeni qovluq",
+      confirmLabel: "Yarat",
+      cancelLabel: "Ləğv et",
+    }))?.trim();
+    if (!name) return;
+    const now = Date.now();
+    setWorkspace((w) => ({
+      ...w,
+      folders: [...(w.folders ?? []), { id: crypto.randomUUID(), kind: "custom" as const, name, createdAt: now, updatedAt: now, files: [] }],
+    }));
+    flash(setToast, "Qovluq yaradıldı");
+  };
+
+  const renderFoldersModule = () => {
+    const companies = sortedCompanies;
+    const folder = activeFolderId ? folderById.get(activeFolderId) : undefined;
+    const anyFoldersExist = (workspace.folders ?? []).length > 0;
+    return (
+      <div className="dg-form-page pg-panel" aria-label="Qovluqlar">
+        <header className="dg-form-page-head">
+          <div>
+            <h1 className="dg-form-page-title">Qovluqlar</h1>
+            <p className="dg-page-desc">Şirkətlər və manual qovluqlar üzrə imzalanmış / skan edilmiş sənədləri saxlayın.</p>
+          </div>
+        </header>
+        <div className="dg-form-page-body">
+          {companies.length === 0 ? (
+            <div className="dg-empty-state-card" role="status" aria-label="Boş vəziyyət">
+              <div className="dg-empty-state-title">Əvvəl şirkət əlavə edin</div>
+              <div className="dg-empty-state-desc">
+                Qovluqlar bölməsindən istifadə etmək üçün əvvəlcə Şirkətlər bölməsində şirkət yaradılmalıdır.
+              </div>
+              <div className="dg-empty-state-actions">
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  onClick={() => {
+                    setModule("companies");
+                    setFolderView("grid");
+                  }}
+                >
+                  Şirkətlərə keç
+                </button>
+              </div>
+            </div>
+          ) : folderView === "grid" ? (
+            <>
+              <div className="dg-folders-toolbar" aria-label="Qovluqlar alət paneli">
+                <div className="dg-folders-toolbar-left">
+                  <input className="dg-input dg-folders-search" type="search" placeholder="Qovluqlarda axtar..." aria-label="Qovluqlarda axtar" />
+                </div>
+                <div className="dg-folders-toolbar-right">
+                  <button type="button" className="dg-btn dg-btn-primary" onClick={() => createCustomFolder()}>
+                    Yeni qovluq
+                  </button>
+                </div>
+              </div>
+
+              {!anyFoldersExist ? (
+                <div className="dg-empty-state-card" role="status">
+                  <div className="dg-empty-state-title">Hələ qovluq yoxdur</div>
+                  <div className="dg-empty-state-desc">Yeni qovluq yaradaraq sənədləri qruplaşdırın.</div>
+                </div>
+              ) : null}
+              <div
+                className="dg-folder-grid"
+                role="list"
+                aria-label="Qovluqlar"
+                onContextMenu={(e) => {
+                  if (e.target !== e.currentTarget) return;
+                  e.preventDefault();
+                  setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "root" });
+                }}
+              >
+                {customFolders.map((cf) => (
+                  <button
+                    key={cf.id}
+                    type="button"
+                    className="dg-folder-tile"
+                    role="listitem"
+                    onDoubleClick={() => {
+                      setActiveFolderId(cf.id);
+                      setFolderView("folder");
+                    }}
+                    onClick={() => setActiveFolderId(cf.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setActiveFolderId(cf.id);
+                      setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "folder", folderId: cf.id });
+                    }}
+                    title="Açmaq üçün iki dəfə klik"
+                  >
+                    <div className="dg-folder-icon-wrap" aria-hidden>
+                      <IconFolder />
+                    </div>
+                    <div className="dg-folder-name">{cf.name || "Qovluq"}</div>
+                  </button>
+                ))}
+                {companies.map((c) => {
+                  const f = foldersByCompany.get(c.id);
+                  const thumbs = (f?.files ?? [])
+                    .slice()
+                    .sort((a, b) => b.createdAt - a.createdAt)
+                    .slice(0, 4);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="dg-folder-tile"
+                      role="listitem"
+                      onDoubleClick={() => {
+                        if (f?.id) setActiveFolderId(f.id);
+                        setFolderView("folder");
+                      }}
+                      onClick={() => f?.id && setActiveFolderId(f.id)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        if (f?.id) setActiveFolderId(f.id);
+                        setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "folder", folderId: f?.id, companyId: c.id });
+                      }}
+                      title="Açmaq üçün iki dəfə klik"
+                    >
+                      <div className="dg-folder-icon-wrap" aria-hidden>
+                        <IconFolder />
+                        {thumbs.length > 0 ? (
+                          <div className="dg-folder-thumbgrid">
+                            {thumbs.map((t) => (
+                              <div key={t.id} className="dg-folder-thumbcell">
+                                {t.mime.startsWith("image/") ? (
+                                  <img src={t.dataUrl} alt="" loading="lazy" />
+                                ) : (
+                                  <div className="dg-folder-thumbbadge">{t.mime === "application/pdf" ? "PDF" : "FILE"}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="dg-folder-name">{c.profile.name || c.profile.voen || "Şirkət"}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {folderMenu.open ? (
+                <div
+                  className="dg-context-menu-backdrop"
+                  onMouseDown={() => setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined })}
+                  aria-hidden
+                >
+                  <div
+                    className="dg-context-menu"
+                    style={{ left: folderMenu.x, top: folderMenu.y }}
+                    role="menu"
+                    aria-label="Qovluq menyusu"
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className="dg-context-item"
+                      role="menuitem"
+                      onClick={() => {
+                        if (folderMenu.kind === "root") {
+                          setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+                          createCustomFolder();
+                          return;
+                        }
+                        if (folderMenu.folderId) setActiveFolderId(folderMenu.folderId);
+                        setFolderView("folder");
+                        setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+                      }}
+                    >
+                      {folderMenu.kind === "root" ? "Yeni qovluq" : "Aç"}
+                    </button>
+                    {folderMenu.kind === "folder" ? (
+                      <button
+                        type="button"
+                        className="dg-context-item dg-context-item-danger"
+                        role="menuitem"
+                        onClick={() => {
+                          if (folderMenu.companyId) deleteCompanyFolder(folderMenu.companyId);
+                          else if (folderMenu.folderId) deleteCustomFolder(folderMenu.folderId);
+                        }}
+                      >
+                        Sil
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <div className="dg-folder-head">
+                <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setFolderView("grid")}>
+                  ← Geri
+                </button>
+                <div className="dg-folder-head-title">
+                  {folder?.kind === "company"
+                    ? sortedCompanies.find((c) => c.id === folder.companyId)?.profile.name || folder.name || "Qovluq"
+                    : folder?.name || "Qovluq"}
+                </div>
+              </div>
+
+              <div className="dg-grid dg-grid-2">
+                <label className="dg-field">
+                  <span className="dg-label">Fayl əlavə et (PDF/JPG/PNG)</span>
+                  <input
+                    className="dg-input"
+                    type="file"
+                    multiple
+                    accept="application/pdf,image/*"
+                    onChange={(e) => {
+                      if (folder) onUploadToFolder(folder.id, e.target.files);
+                      // eyni faylı təkrar seçəndə də change işləsin
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+              </div>
+
+              {!folder || (folder.files ?? []).length === 0 ? (
+                <div className="dg-empty-card" role="status">
+                  Bu qovluqda hələ fayl yoxdur.
+                </div>
+              ) : (
+                <div className="dg-file-grid" role="list" aria-label="Qovluq faylları">
+                  {[...folder.files]
+                    .sort((a, b) => b.createdAt - a.createdAt)
+                    .map((f) => {
+                      const isImg = f.mime.startsWith("image/");
+                      const isPdf = f.mime === "application/pdf";
+                      return (
+                        <div key={f.id} className="dg-file-tile" role="listitem">
+                          <a className="dg-file-thumb" href={f.dataUrl} target="_blank" rel="noreferrer" title="Aç">
+                            {isImg ? <img src={f.dataUrl} alt={f.name} loading="lazy" /> : <span className="dg-file-thumb-badge">{isPdf ? "PDF" : "FILE"}</span>}
+                          </a>
+                          <div className="dg-file-meta">
+                            <div className="dg-file-name" title={f.name}>
+                              {f.name}
+                            </div>
+                            <div className="dg-file-sub">
+                              {new Date(f.createdAt).toLocaleDateString("az-AZ")} · {Math.round((f.size / 1024) * 10) / 10} KB
+                            </div>
+                          </div>
+                          <div className="dg-file-actions">
+                            <a className="dg-btn dg-btn-secondary" href={f.dataUrl} target="_blank" rel="noreferrer">
+                              Aç
+                            </a>
+                            <a className="dg-btn dg-btn-secondary" href={f.dataUrl} download={f.name}>
+                              Endir
+                            </a>
+                            <button type="button" className="dg-btn dg-btn-danger" onClick={() => folder && deleteFolderFile(folder.id, f.id)}>
+                              Sil
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const headerPrimaryAction =
+    module === "companies" && companyMode === "list"
+      ? { label: "Yeni şirkət", onClick: startNewCompany }
+      : module === "projects" && projectMode === "list"
+        ? { label: "Yeni təklif", onClick: startNewProject }
+        : null;
+
+  const modalLayer = (
+    <>
+      {printProjectId ? (
+        <dialog ref={printDialogRef} className="dg-modal" onClose={() => setPrintProjectId(null)}>
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">Çap — sənəd seçin</h2>
+            <p className="dg-modal-hint">Satıcı Ayarlardan, alıcı təklifdə seçilmiş şirkətdən götürülür.</p>
+            <div className="dg-print-picker" role="group" aria-label="Sənəd seçimləri">
+              <div className="dg-print-picker-head">
+                <div>Sənəd</div>
+                <div>Çap</div>
+                <div>PDF</div>
+              </div>
+              <div className="dg-print-picker-row">
+                <div className="dg-print-picker-name">Hesab-faktura</div>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  onClick={() => printProjectId && runExport(printProjectId, "invoice", "print")}
+                >
+                  Çap et
+                </button>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => printProjectId && runExport(printProjectId, "invoice", "pdf")}
+                >
+                  Endir
+                </button>
+              </div>
+              <div className="dg-print-picker-row">
+                <div className="dg-print-picker-name">Təhvil aktı</div>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  onClick={() => printProjectId && runExport(printProjectId, "delivery", "print")}
+                >
+                  Çap et
+                </button>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => printProjectId && runExport(printProjectId, "delivery", "pdf")}
+                >
+                  Endir
+                </button>
+              </div>
+              <div className="dg-print-picker-row">
+                <div className="dg-print-picker-name">Qiymətsiz təhvil aktı</div>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  onClick={() => printProjectId && runExport(printProjectId, "deliveryNoPrice", "print")}
+                >
+                  Çap et
+                </button>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => printProjectId && runExport(printProjectId, "deliveryNoPrice", "pdf")}
+                >
+                  Endir
+                </button>
+              </div>
+              <div className="dg-print-picker-row">
+                <div className="dg-print-picker-name">Protokol</div>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  onClick={() => printProjectId && runExport(printProjectId, "protocol", "print")}
+                >
+                  Çap et
+                </button>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => printProjectId && runExport(printProjectId, "protocol", "pdf")}
+                >
+                  Endir
+                </button>
+              </div>
+            </div>
+
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => closePrintDialog()}>
+                Bağla
+              </button>
+            </div>
+          </div>
+        </dialog>
+      ) : null}
+
+      <dialog ref={infoDialogRef} className="dg-modal dg-modal-info" onClose={() => setInfoDialog(null)}>
+        <div className="dg-modal-body">
+          {infoDialog?.kind === "company" && infoCompany ? (
+            <>
+              <h2 className="dg-modal-title">Şirkət məlumatı</h2>
+              <dl className="dg-info-dl">
+                {companyInfoLines(infoCompany.profile).map((line) => (
+                  <div key={line.label} className="dg-info-row">
+                    <dt>{line.label}</dt>
+                    <dd>{line.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          ) : null}
+          {infoDialog?.kind === "project" && infoProject ? (
+            <>
+              <h2 className="dg-modal-title">Təklif məlumatı</h2>
+              <dl className="dg-info-dl">
+                <div className="dg-info-row">
+                  <dt>Təklif</dt>
+                  <dd>{infoProject.title}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Tarix</dt>
+                  <dd>{formatDateAzLong(infoProject.meta.invoiceDate)}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Şirkət</dt>
+                  <dd>{infoProjectBuyer?.name ?? "—"}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Sətir sayı</dt>
+                  <dd>{infoProject.rows.length}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>H/F №</dt>
+                  <dd>{infoProject.meta.invoiceNumber || "—"}</dd>
+                </div>
+              </dl>
+              <div className="dg-info-section-title">Məhsullar</div>
+              <div className="dg-info-table-wrap">
+                <table className="dg-info-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 54 }} className="dg-num">
+                        №
+                      </th>
+                      <th>Məhsul</th>
+                      <th style={{ width: 90 }}>Vahid</th>
+                      <th style={{ width: 90 }} className="dg-num">
+                        Miqdar
+                      </th>
+                      <th style={{ width: 140 }} className="dg-num">
+                        Qiymət
+                      </th>
+                      <th style={{ width: 160 }} className="dg-num">
+                        Məbləğ
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {infoProject.rows.map((r, idx) => (
+                      <tr key={r.id}>
+                        <td className="dg-num">{idx + 1}</td>
+                        <td>{r.name || "—"}</td>
+                        <td>{r.unit || "—"}</td>
+                        <td className="dg-num">{r.qty}</td>
+                        <td className="dg-num">{formatMoney(r.unitPrice)}</td>
+                        <td className="dg-num">{formatMoney(r.qty * r.unitPrice)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {(() => {
+                const pack = workspaceToGeneratorState(workspace, { ...infoProject, companyId: infoProject.companyId });
+                const t = computeTotals(pack);
+                return (
+                  <div className="dg-info-totals" aria-label="Yekunlar">
+                    <div className="k">Ara cəm</div>
+                    <div className="v">{formatMoney(t.subtotal)}</div>
+                    {t.vatRate > 0 ? (
+                      <>
+                        <div className="k">ƏDV ({t.vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%)</div>
+                        <div className="v">{formatMoney(t.vatAmount)}</div>
+                      </>
+                    ) : null}
+                    <div className="k">Yekun</div>
+                    <div className="v">{formatMoney(t.vatRate > 0 ? t.grandTotal : t.subtotal)}</div>
+                  </div>
+                );
+              })()}
+            </>
+          ) : null}
+          <button type="button" className="dg-btn dg-btn-primary dg-btn-block dg-modal-close" onClick={() => infoDialogRef.current?.close()}>
+            Bağla
+          </button>
+        </div>
+      </dialog>
+
+      {confirmDialog ? (
+        <dialog ref={confirmDialogRef} className="dg-modal" onClose={() => resolveConfirm(false)}>
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">{confirmDialog.title}</h2>
+            <p className="dg-modal-hint">{confirmDialog.message}</p>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => resolveConfirm(false)}>
+                {confirmDialog.cancelLabel ?? "Ləğv et"}
+              </button>
+              <button
+                type="button"
+                className={`dg-btn ${confirmDialog.danger ? "dg-btn-danger" : "dg-btn-primary"}`}
+                onClick={() => resolveConfirm(true)}
+              >
+                {confirmDialog.confirmLabel ?? "Təsdiqlə"}
+              </button>
+            </div>
+          </div>
+        </dialog>
+      ) : null}
+
+      {promptDialog ? (
+        <dialog ref={promptDialogRef} className="dg-modal" onClose={() => resolvePrompt(null)}>
+          <form
+            className="dg-modal-body"
+            onSubmit={(e) => {
+              e.preventDefault();
+              resolvePrompt(promptInputRef.current?.value ?? "");
+            }}
+          >
+            <h2 className="dg-modal-title">{promptDialog.title}</h2>
+            <label className="dg-field">
+              <span className="dg-label">{promptDialog.label}</span>
+              <input ref={promptInputRef} className="dg-input" defaultValue={promptDialog.defaultValue ?? ""} />
+            </label>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => resolvePrompt(null)}>
+                {promptDialog.cancelLabel ?? "Ləğv et"}
+              </button>
+              <button type="submit" className="dg-btn dg-btn-primary">
+                {promptDialog.confirmLabel ?? "OK"}
+              </button>
+            </div>
+          </form>
+        </dialog>
+      ) : null}
+    </>
+  );
+
+  return (
+    <>
+      <div className="pg-root biz-ui rb-desktop">
+        <button
+          type="button"
+          className={`rb-sidebar-backdrop ${sidebarOpen ? "is-visible" : ""}`}
+          aria-label="Menyunu bağla"
+          tabIndex={sidebarOpen ? 0 : -1}
+          onClick={() => setSidebarOpen(false)}
+        />
+
+        <div className="rb-shell">
+          <aside className={`rb-sidebar ${sidebarOpen ? "is-open" : ""}`} aria-label="Modullar">
+            <div className="rb-profile-card">
+              <div className="rb-profile-avatar" aria-hidden>
+                <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                  <circle cx="20" cy="20" r="20" fill="rgba(255,255,255,0.12)" />
+                  <circle cx="20" cy="16" r="7" fill="rgba(255,255,255,0.9)" />
+                  <path d="M7.5 36.5c2.7-6.7 8.2-10 12.5-10s9.8 3.3 12.5 10" fill="rgba(255,255,255,0.9)" />
+                </svg>
+              </div>
+              <div className="rb-profile-meta">
+                <div className="rb-profile-name">GenDoc</div>
+                <div className="rb-profile-sub">Sənəd generatoru</div>
+              </div>
+            </div>
+
+            <p className="rb-menu-section">Modullar</p>
+            <nav className="rb-menu" aria-label="Əsas modullar">
+              {filteredMainNavIds.map((id) => {
+                const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}`}
+                    onClick={() => {
+                      cancelCompanyForm();
+                      cancelProjectForm();
+                      setModule(m.id);
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    <span className="rb-menu-icon">
+                      <SidebarNavIcon mod={m.id} />
+                    </span>
+                    <span>{m.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <p className="rb-menu-section">Sistem</p>
+            <nav className="rb-menu" aria-label="Sistem ayarları">
+              <button
+                type="button"
+                className={`rb-menu-item ${module === "settings" ? "is-active" : ""}`}
+                onClick={() => {
+                  cancelCompanyForm();
+                  cancelProjectForm();
+                  setModule("settings");
+                  setSidebarOpen(false);
+                }}
+              >
+                <span className="rb-menu-icon">
+                  <SidebarNavIcon mod="settings" />
+                </span>
+                <span>Ayarlar</span>
+              </button>
+            </nav>
+
+            <div className="rb-sidebar-spacer" aria-hidden />
+            <button type="button" className="rb-menu-item rb-menu-item-logout" onClick={() => setSidebarOpen(false)}>
+              <span className="rb-menu-icon">
+                <IconLogout />
+              </span>
+              <span>Logout</span>
+            </button>
+          </aside>
+
+          <section className="rb-workspace">
+            <header className="rb-topbar">
+              <div className="rb-topbar-leading">
+                <button
+                  type="button"
+                  className="rb-sidebar-toggle"
+                  aria-label="Menyunu aç"
+                  onClick={() => setSidebarOpen(true)}
+                >
+                  <IconMenuBars />
+                </button>
+                <div className="rb-page-title">
+                  <h1>{workspaceHeader.title}</h1>
+                </div>
+              </div>
+              <div className="rb-topbar-tools">
+                <div className="rb-search-with-action">
+                  <div className="rb-search-box" role="search">
+                    <IconSearchSidebar />
+                    <input
+                      ref={navSearchRef}
+                      type="search"
+                      placeholder="Modullarda süzgəc..."
+                      value={navSearch}
+                      onChange={(e) => setNavSearch(e.target.value)}
+                      aria-label="Modullarda süzgəc"
+                    />
+                  </div>
+                  {headerPrimaryAction ? (
+                    <button type="button" className="dg-btn dg-btn-primary" onClick={headerPrimaryAction.onClick}>
+                      {headerPrimaryAction.label}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </header>
+
+            <main className="rb-content">
+              {toast ? (
+                <div className="dg-toast" role="status">
+                  {toast}
+                </div>
+              ) : null}
+
+              {module === "companies" ? renderCompaniesModule() : null}
+              {module === "projects" ? renderProjectsModule() : null}
+              {module === "folders" ? renderFoldersModule() : null}
+              {module === "settings" ? renderSettingsModule() : null}
+            </main>
+          </section>
+        </div>
+      </div>
+      {createPortal(<div className="biz-ui biz-portal-modals">{modalLayer}</div>, document.body)}
+    </>
+  );
+}

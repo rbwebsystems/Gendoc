@@ -1,0 +1,766 @@
+/* GenDoc — Orders Screen style */
+
+.rb-desktop {
+  /* Workspace background tuned for table readability */
+  --rb-bg: #d3d9e2;
+  --rb-card: #ffffff;
+  --rb-border: rgba(15, 23, 42, 0.1);
+  --rb-text: #0f172a;
+  --rb-muted: #64748b;
+
+  /* Layout surfaces (match provided mock) */
+  --rb-surface: #ffffff;
+  --rb-surface-border: rgba(15, 23, 42, 0.08);
+  --rb-soft-shadow: 0 26px 70px rgba(15, 23, 42, 0.16);
+  --rb-card-soft: rgba(15, 23, 42, 0.03);
+  --rb-card-border: rgba(15, 23, 42, 0.08);
+
+  --rb-sidebar: #1f5a70;
+  --rb-sidebar-deep: #174a5e;
+  --rb-sidebar-text: rgba(255, 255, 255, 0.92);
+  --rb-sidebar-muted: rgba(255, 255, 255, 0.68);
+  --rb-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --rb-sidebar-active: rgba(255, 255, 255, 0.14);
+
+  --rb-radius: 14px;
+  --rb-shadow: 0 10px 30px rgba(15, 23, 42, 0.16);
+
+  box-sizing: border-box;
+  color: var(--rb-text);
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #0b0f16;
+}
+
+.rb-desktop *,
+.rb-desktop *::before,
+.rb-desktop *::after {
+  box-sizing: inherit;
+}
+
+.rb-shell {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  background: transparent;
+  padding: 16px;
+  gap: 14px;
+}
+
+.rb-sidebar {
+  min-height: 0;
+  padding: 14px 12px;
+  border-radius: var(--rb-radius);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0b0f16;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--rb-shadow);
+}
+
+.rb-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.rb-profile-avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.rb-profile-avatar svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.rb-profile-name {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--rb-sidebar-text);
+}
+
+.rb-profile-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--rb-sidebar-muted);
+}
+
+.rb-menu-section {
+  margin: 4px 0 2px;
+  padding: 0 11px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.rb-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.rb-menu-item {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--rb-sidebar-text);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.rb-menu-item:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--rb-sidebar-hover);
+}
+
+.rb-menu-item.is-active {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: var(--rb-sidebar-active);
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.rb-menu-icon {
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rb-menu-icon .dg-nav-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.rb-sidebar-spacer {
+  margin-top: auto;
+}
+
+.rb-menu-item-logout {
+  opacity: 0.92;
+}
+
+.rb-workspace {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid var(--rb-surface-border);
+  background: var(--rb-surface);
+  box-shadow: var(--rb-soft-shadow);
+}
+
+.rb-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  min-height: 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  flex-wrap: nowrap;
+}
+
+.rb-topbar-leading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.rb-sidebar-toggle {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 30px;
+  margin-top: 0;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(126, 177, 216, 0.85);
+  background: linear-gradient(to bottom, #ffffff, #e3f2ff 48%, #d4e9fb 52%, #f8fcff);
+  color: #143f68;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.rb-sidebar-toggle:hover {
+  border-color: #5fa6e0;
+}
+
+.rb-page-title {
+  min-width: 0;
+}
+
+.rb-page-title h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--rb-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rb-page-title p {
+  margin: 1px 0 0;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--rb-muted);
+  max-width: 52ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rb-topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.rb-search-with-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  max-width: min(100%, 520px);
+}
+
+.rb-search-box {
+  width: min(260px, 42vw);
+  flex: 1 1 auto;
+  min-width: 140px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(15, 23, 42, 0.04);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+  font-size: 13px;
+  color: var(--rb-muted);
+}
+
+.rb-search-box svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.rb-search-box input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: var(--rb-text);
+}
+
+.rb-search-box input::placeholder {
+  color: var(--rb-muted);
+}
+
+.rb-content {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: transparent;
+}
+
+.rb-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .rb-shell {
+    grid-template-columns: 210px 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .rb-shell {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+
+  .rb-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    margin: 0;
+    padding: 0;
+    border: none;
+    appearance: none;
+    background: rgba(15, 23, 42, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .rb-sidebar-backdrop.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .rb-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 50;
+    width: min(280px, 86vw);
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    box-shadow: 8px 0 28px rgba(0, 0, 0, 0.18);
+  }
+
+  .rb-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .rb-sidebar-toggle {
+    display: inline-flex;
+  }
+
+  .rb-topbar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .rb-topbar-tools {
+    flex: 1 1 100%;
+    margin-left: 0;
+    min-width: 0;
+  }
+
+  .rb-search-with-action {
+    width: 100%;
+    max-width: none;
+  }
+
+  .rb-search-box {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 100px;
+  }
+}
+
+@media (min-width: 768px) {
+  .rb-sidebar-backdrop {
+    display: none !important;
+  }
+}
+
+/* Controls */
+.rb-desktop .dg-btn,
+.rb-desktop .pg-btn-primary {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(15, 23, 42, 0.04);
+  box-shadow: none;
+  color: rgba(15, 23, 42, 0.88);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 160ms ease;
+}
+
+.rb-desktop .dg-btn:hover,
+.rb-desktop .pg-btn-primary:hover {
+  border-color: rgba(15, 23, 42, 0.16);
+  background: rgba(15, 23, 42, 0.07);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
+  transform: translateY(-1px);
+}
+
+.rb-desktop .dg-btn-primary:hover,
+.rb-desktop .pg-btn-primary:hover {
+  background: #0ea371;
+  border-color: rgba(5, 150, 105, 0.62);
+  box-shadow: 0 8px 18px rgba(16, 185, 129, 0.18);
+}
+
+.rb-desktop .dg-btn-secondary:hover {
+  background: rgba(15, 23, 42, 0.07);
+  border-color: rgba(15, 23, 42, 0.16);
+}
+
+.rb-desktop .dg-btn-danger:hover {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.36);
+}
+
+.rb-desktop .dg-btn-danger:active {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.rb-desktop .dg-btn-icon:hover {
+  background: rgba(15, 23, 42, 0.07);
+  border-color: rgba(15, 23, 42, 0.16);
+}
+
+.rb-desktop .dg-btn:active,
+.rb-desktop .pg-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.rb-desktop .dg-btn:focus-visible,
+.rb-desktop .pg-btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.22);
+}
+
+.rb-desktop .dg-btn-primary,
+.rb-desktop .pg-btn-primary {
+  color: #ffffff;
+  border-color: rgba(5, 150, 105, 0.55);
+  background: #10b981;
+  box-shadow: none;
+}
+
+.rb-desktop .dg-btn-danger {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.28);
+  color: rgba(185, 28, 28, 0.92);
+  box-shadow: none;
+}
+
+.rb-desktop .dg-btn-danger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
+}
+
+.rb-desktop .dg-btn-danger:active {
+  transform: translateY(0);
+}
+
+.rb-desktop .dg-btn-square {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.rb-desktop .rb-search-with-action .dg-btn {
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Formalar və panellər */
+.rb-desktop .dg-form-page.pg-panel {
+  /* workspace böyük kartdır — içəridə əlavə "kart" olmasın */
+  border-radius: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+  border-top: none;
+}
+
+.rb-desktop .dg-form-page-head {
+  min-height: 42px;
+  padding: 0;
+  align-items: center;
+  border-bottom: none;
+  background: transparent;
+}
+
+.rb-desktop .dg-form-page-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rb-text);
+}
+
+.rb-desktop .dg-form-page-sub {
+  font-size: 12px;
+  color: var(--rb-muted);
+}
+
+.rb-desktop .dg-form-bc {
+  font-size: 11px;
+  color: var(--rb-muted);
+}
+
+.rb-desktop .dg-form-bc-current {
+  color: rgba(15, 23, 42, 0.85);
+  font-weight: 700;
+}
+
+.rb-desktop .dg-form-page-body {
+  padding: 0;
+  background: transparent;
+}
+
+.rb-desktop .dg-form-inner-panel {
+  border-radius: 12px;
+  border: 1px solid var(--rb-card-border);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+}
+
+.rb-desktop .dg-form-inner-panel:hover {
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
+}
+
+.rb-desktop .dg-form-inner-panel-title,
+.rb-desktop .dg-form-inner-panel-title--sm {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rb-text);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding-bottom: 6px;
+}
+
+.rb-desktop .dg-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(15, 23, 42, 0.8);
+}
+
+.rb-desktop .dg-input,
+.rb-desktop textarea.dg-input,
+.rb-desktop select.dg-input {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
+  padding: 7px 9px;
+  font-size: 13px;
+  color: var(--rb-text);
+}
+
+.rb-desktop textarea.dg-input {
+  height: auto;
+}
+
+.rb-desktop textarea.dg-input.dg-input-textarea-compact {
+  min-height: 52px;
+}
+
+.rb-desktop .dg-input:focus,
+.rb-desktop textarea.dg-input:focus,
+.rb-desktop select.dg-input:focus {
+  border-color: rgba(15, 23, 42, 0.3);
+  box-shadow:
+    0 0 0 3px rgba(15, 23, 42, 0.08),
+    inset 0 1px 2px rgba(15, 23, 42, 0.06);
+  outline: none;
+}
+
+.rb-desktop .dg-form-footer-actions {
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-top: 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+/* Fieldset şirkət formu */
+.rb-desktop fieldset.pg-fieldset {
+  margin: 0 0 14px;
+  padding: 13px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+}
+
+.rb-desktop fieldset.pg-fieldset > legend {
+  padding: 0 0 8px;
+  margin-bottom: 8px;
+  width: 100%;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rb-text);
+}
+
+/* Cədvəl */
+.rb-desktop .dg-table-wrap.pg-grid-host {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
+}
+
+.rb-desktop .dg-table.dg-table--sales thead th {
+  height: 44px;
+  padding: 0 12px;
+  font-size: 11px;
+  color: rgba(15, 23, 42, 0.72);
+  background: rgba(15, 23, 42, 0.04);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rb-desktop .dg-table.dg-table--sales tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.rb-desktop .dg-table.dg-table--sales tbody tr:nth-child(even) td {
+  background: rgba(15, 23, 42, 0.015);
+}
+
+.rb-desktop .dg-table.dg-table--sales tbody tr:hover td {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.rb-desktop .dg-table.dg-table--sales tbody tr:hover td .dg-input {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.rb-desktop .dg-table.dg-table--sales tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.rb-desktop .dg-icon-btn {
+  width: 28px;
+  height: 26px;
+  border-radius: 9px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.rb-desktop .dg-icon-btn:hover {
+  border-color: rgba(15, 23, 42, 0.24);
+  background: rgba(15, 23, 42, 0.03);
+  color: var(--rb-text);
+}
+
+.rb-desktop .dg-qty-wrap {
+  border-color: #9ebdd6;
+}
+
+.rb-desktop .dg-toast {
+  bottom: 1.25rem;
+}
+
+/* Dialoqlar */
+.biz-portal-modals .dg-modal {
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+}
+
+.biz-portal-modals .dg-modal::backdrop {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: none;
+}
+
+.biz-portal-modals .dg-modal-title {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--rb-text);
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.biz-portal-modals .dg-modal-body {
+  padding: 14px 16px 16px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.biz-portal-modals .dg-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--rb-text);
+}
+
+.biz-portal-modals .dg-btn-primary {
+  color: #ffffff;
+  border-color: rgba(5, 150, 105, 0.55);
+  background: #10b981;
+}
+
+.biz-portal-modals .dg-btn-danger {
+  color: #ffffff;
+  border-color: rgba(220, 38, 38, 0.55);
+  background: #ef4444;
+}
+
+.rb-desktop .rb-company-form-caption {
+  margin: 0 0 14px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #dcdcdc;
+  font-size: 12px;
+  font-weight: 700;
+  color: #444444;
+}
+
+#root {
+  height: 100%;
+}
+
+.pg-root.rb-desktop {
+  min-height: 100%;
+  height: 100%;
+}
