@@ -114,9 +114,7 @@ export function buildInvoiceHtml(state: GeneratorState): string {
   const sellerCorr = state.seller.correspondentAccount?.trim() || "";
   const sellerCurrency = state.seller.currency?.trim() || "";
 
-  const buyerName = state.buyer.name?.trim() || "—";
-  const buyerVoen = state.buyer.voen?.trim() || "";
-  const buyerAddr = state.buyer.address?.trim() || "";
+  // alıcı rekvizitləri fakturada göstərilmir
 
   const director = state.seller.director?.trim() || "";
 
@@ -265,13 +263,11 @@ export function buildInvoiceHtml(state: GeneratorState): string {
             <p class="text-sm font-medium text-gray-600 mt-2">Tarix: ${escapeHtml(formatDateAzLong(m.invoiceDate))}</p>
         </div>
 
-        <!-- Məlumat Hissəsi (Satıcı və Alıcı) -->
-        <div class="mb-10 border border-gray-200 rounded-xl bg-gray-50/60 p-5">
-          <div class="grid grid-cols-2 gap-8 text-[13px]">
-            <!-- Satıcı Məlumatları -->
-            <div class="min-w-0">
-                <h3 class="font-bold text-gray-900 text-sm uppercase mb-3 border-b border-gray-200 pb-1">Satıcı / İcraçı</h3>
-                <div class="grid grid-cols-[120px_minmax(0,1fr)] gap-y-1.5 gap-x-3">
+        <!-- Rekvizitlər (yalnız Satıcı) -->
+        <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4">
+          <div class="min-w-0 text-[12.5px]">
+                <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Satıcı rekvizitləri</h3>
+                <div class="grid grid-cols-[110px_minmax(0,1fr)] gap-y-1 gap-x-3">
                     <div class="font-semibold text-gray-700">Müəssisə</div>
                     <div class="text-gray-900 break-words">${escapeHtml(sellerName)}</div>
                     ${sellerVoen ? `<div class="font-semibold text-gray-700">VÖEN</div><div class="text-gray-900 break-words">${escapeHtml(sellerVoen)}</div>` : ""}
@@ -283,18 +279,6 @@ export function buildInvoiceHtml(state: GeneratorState): string {
                     ${sellerAccount ? `<div class="font-semibold text-gray-700">Hesab</div><div class="text-gray-900 break-words">${escapeHtml(sellerAccount)}</div>` : ""}
                     ${sellerCorr ? `<div class="font-semibold text-gray-700">Müxbir</div><div class="text-gray-900 break-words">${escapeHtml(sellerCorr)}</div>` : ""}
                 </div>
-            </div>
-            
-            <!-- Alıcı Məlumatları -->
-            <div class="min-w-0">
-                <h3 class="font-bold text-gray-900 text-sm uppercase mb-3 border-b border-gray-200 pb-1">Alıcı / Sifarişçi</h3>
-                <div class="grid grid-cols-[120px_minmax(0,1fr)] gap-y-1.5 gap-x-3">
-                    <div class="font-semibold text-gray-700">Müəssisə</div>
-                    <div class="text-gray-900 break-words">${escapeHtml(buyerName)}</div>
-                    ${buyerVoen ? `<div class="font-semibold text-gray-700">VÖEN</div><div class="text-gray-900 break-words">${escapeHtml(buyerVoen)}</div>` : ""}
-                    ${buyerAddr ? `<div class="font-semibold text-gray-700">Ünvan</div><div class="text-gray-900 break-words">${escapeHtml(buyerAddr)}</div>` : ""}
-                </div>
-            </div>
           </div>
         </div>
 
