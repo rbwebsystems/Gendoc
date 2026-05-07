@@ -925,10 +925,10 @@ textarea.dg-input::placeholder {
   max-width: min(420px, calc(100vw - 32px));
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
-  color: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  background: rgba(239, 68, 68, 0.92);
+  box-shadow: 0 18px 44px rgba(239, 68, 68, 0.22);
+  color: #ffffff;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
