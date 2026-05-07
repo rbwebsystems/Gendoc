@@ -58,6 +58,14 @@ async function downloadPdfFromHtml(html: string, filename: string): Promise<void
   doc.write(html);
   doc.close();
 
+  const waitFor = async (cond: () => boolean, timeoutMs: number) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (cond()) return;
+      await new Promise((r) => setTimeout(r, 80));
+    }
+  };
+
   await new Promise<void>((resolve) => {
     const w = iframe.contentWindow;
     if (!w) return resolve();
@@ -66,13 +74,24 @@ async function downloadPdfFromHtml(html: string, filename: string): Promise<void
     setTimeout(() => resolve(), 1500);
   });
 
-  // Tailwind/şrift yüklənməsi üçün əlavə gözləmə
+  // Tailwind CDN + şrift + şəkillər yüklənsin (PDF-də "qarışıq" olmasın)
+  await waitFor(() => {
+    const styles = Array.from(doc.querySelectorAll("style"));
+    return styles.some((s) => (s.textContent || "").toLowerCase().includes("tailwindcss"));
+  }, 5000);
+
   try {
     const anyDoc = doc as unknown as { fonts?: { ready?: Promise<void> } };
     if (anyDoc.fonts?.ready) await anyDoc.fonts.ready;
   } catch {
     /* ignore */
   }
+
+  await waitFor(() => {
+    const imgs = Array.from(doc.images ?? []);
+    return imgs.every((im) => (im as HTMLImageElement).complete);
+  }, 4000);
+
   await new Promise((r) => setTimeout(r, 500));
 
   try {
@@ -86,6 +105,7 @@ async function downloadPdfFromHtml(html: string, filename: string): Promise<void
         html2canvas: {
           scale: 2,
           useCORS: true,
+          letterRendering: true,
           backgroundColor: "#ffffff",
           windowWidth: 1200,
         },
