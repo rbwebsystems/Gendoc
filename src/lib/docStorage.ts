@@ -102,15 +102,28 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         updatedAt: typeof (f as { updatedAt?: unknown }).updatedAt === "number" ? Number((f as { updatedAt: number }).updatedAt) : Date.now(),
         files: Array.isArray((f as { files?: unknown }).files)
           ? (f as { files: unknown[] }).files
-              .filter((x) => x && typeof (x as { id?: unknown }).id === "string" && typeof (x as { dataUrl?: unknown }).dataUrl === "string")
-              .map((x) => ({
-                id: String((x as { id: string }).id),
-                name: typeof (x as { name?: unknown }).name === "string" ? String((x as { name: string }).name) : "fayl",
-                mime: typeof (x as { mime?: unknown }).mime === "string" ? String((x as { mime: string }).mime) : "application/octet-stream",
-                size: typeof (x as { size?: unknown }).size === "number" ? Number((x as { size: number }).size) : 0,
-                createdAt: typeof (x as { createdAt?: unknown }).createdAt === "number" ? Number((x as { createdAt: number }).createdAt) : Date.now(),
-                dataUrl: String((x as { dataUrl: string }).dataUrl),
-              }))
+              .filter((x) => {
+                if (!x || typeof (x as { id?: unknown }).id !== "string") return false;
+                const hasDataUrl = typeof (x as { dataUrl?: unknown }).dataUrl === "string";
+                const hasUrl = typeof (x as { url?: unknown }).url === "string";
+                const hasPath = typeof (x as { storagePath?: unknown }).storagePath === "string";
+                return hasDataUrl || hasUrl || hasPath;
+              })
+              .map((x) => {
+                const dataUrl = typeof (x as { dataUrl?: unknown }).dataUrl === "string" ? String((x as { dataUrl: string }).dataUrl) : undefined;
+                const url = typeof (x as { url?: unknown }).url === "string" ? String((x as { url: string }).url) : undefined;
+                const storagePath = typeof (x as { storagePath?: unknown }).storagePath === "string" ? String((x as { storagePath: string }).storagePath) : undefined;
+                return {
+                  id: String((x as { id: string }).id),
+                  name: typeof (x as { name?: unknown }).name === "string" ? String((x as { name: string }).name) : "fayl",
+                  mime: typeof (x as { mime?: unknown }).mime === "string" ? String((x as { mime: string }).mime) : "application/octet-stream",
+                  size: typeof (x as { size?: unknown }).size === "number" ? Number((x as { size: number }).size) : 0,
+                  createdAt: typeof (x as { createdAt?: unknown }).createdAt === "number" ? Number((x as { createdAt: number }).createdAt) : Date.now(),
+                  ...(dataUrl ? { dataUrl } : {}),
+                  ...(url ? { url } : {}),
+                  ...(storagePath ? { storagePath } : {}),
+                };
+              })
           : [],
       };
     })
@@ -220,7 +233,7 @@ function migrateV2ToV3(v2: DocWorkspaceV2): DocWorkspace {
   return normalizeWorkspace(ws);
 }
 
-export function loadWorkspace(): DocWorkspace {
+export function loadWorkspaceLocal(): DocWorkspace {
   try {
     const rawV3 = localStorage.getItem(WS_KEY_V3);
     if (rawV3) {
@@ -308,8 +321,29 @@ export function loadWorkspace(): DocWorkspace {
   return fresh;
 }
 
-export function saveWorkspace(w: DocWorkspace): void {
+export function saveWorkspaceLocal(w: DocWorkspace): void {
   localStorage.setItem(WS_KEY_V3, JSON.stringify(w));
+}
+
+/** Köhnə adlar — geriyə uyğunluq üçün ekvivalent funksiyalar */
+export const loadWorkspace = loadWorkspaceLocal;
+export const saveWorkspace = saveWorkspaceLocal;
+
+/** Əgər istifadəçi remote-a köçürülübsə, lokal nüsxəni təmizləmək üçün istifadə olunur */
+export function clearLocalWorkspace(): void {
+  try {
+    localStorage.removeItem(WS_KEY_V3);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function hasLocalWorkspace(): boolean {
+  try {
+    return Boolean(localStorage.getItem(WS_KEY_V3));
+  } catch {
+    return false;
+  }
 }
 
 export function workspaceToGeneratorState(ws: DocWorkspace, proj: ProjectRecord): GeneratorState {

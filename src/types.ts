@@ -82,8 +82,12 @@ export interface FolderFileRecord {
   mime: string;
   size: number;
   createdAt: number;
-  /** Base64 data URL (PDF/JPG/PNG) */
-  dataUrl: string;
+  /** Legacy: base64 data URL (PDF/JPG/PNG) — saxlanılır geriyə uyğunluq üçün */
+  dataUrl?: string;
+  /** Firebase Storage path (məs: users/{uid}/folders/{folderId}/{fileId}-{name}) */
+  storagePath?: string;
+  /** Public download URL (Firebase Storage) */
+  url?: string;
 }
 
 export type WorkspaceFolderKind = "company" | "custom";

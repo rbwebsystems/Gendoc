@@ -12,12 +12,13 @@ import {
   computeTotals,
 } from "./documents/generateDocuments";
 import {
-  loadWorkspace,
+  clearLocalWorkspace,
+  loadWorkspaceLocal,
   normalizeCompany,
   normalizeProductRows,
   normalizeWorkspace,
   projectsUsingCompany,
-  saveWorkspace,
+  saveWorkspaceLocal,
   sortProjectsByDate,
   workspaceToGeneratorState,
 } from "./lib/docStorage";
@@ -27,6 +28,7 @@ import type {
   CompanyProfile,
   DocWorkspace,
   DocumentMeta,
+  FolderFileRecord,
   NoteRecord,
   ProductRow,
   ProjectRecord,
@@ -34,6 +36,22 @@ import type {
   WorkspaceFolderRecord,
 } from "./types";
 import html2pdf from "html2pdf.js";
+import { auth, firebaseEnabled } from "./lib/firebase";
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  type User,
+} from "firebase/auth";
+import {
+  deleteStorageFile,
+  fetchWorkspaceOnce,
+  subscribeWorkspace,
+  uploadFolderFile,
+  writeWorkspace,
+} from "./lib/workspaceSync";
 
 async function downloadPdfFromHtml(html: string, filename: string): Promise<void> {
   const iframe = document.createElement("iframe");
@@ -464,8 +482,29 @@ function parseDatetimeLocal(s: string): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+type AuthState =
+  | { status: "loading" }
+  | { status: "signedOut" }
+  | { status: "signedIn"; user: User }
+  | { status: "disabled" };
+
+type LoginFormMode = "signin" | "signup";
+
 export default function App() {
-  const [workspace, setWorkspace] = useState<DocWorkspace>(() => normalizeWorkspace(loadWorkspace()));
+  // Firebase yoxdursa lokal localStorage rejimində qalırıq.
+  const initialAuth: AuthState = firebaseEnabled ? { status: "loading" } : { status: "disabled" };
+  const [authState, setAuthState] = useState<AuthState>(initialAuth);
+  const [authError, setAuthError] = useState<string>("");
+  const [authBusy, setAuthBusy] = useState<boolean>(false);
+  const [loginMode, setLoginMode] = useState<LoginFormMode>("signin");
+  const [loginEmail, setLoginEmail] = useState<string>("");
+  const [loginPassword, setLoginPassword] = useState<string>("");
+
+  const [workspace, setWorkspace] = useState<DocWorkspace>(() => normalizeWorkspace(loadWorkspaceLocal()));
+  // Remote ilə yerli arasında "echo" yazıların qarşısını almaq üçün son sinxronlaşmış JSON
+  const lastSyncedJsonRef = useRef<string>("");
+  // İlk snapshot gəlmədən yazmaq olmaz (yoxsa migration ilə yaza bilərik)
+  const remoteReadyRef = useRef<boolean>(false);
   const [module, setModule] = useState<SidebarModule>("companies");
   const [toast, setToast] = useState<{ kind: ToastKind; msg: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -519,10 +558,108 @@ export default function App() {
   const noteInfoDialogRef = useRef<HTMLDialogElement>(null);
   const [noteInfoId, setNoteInfoId] = useState<string | null>(null);
 
+  // 1) Firebase Auth dövriyyəsi
   useEffect(() => {
-    const id = window.setTimeout(() => saveWorkspace(workspace), 420);
-    return () => window.clearTimeout(id);
-  }, [workspace]);
+    if (!firebaseEnabled || !auth) {
+      setAuthState({ status: "disabled" });
+      return;
+    }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setAuthState({ status: "signedIn", user });
+      } else {
+        setAuthState({ status: "signedOut" });
+        // İstifadəçi çıxış edibsə remote sinxron izlərini sıfırla
+        remoteReadyRef.current = false;
+        lastSyncedJsonRef.current = "";
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // 2) Workspace abunəliyi (yalnız autentifikasiyadan sonra)
+  useEffect(() => {
+    if (authState.status !== "signedIn") return;
+    const uid = authState.user.uid;
+    let cancelled = false;
+
+    // İlk dəfə: əgər remote-da workspace yoxdursa, cari (lokal) məlumatları köçür
+    (async () => {
+      try {
+        const remote = await fetchWorkspaceOnce(uid);
+        if (cancelled) return;
+        if (!remote) {
+          // Cari işçi sahəsindəki məlumatları (mount-da localStorage-dən gəlibsə də) seed kimi yaz
+          const seed = normalizeWorkspace(workspace);
+          await writeWorkspace(uid, seed);
+          // Lokal nüsxəni təmizləyirik ki, başqa istifadəçi daxil olduqda qarışmasın
+          clearLocalWorkspace();
+          if (!cancelled) {
+            lastSyncedJsonRef.current = JSON.stringify(seed);
+            setWorkspace(seed);
+            remoteReadyRef.current = true;
+          }
+        } else {
+          // Remote mövcuddur — lokal nüsxəni saxlamağa ehtiyac yoxdur
+          clearLocalWorkspace();
+        }
+      } catch {
+        /* ignore — onSnapshot da işə düşəcək */
+      }
+    })();
+
+    const unsub = subscribeWorkspace(uid, ({ exists, workspace: remoteWs }) => {
+      if (!exists || !remoteWs) {
+        // Hələ doc yaranmayıb — fetchWorkspaceOnce yuxarıda işini görür
+        return;
+      }
+      const normalized = normalizeWorkspace(remoteWs);
+      const json = JSON.stringify(normalized);
+      // Echo qoruması: snapshot bizim öz yazımızdırsa, state-ə dəymə
+      if (json === lastSyncedJsonRef.current) {
+        remoteReadyRef.current = true;
+        return;
+      }
+      lastSyncedJsonRef.current = json;
+      remoteReadyRef.current = true;
+      setWorkspace(normalized);
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [authState]);
+
+  // 3) Workspace dəyişəndə debounced yazı (remote və ya lokal)
+  useEffect(() => {
+    const json = JSON.stringify(workspace);
+
+    // Remote rejim
+    if (firebaseEnabled && authState.status === "signedIn") {
+      if (!remoteReadyRef.current) return; // hələ ilk snapshot gəlməyib
+      if (json === lastSyncedJsonRef.current) return; // remote ilə eyni
+      const uid = authState.user.uid;
+      const id = window.setTimeout(() => {
+        writeWorkspace(uid, workspace)
+          .then(() => {
+            lastSyncedJsonRef.current = json;
+          })
+          .catch(() => {
+            flash(setToast, "Sinxronlaşma alınmadı", "error");
+          });
+      }, 600);
+      return () => window.clearTimeout(id);
+    }
+
+    // Lokal rejim — yalnız Firebase ümumiyyətlə deaktivdirsə
+    if (!firebaseEnabled || authState.status === "disabled") {
+      const id = window.setTimeout(() => saveWorkspaceLocal(workspace), 420);
+      return () => window.clearTimeout(id);
+    }
+    // signedOut / loading vəziyyətində yazma — istifadəçilər arası məlumat sızmasın
+    return;
+  }, [workspace, authState]);
 
   // Reminder: vaxt çatanda bir dəfə səsli xəbərdarlıq et
   useEffect(() => {
@@ -801,6 +938,8 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
+    const toPurge = (workspace.folders ?? []).filter((f) => f.kind === "company" && f.companyId === c.id);
+    await purgeFoldersStorage(toPurge);
     setWorkspace((w) => ({ ...w, companies: w.companies.filter((x) => x.id !== c.id) }));
     setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => f.companyId !== c.id) }));
     flash(setToast, "Şirkət silindi");
@@ -1676,36 +1815,68 @@ export default function App() {
     return (workspace.folders ?? []).filter((f) => (f as WorkspaceFolderRecord).kind === "custom") as WorkspaceFolderRecord[];
   }, [workspace.folders]);
 
+  // Faylı oxumaq üçün vahid mənbə (Storage URL → varsa, lokal dataUrl → fallback)
+  const fileSrc = (f: FolderFileRecord): string => f.url || f.dataUrl || "";
+
+  const readFileAsDataUrlRecord = (f: File): Promise<FolderFileRecord> => {
+    return new Promise<FolderFileRecord>((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = () => reject(new Error("read"));
+      r.onload = () =>
+        resolve({
+          id: crypto.randomUUID(),
+          name: f.name,
+          mime: f.type || "application/octet-stream",
+          size: f.size,
+          createdAt: Date.now(),
+          dataUrl: String(r.result || ""),
+        });
+      r.readAsDataURL(f);
+    });
+  };
+
   const onUploadToFolder = async (folderId: string, filesList: FileList | null) => {
     if (!folderId || !filesList || filesList.length === 0) return;
     const files = Array.from(filesList);
-    const reads = await Promise.all(
-      files.map(
-        (f) =>
-          new Promise<{ name: string; mime: string; size: number; dataUrl: string }>((resolve, reject) => {
-            const r = new FileReader();
-            r.onerror = () => reject(new Error("read"));
-            r.onload = () => resolve({ name: f.name, mime: f.type || "application/octet-stream", size: f.size, dataUrl: String(r.result || "") });
-            r.readAsDataURL(f);
+    const useRemote = firebaseEnabled && authState.status === "signedIn";
+    try {
+      let added: FolderFileRecord[] = [];
+      if (useRemote && authState.status === "signedIn") {
+        const uid = authState.user.uid;
+        // Storage ola bilməz (billing tələb edə bilər). Bu halda dataUrl fallback edirik.
+        const results = await Promise.all(
+          files.map(async (f) => {
+            try {
+              return await uploadFolderFile(uid, folderId, f);
+            } catch {
+              return await readFileAsDataUrlRecord(f);
+            }
           }),
-      ),
-    );
-    setWorkspace((w) => ({
-      ...w,
-      folders: (w.folders ?? []).map((fold) => {
-        if (fold.id !== folderId) return fold;
-        const now = Date.now();
-        return {
-          ...fold,
-          updatedAt: now,
-          files: [
-            ...(fold.files ?? []),
-            ...reads.map((x) => ({ id: crypto.randomUUID(), name: x.name, mime: x.mime, size: x.size, createdAt: now, dataUrl: x.dataUrl })),
-          ],
-        };
-      }),
-    }));
-    flash(setToast, "Fayllar əlavə olundu");
+        );
+        added = results;
+        if (results.some((x) => Boolean(x.dataUrl) && !x.url)) {
+          flash(setToast, "Storage yoxdur — fayllar dataUrl kimi saxlanıldı", "error");
+        }
+      } else {
+        // Lokal rejim — eski dataUrl formatı
+        added = await Promise.all(files.map(readFileAsDataUrlRecord));
+      }
+      setWorkspace((w) => ({
+        ...w,
+        folders: (w.folders ?? []).map((fold) => {
+          if (fold.id !== folderId) return fold;
+          const now = Date.now();
+          return {
+            ...fold,
+            updatedAt: now,
+            files: [...(fold.files ?? []), ...added],
+          };
+        }),
+      }));
+      flash(setToast, "Fayllar əlavə olundu");
+    } catch {
+      flash(setToast, "Fayl yüklənmədi", "error");
+    }
   };
 
   const deleteFolderFile = async (folderId: string, fileId: string) => {
@@ -1717,6 +1888,16 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
+    // Əvvəlcə Storage-dən sil (varsa)
+    const folder = (workspace.folders ?? []).find((x) => x.id === folderId);
+    const file = folder?.files?.find((x) => x.id === fileId);
+    if (file?.storagePath && firebaseEnabled && authState.status === "signedIn") {
+      try {
+        await deleteStorageFile(file.storagePath);
+      } catch {
+        /* metadatanı yenə də siləcəyik */
+      }
+    }
     setWorkspace((w) => ({
       ...w,
       folders: (w.folders ?? []).map((fold) =>
@@ -1724,6 +1905,22 @@ export default function App() {
       ),
     }));
     flash(setToast, "Fayl silindi");
+  };
+
+  // Qovluq silərkən bütün remote faylları da Storage-dən təmizləyir
+  const purgeFoldersStorage = async (folders: WorkspaceFolderRecord[]) => {
+    if (!(firebaseEnabled && authState.status === "signedIn")) return;
+    for (const fold of folders) {
+      for (const f of fold.files ?? []) {
+        if (f.storagePath) {
+          try {
+            await deleteStorageFile(f.storagePath);
+          } catch {
+            /* davam et */
+          }
+        }
+      }
+    }
   };
 
   const deleteCompanyFolder = async (cid: string) => {
@@ -1736,6 +1933,8 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
+    const toPurge = (workspace.folders ?? []).filter((f) => f.kind === "company" && f.companyId === cid);
+    await purgeFoldersStorage(toPurge);
     setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => !(f.kind === "company" && f.companyId === cid)) }));
     setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
     flash(setToast, "Qovluq silindi");
@@ -1751,6 +1950,8 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
+    const toPurge = (workspace.folders ?? []).filter((f) => f.id === fid);
+    await purgeFoldersStorage(toPurge);
     setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => f.id !== fid) }));
     if (activeFolderId === fid) setActiveFolderId("");
     setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
@@ -1885,7 +2086,7 @@ export default function App() {
                             {thumbs.map((t) => (
                               <div key={t.id} className="dg-folder-thumbcell">
                                 {t.mime.startsWith("image/") ? (
-                                  <img src={t.dataUrl} alt="" loading="lazy" />
+                                  <img src={fileSrc(t)} alt="" loading="lazy" />
                                 ) : (
                                   <div className="dg-folder-thumbbadge">{t.mime === "application/pdf" ? "PDF" : "FILE"}</div>
                                 )}
@@ -1990,8 +2191,8 @@ export default function App() {
                       const isPdf = f.mime === "application/pdf";
                       return (
                         <div key={f.id} className="dg-file-tile" role="listitem">
-                          <a className="dg-file-thumb" href={f.dataUrl} target="_blank" rel="noreferrer" title="Aç">
-                            {isImg ? <img src={f.dataUrl} alt={f.name} loading="lazy" /> : <span className="dg-file-thumb-badge">{isPdf ? "PDF" : "FILE"}</span>}
+                          <a className="dg-file-thumb" href={fileSrc(f)} target="_blank" rel="noreferrer" title="Aç">
+                            {isImg ? <img src={fileSrc(f)} alt={f.name} loading="lazy" /> : <span className="dg-file-thumb-badge">{isPdf ? "PDF" : "FILE"}</span>}
                           </a>
                           <div className="dg-file-meta">
                             <div className="dg-file-name" title={f.name}>
@@ -2002,10 +2203,10 @@ export default function App() {
                             </div>
                           </div>
                           <div className="dg-file-actions">
-                            <a className="dg-btn dg-btn-secondary" href={f.dataUrl} target="_blank" rel="noreferrer">
+                            <a className="dg-btn dg-btn-secondary" href={fileSrc(f)} target="_blank" rel="noreferrer">
                               Aç
                             </a>
-                            <a className="dg-btn dg-btn-secondary" href={f.dataUrl} download={f.name}>
+                            <a className="dg-btn dg-btn-secondary" href={fileSrc(f)} download={f.name}>
                               Endir
                             </a>
                             <button type="button" className="dg-btn dg-btn-danger" onClick={() => folder && deleteFolderFile(folder.id, f.id)}>
@@ -2162,6 +2363,113 @@ export default function App() {
       </div>
     );
   };
+
+  // ----- Auth handlers -----
+  const mapAuthError = (e: unknown): string => {
+    const code = (e as { code?: string })?.code || "";
+    switch (code) {
+      case "auth/invalid-email":
+        return "Email səhvdir.";
+      case "auth/missing-password":
+      case "auth/weak-password":
+        return "Şifrə ən azı 6 simvol olmalıdır.";
+      case "auth/email-already-in-use":
+        return "Bu email artıq qeydiyyatdadır.";
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/user-not-found":
+        return "Email və ya şifrə səhvdir.";
+      case "auth/network-request-failed":
+        return "Şəbəkə xətası. Yenidən cəhd edin.";
+      default:
+        return "Daxil olmaq alınmadı.";
+    }
+  };
+
+  const handleSignIn = useCallback(async () => {
+    if (!auth) return;
+    if (!loginEmail.trim() || !loginPassword) {
+      setAuthError("Email və şifrə daxil edin.");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      setLoginPassword("");
+    } catch (e: unknown) {
+      setAuthError(mapAuthError(e));
+    } finally {
+      setAuthBusy(false);
+    }
+  }, [loginEmail, loginPassword]);
+
+  const handleSignUp = useCallback(async () => {
+    if (!auth) return;
+    if (!loginEmail.trim() || !loginPassword) {
+      setAuthError("Email və şifrə daxil edin.");
+      return;
+    }
+    if (loginPassword.length < 6) {
+      setAuthError("Şifrə ən azı 6 simvol olmalıdır.");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      await createUserWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      setLoginPassword("");
+    } catch (e: unknown) {
+      setAuthError(mapAuthError(e));
+    } finally {
+      setAuthBusy(false);
+    }
+  }, [loginEmail, loginPassword]);
+
+  const handlePasswordReset = useCallback(async () => {
+    if (!auth) return;
+    if (!loginEmail.trim()) {
+      setAuthError("Şifrə yeniləmək üçün email daxil edin.");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      await sendPasswordResetEmail(auth, loginEmail.trim());
+      flash(setToast, "Şifrə yeniləmə linki email-ə göndərildi");
+    } catch (e: unknown) {
+      setAuthError(mapAuthError(e));
+    } finally {
+      setAuthBusy(false);
+    }
+  }, [loginEmail]);
+
+  const handleSignOut = useCallback(async () => {
+    if (!auth) return;
+    const ok = await askConfirm({
+      title: "Çıxış",
+      message: "Sistemdən çıxış etmək istədiyinizdən əminsiniz?",
+      confirmLabel: "Çıxış",
+      cancelLabel: "Ləğv et",
+    });
+    if (!ok) return;
+    try {
+      await signOut(auth);
+      // Lokal nüsxə qarışmasın deyə təmizləyirik (remote artıq əsas mənbədi)
+      clearLocalWorkspace();
+      // Ekrana boş workspace göstər
+      setWorkspace(
+        normalizeWorkspace({
+          version: 3,
+          settings: { seller: emptyCompany() },
+          companies: [],
+          projects: [],
+        }),
+      );
+    } catch {
+      flash(setToast, "Çıxış alınmadı", "error");
+    }
+  }, [askConfirm]);
 
   const headerPrimaryAction =
     module === "companies" && companyMode === "list"
@@ -2499,6 +2807,134 @@ export default function App() {
     </>
   );
 
+  if (authState.status === "loading") {
+    return (
+      <>
+        <div className="pg-root biz-ui rb-desktop rb-auth-screen">
+          <div className="rb-auth-card" role="status" aria-live="polite">
+            <div className="rb-auth-brand">
+              <div className="rb-auth-logo" aria-hidden>
+                <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                  <circle cx="20" cy="20" r="20" fill="rgba(15,23,42,0.06)" />
+                  <path d="M11 14h12M11 20h12M11 26h8" stroke="rgba(15,23,42,0.7)" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div className="rb-auth-title">GenDoc</div>
+            </div>
+            <p className="rb-auth-sub">Yüklənir…</p>
+          </div>
+        </div>
+        {createPortal(<div className="biz-ui biz-portal-modals">{modalLayer}</div>, document.body)}
+      </>
+    );
+  }
+
+  if (authState.status === "signedOut") {
+    return (
+      <>
+        <div className="pg-root biz-ui rb-desktop rb-auth-screen">
+          <form
+            className="rb-auth-card"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (loginMode === "signin") handleSignIn();
+              else handleSignUp();
+            }}
+          >
+            <div className="rb-auth-brand">
+              <div className="rb-auth-logo" aria-hidden>
+                <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                  <circle cx="20" cy="20" r="20" fill="rgba(15,23,42,0.06)" />
+                  <path d="M11 14h12M11 20h12M11 26h8" stroke="rgba(15,23,42,0.7)" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div className="rb-auth-title">GenDoc</div>
+            </div>
+            <p className="rb-auth-sub">{loginMode === "signin" ? "Daxil olun" : "Yeni hesab yaradın"}</p>
+
+            <label className="dg-field">
+              <span className="dg-label">Email</span>
+              <input
+                className="dg-input"
+                type="email"
+                autoComplete="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="email@example.com"
+                disabled={authBusy}
+                required
+              />
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Şifrə</span>
+              <input
+                className="dg-input"
+                type="password"
+                autoComplete={loginMode === "signin" ? "current-password" : "new-password"}
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="Ən azı 6 simvol"
+                disabled={authBusy}
+                required
+              />
+            </label>
+
+            {authError ? (
+              <div className="rb-auth-error" role="alert">
+                {authError}
+              </div>
+            ) : null}
+
+            <div className="rb-auth-actions">
+              <button type="submit" className="dg-btn dg-btn-primary" disabled={authBusy}>
+                {authBusy ? "Gözləyin…" : loginMode === "signin" ? "Daxil ol" : "Qeydiyyat"}
+              </button>
+              {loginMode === "signin" ? (
+                <button type="button" className="dg-btn dg-btn-secondary" onClick={handlePasswordReset} disabled={authBusy}>
+                  Şifrəni unutmusan?
+                </button>
+              ) : null}
+            </div>
+
+            <div className="rb-auth-switch">
+              {loginMode === "signin" ? (
+                <button
+                  type="button"
+                  className="rb-auth-link"
+                  onClick={() => {
+                    setLoginMode("signup");
+                    setAuthError("");
+                  }}
+                  disabled={authBusy}
+                >
+                  Hesabın yoxdur? Qeydiyyatdan keç
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="rb-auth-link"
+                  onClick={() => {
+                    setLoginMode("signin");
+                    setAuthError("");
+                  }}
+                  disabled={authBusy}
+                >
+                  Artıq hesabın var? Daxil ol
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+        {toast ? (
+          <div className={`dg-toast ${toast.kind === "error" ? "dg-toast--error" : "dg-toast--success"}`} role="status">
+            {toast.msg}
+          </div>
+        ) : null}
+        {createPortal(<div className="biz-ui biz-portal-modals">{modalLayer}</div>, document.body)}
+      </>
+    );
+  }
+
   return (
     <>
       <div className="pg-root biz-ui rb-desktop">
@@ -2571,11 +3007,28 @@ export default function App() {
             </nav>
 
             <div className="rb-sidebar-spacer" aria-hidden />
-            <button type="button" className="rb-menu-item rb-menu-item-logout" onClick={() => setSidebarOpen(false)}>
+            {authState.status === "signedIn" ? (
+              <div className="rb-auth-bar">
+                <div className="rb-auth-email" title={authState.user.email || ""}>
+                  {authState.user.email || "İstifadəçi"}
+                </div>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              className="rb-menu-item rb-menu-item-logout"
+              onClick={() => {
+                if (authState.status === "signedIn") {
+                  handleSignOut();
+                } else {
+                  setSidebarOpen(false);
+                }
+              }}
+            >
               <span className="rb-menu-icon">
                 <IconLogout />
               </span>
-              <span>Logout</span>
+              <span>{authState.status === "signedIn" ? "Çıxış" : "Logout"}</span>
             </button>
           </aside>
 
