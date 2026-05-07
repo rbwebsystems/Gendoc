@@ -268,26 +268,32 @@ export function buildInvoiceHtml(state: GeneratorState): string {
         <!-- Məlumat Hissəsi (Satıcı və Alıcı) -->
         <div class="grid grid-cols-2 gap-8 mb-10 text-[13px] border-b border-gray-300 pb-8">
             <!-- Satıcı Məlumatları -->
-            <div class="space-y-2">
+            <div>
                 <h3 class="font-bold text-gray-900 text-sm uppercase mb-3 border-b border-gray-200 pb-1">Satıcı / İcraçı</h3>
-                <p><span class="font-bold text-gray-900 w-20 inline-block">Müəssisə:</span> ${escapeHtml(sellerName)}</p>
-                ${sellerVoen ? `<p><span class="font-bold text-gray-900 w-20 inline-block">VÖEN:</span> ${escapeHtml(sellerVoen)}</p>` : ""}
-                ${sellerCurrency ? `<p><span class="font-bold text-gray-900 w-20 inline-block">Valyuta:</span> ${escapeHtml(sellerCurrency)}</p>` : ""}
-                ${sellerBank ? `<p><span class="font-bold text-gray-900 w-20 inline-block">Bank:</span> ${escapeHtml(sellerBank)}</p>` : ""}
-                ${sellerCode ? `<p><span class="font-bold text-gray-900 w-20 inline-block">KOD:</span> ${escapeHtml(sellerCode)}</p>` : ""}
-                ${sellerSwift ? `<p><span class="font-bold text-gray-900 w-20 inline-block">SWIFT:</span> ${escapeHtml(sellerSwift)}</p>` : ""}
-                ${sellerBankVoen ? `<p><span class="font-bold text-gray-900 w-20 inline-block">Bank VÖEN:</span> ${escapeHtml(sellerBankVoen)}</p>` : ""}
-                ${sellerAccount ? `<p><span class="font-bold text-gray-900 w-20 inline-block">Hesab:</span> ${escapeHtml(sellerAccount)}</p>` : ""}
-                ${sellerCorr ? `<p><span class="font-bold text-gray-900 w-20 inline-block">Müxbir:</span> ${escapeHtml(sellerCorr)}</p>` : ""}
-                ${director ? `<p><span class="font-bold text-gray-900 w-20 inline-block">Direktor:</span> ${escapeHtml(director)}</p>` : ""}
+                <div class="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3">
+                    <div class="font-semibold text-gray-700">Müəssisə</div>
+                    <div class="text-gray-900">${escapeHtml(sellerName)}</div>
+                    ${sellerVoen ? `<div class="font-semibold text-gray-700">VÖEN</div><div class="text-gray-900">${escapeHtml(sellerVoen)}</div>` : ""}
+                    ${sellerCurrency ? `<div class="font-semibold text-gray-700">Valyuta</div><div class="text-gray-900">${escapeHtml(sellerCurrency)}</div>` : ""}
+                    ${sellerBank ? `<div class="font-semibold text-gray-700">Bank</div><div class="text-gray-900">${escapeHtml(sellerBank)}</div>` : ""}
+                    ${sellerCode ? `<div class="font-semibold text-gray-700">KOD</div><div class="text-gray-900">${escapeHtml(sellerCode)}</div>` : ""}
+                    ${sellerSwift ? `<div class="font-semibold text-gray-700">SWIFT</div><div class="text-gray-900">${escapeHtml(sellerSwift)}</div>` : ""}
+                    ${sellerBankVoen ? `<div class="font-semibold text-gray-700">Bank VÖEN</div><div class="text-gray-900">${escapeHtml(sellerBankVoen)}</div>` : ""}
+                    ${sellerAccount ? `<div class="font-semibold text-gray-700">Hesab</div><div class="text-gray-900 break-words">${escapeHtml(sellerAccount)}</div>` : ""}
+                    ${sellerCorr ? `<div class="font-semibold text-gray-700">Müxbir</div><div class="text-gray-900 break-words">${escapeHtml(sellerCorr)}</div>` : ""}
+                    ${director ? `<div class="font-semibold text-gray-700">Direktor</div><div class="text-gray-900">${escapeHtml(director)}</div>` : ""}
+                </div>
             </div>
             
             <!-- Alıcı Məlumatları -->
-            <div class="space-y-2">
+            <div>
                 <h3 class="font-bold text-gray-900 text-sm uppercase mb-3 border-b border-gray-200 pb-1">Alıcı / Sifarişçi</h3>
-                <p><span class="font-bold text-gray-900 w-20 inline-block">Müəssisə:</span> ${escapeHtml(buyerName)}</p>
-                ${buyerVoen ? `<p><span class="font-bold text-gray-900 w-20 inline-block">VÖEN:</span> ${escapeHtml(buyerVoen)}</p>` : ""}
-                ${buyerAddr ? `<p><span class="font-bold text-gray-900 w-20 inline-block">Ünvan:</span> ${escapeHtml(buyerAddr)}</p>` : ""}
+                <div class="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3">
+                    <div class="font-semibold text-gray-700">Müəssisə</div>
+                    <div class="text-gray-900">${escapeHtml(buyerName)}</div>
+                    ${buyerVoen ? `<div class="font-semibold text-gray-700">VÖEN</div><div class="text-gray-900">${escapeHtml(buyerVoen)}</div>` : ""}
+                    ${buyerAddr ? `<div class="font-semibold text-gray-700">Ünvan</div><div class="text-gray-900">${escapeHtml(buyerAddr)}</div>` : ""}
+                </div>
             </div>
         </div>
 
