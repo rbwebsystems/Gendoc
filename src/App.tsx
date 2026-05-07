@@ -322,6 +322,18 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
           <path strokeWidth="2" strokeLinecap="round" d="M3 10h18" />
         </svg>
       );
+    case "notes":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 3h6a2 2 0 0 1 2 2v16l-2-1-2 1-2-1-2 1-2-1-2 1V5a2 2 0 0 1 2-2z"
+          />
+          <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 8h6M9 12h6M9 16h6" />
+        </svg>
+      );
     case "settings":
       return (
         <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
