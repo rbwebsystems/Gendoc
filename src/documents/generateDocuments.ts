@@ -266,7 +266,8 @@ export function buildInvoiceHtml(state: GeneratorState): string {
         </div>
 
         <!-- Məlumat Hissəsi (Satıcı və Alıcı) -->
-        <div class="grid grid-cols-2 gap-8 mb-10 text-[13px] border-b border-gray-300 pb-8">
+        <div class="mb-10 border border-gray-200 rounded-xl bg-gray-50/60 p-5">
+          <div class="grid grid-cols-2 gap-8 text-[13px]">
             <!-- Satıcı Məlumatları -->
             <div>
                 <h3 class="font-bold text-gray-900 text-sm uppercase mb-3 border-b border-gray-200 pb-1">Satıcı / İcraçı</h3>
@@ -295,6 +296,7 @@ export function buildInvoiceHtml(state: GeneratorState): string {
                     ${buyerAddr ? `<div class="font-semibold text-gray-700">Ünvan</div><div class="text-gray-900">${escapeHtml(buyerAddr)}</div>` : ""}
                 </div>
             </div>
+          </div>
         </div>
 
         <!-- Cədvəl -->
