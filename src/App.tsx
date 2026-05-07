@@ -1655,7 +1655,6 @@ export default function App() {
         <header className="dg-form-page-head">
           <div>
             <h1 className="dg-form-page-title">Qovluqlar</h1>
-            <p className="dg-page-desc">Şirkətlər və manual qovluqlar üzrə imzalanmış / skan edilmiş sənədləri saxlayın.</p>
           </div>
         </header>
         <div className="dg-form-page-body">
