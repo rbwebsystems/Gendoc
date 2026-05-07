@@ -195,8 +195,14 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   settings: "",
 };
 
-function flash(setter: (s: string | null) => void, msg: string) {
-  setter(msg);
+type ToastKind = "success" | "error";
+
+function flash(
+  setter: (s: { kind: ToastKind; msg: string } | null) => void,
+  msg: string,
+  kind: ToastKind = "success",
+) {
+  setter({ kind, msg });
   window.setTimeout(() => setter(null), 2600);
 }
 
@@ -441,7 +447,7 @@ function parseDatetimeLocal(s: string): number | null {
 export default function App() {
   const [workspace, setWorkspace] = useState<DocWorkspace>(() => normalizeWorkspace(loadWorkspace()));
   const [module, setModule] = useState<SidebarModule>("companies");
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ kind: ToastKind; msg: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navSearch, setNavSearch] = useState("");
   const navSearchRef = useRef<HTMLInputElement>(null);
@@ -701,7 +707,7 @@ export default function App() {
   const saveCompanyForm = () => {
     const profile = normalizeCompany(companyDraft);
     if (!profile.name.trim() && !profile.voen.trim()) {
-      flash(setToast, "Ən azı şirkət adı və ya VÖEN daxil edin.");
+      flash(setToast, "Ən azı şirkət adı və ya VÖEN daxil edin.", "error");
       return;
     }
     const now = Date.now();
@@ -764,7 +770,7 @@ export default function App() {
     const n = projectsUsingCompany(workspace, c.id);
     if (n > 0) {
       softBeep();
-      flash(setToast, `Bu şirkət ${n} təklifdə istifadə olunur — əvvəl təklifləri silin və ya dəyişin.`);
+      flash(setToast, `Bu şirkət ${n} təklifdə istifadə olunur — əvvəl təklifləri silin və ya dəyişin.`, "error");
       return;
     }
     const ok = await askConfirm({
@@ -782,7 +788,7 @@ export default function App() {
 
   const startNewProject = () => {
     if (workspace.companies.length === 0) {
-      flash(setToast, "Əvvəl «Şirkətlər» bölməsində ən azı bir şirkət əlavə edin.");
+      flash(setToast, "Əvvəl «Şirkətlər» bölməsində ən azı bir şirkət əlavə edin.", "error");
       setModule("companies");
       return;
     }
@@ -829,7 +835,7 @@ export default function App() {
 
   const saveProjectForm = () => {
     if (!projectDraft.companyId) {
-      flash(setToast, "Şirkət seçin.");
+      flash(setToast, "Şirkət seçin.", "error");
       return;
     }
     const now = Date.now();
@@ -977,7 +983,7 @@ export default function App() {
       const ok = openPrintableDocument(html);
       if (!ok) {
         softBeep();
-        flash(setToast, "Pop-up bloklanıb — brauzerdə yeni pəncərəyə icazə verin.");
+        flash(setToast, "Pop-up bloklanıb — brauzerdə yeni pəncərəyə icazə verin.", "error");
       }
     }
     closePrintDialog();
@@ -2020,7 +2026,7 @@ export default function App() {
     const title = (noteDraft.title || "").trim();
     const body = (noteDraft.body || "").trim();
     if (!title && !body) {
-      flash(setToast, "Qeyd boş ola bilməz.");
+      flash(setToast, "Qeyd boş ola bilməz.", "error");
       return;
     }
     const now = Date.now();
@@ -2592,8 +2598,8 @@ export default function App() {
 
             <main className="rb-content">
               {toast ? (
-                <div className="dg-toast" role="status">
-                  {toast}
+                <div className={`dg-toast ${toast.kind === "error" ? "dg-toast--error" : "dg-toast--success"}`} role="status">
+                  {toast.msg}
                 </div>
               ) : null}
 
