@@ -2007,6 +2007,8 @@ export default function App() {
   const startEditNote = (n: NoteRecord) => {
     setNoteEditId(n.id);
     setNoteDraft({ title: n.title || "", body: n.body || "", remindAt: n.remindAt || "" });
+    setNoteDraftStartedAt(n.createdAt || Date.now());
+    setNoteDialogOpen(true);
   };
 
   const openNewNoteDialog = () => {
@@ -2395,7 +2397,7 @@ export default function App() {
               saveNote();
             }}
           >
-            <h2 className="dg-modal-title">Yeni qeyd</h2>
+            <h2 className="dg-modal-title">{noteEditId ? "Qeydi yenilə" : "Yeni qeyd"}</h2>
             <p className="dg-modal-hint">Tarix: {new Date(noteDraftStartedAt).toLocaleString("az-AZ")}</p>
             <div className="dg-grid dg-grid-2">
               <label className="dg-field">
