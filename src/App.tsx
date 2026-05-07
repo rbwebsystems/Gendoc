@@ -27,6 +27,7 @@ import type {
   CompanyProfile,
   DocWorkspace,
   DocumentMeta,
+  NoteRecord,
   ProductRow,
   ProjectRecord,
   SavedCompanyRecord,
@@ -113,7 +114,7 @@ function mm(iso: string): string {
   return m && m.length === 2 ? m : String(new Date().getMonth() + 1).padStart(2, "0");
 }
 
-type SidebarModule = "companies" | "projects" | "folders" | "settings";
+type SidebarModule = "companies" | "projects" | "folders" | "notes" | "settings";
 
 type CompanyFormMode = "list" | "form";
 type ProjectFormMode = "list" | "form";
@@ -180,15 +181,17 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "companies", label: "Şirkətlər" },
   { id: "projects", label: "Təkliflər" },
   { id: "folders", label: "Qovluqlar" },
+  { id: "notes", label: "Qeydlər" },
   { id: "settings", label: "Ayarlar" },
 ];
 
-const SIDEBAR_MAIN_IDS: SidebarModule[] = ["companies", "projects", "folders"];
+const SIDEBAR_MAIN_IDS: SidebarModule[] = ["companies", "projects", "folders", "notes"];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
   companies: "",
   projects: "",
   folders: "",
+  notes: "",
   settings: "",
 };
 
@@ -413,6 +416,13 @@ export default function App() {
   const navSearchRef = useRef<HTMLInputElement>(null);
   const [projectProductSearch, setProjectProductSearch] = useState("");
 
+  const [noteEditId, setNoteEditId] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState<Pick<NoteRecord, "title" | "body" | "remindAt">>(() => ({
+    title: "",
+    body: "",
+    remindAt: "",
+  }));
+
   const [companyMode, setCompanyMode] = useState<CompanyFormMode>("list");
   const [companyEditId, setCompanyEditId] = useState<string | null>(null);
   const [companyDraft, setCompanyDraft] = useState<CompanyProfile>(() => emptyCompany());
@@ -449,6 +459,32 @@ export default function App() {
     const id = window.setTimeout(() => saveWorkspace(workspace), 420);
     return () => window.clearTimeout(id);
   }, [workspace]);
+
+  // Reminder: vaxt çatanda bir dəfə səsli xəbərdarlıq et
+  useEffect(() => {
+    const tick = () => {
+      const now = Date.now();
+      const due = (workspace.notes ?? []).filter((n) => {
+        if (!n || n.done) return false;
+        if (!n.remindAt) return false;
+        const t = Date.parse(n.remindAt);
+        if (!Number.isFinite(t)) return false;
+        if (t > now) return false;
+        return !n.remindedAt;
+      });
+      if (due.length === 0) return;
+      softBeep();
+      flash(setToast, `Reminder: ${due[0].title || "Qeyd"}`);
+      const markIds = new Set(due.map((d) => d.id));
+      setWorkspace((w) => ({
+        ...w,
+        notes: (w.notes ?? []).map((n) => (markIds.has(n.id) ? { ...n, remindedAt: now } : n)),
+      }));
+    };
+    tick();
+    const t = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(t);
+  }, [workspace.notes]);
 
   // Hər şirkət üçün avtomatik qovluq olsun
   useEffect(() => {
@@ -567,6 +603,9 @@ export default function App() {
     }
     if (module === "folders") {
       return { title: "Qovluqlar", sub: MODULE_TAGLINE.folders };
+    }
+    if (module === "notes") {
+      return { title: "Qeydlər", sub: MODULE_TAGLINE.notes };
     }
     return { title: "", sub: "" };
   }, [module, companyMode, projectMode, companyEditId, projectEditId]);
@@ -1900,6 +1939,154 @@ export default function App() {
     );
   };
 
+  const startNewNote = () => {
+    setNoteEditId(null);
+    setNoteDraft({ title: "", body: "", remindAt: "" });
+  };
+
+  const startEditNote = (n: NoteRecord) => {
+    setNoteEditId(n.id);
+    setNoteDraft({ title: n.title || "", body: n.body || "", remindAt: n.remindAt || "" });
+  };
+
+  const saveNote = () => {
+    const title = (noteDraft.title || "").trim();
+    const body = (noteDraft.body || "").trim();
+    if (!title && !body) {
+      flash(setToast, "Qeyd boş ola bilməz.");
+      return;
+    }
+    const now = Date.now();
+    const remindAt = (noteDraft.remindAt || "").trim() || undefined;
+    if (noteEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        notes: (w.notes ?? []).map((n) =>
+          n.id === noteEditId
+            ? { ...n, title, body, remindAt, updatedAt: now, remindedAt: remindAt ? n.remindedAt : undefined }
+            : n,
+        ),
+      }));
+      flash(setToast, "Qeyd yeniləndi");
+    } else {
+      const n: NoteRecord = {
+        id: crypto.randomUUID(),
+        title,
+        body,
+        remindAt,
+        createdAt: now,
+        updatedAt: now,
+        done: false,
+      };
+      setWorkspace((w) => ({ ...w, notes: [...(w.notes ?? []), n] }));
+      flash(setToast, "Qeyd əlavə olundu");
+    }
+    startNewNote();
+  };
+
+  const deleteNote = async (id: string) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: "Bu qeyd silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, notes: (w.notes ?? []).filter((n) => n.id !== id) }));
+    if (noteEditId === id) startNewNote();
+    flash(setToast, "Qeyd silindi");
+  };
+
+  const toggleNoteDone = (id: string) => {
+    setWorkspace((w) => ({
+      ...w,
+      notes: (w.notes ?? []).map((n) =>
+        n.id === id ? { ...n, done: !n.done, remindedAt: !n.done ? undefined : n.remindedAt, updatedAt: Date.now() } : n,
+      ),
+    }));
+  };
+
+  const renderNotesModule = () => {
+    const notes = [...(workspace.notes ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
+    return (
+      <div className="dg-form-page pg-panel" aria-label="Qeydlər">
+        <header className="dg-form-page-head">
+          <div>
+            <h1 className="dg-form-page-title">Qeydlər</h1>
+          </div>
+        </header>
+        <div className="dg-form-page-body">
+          <section className="dg-form-inner-panel" aria-label="Qeyd formu">
+            <h2 className="dg-form-inner-panel-title">{noteEditId ? "Qeydi yenilə" : "Yeni qeyd"}</h2>
+            <div className="dg-grid dg-grid-2">
+              <label className="dg-field">
+                <span className="dg-label">Başlıq</span>
+                <input className="dg-input" value={noteDraft.title} onChange={(e) => setNoteDraft((d) => ({ ...d, title: e.target.value }))} />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Reminder vaxtı</span>
+                <input
+                  className="dg-input"
+                  type="datetime-local"
+                  value={noteDraft.remindAt || ""}
+                  onChange={(e) => setNoteDraft((d) => ({ ...d, remindAt: e.target.value }))}
+                />
+              </label>
+              <label className="dg-field" style={{ gridColumn: "1 / -1" }}>
+                <span className="dg-label">Mətn</span>
+                <textarea className="dg-input" rows={4} value={noteDraft.body} onChange={(e) => setNoteDraft((d) => ({ ...d, body: e.target.value }))} />
+              </label>
+            </div>
+            <div className="dg-notes-actions">
+              {noteEditId ? (
+                <button type="button" className="dg-btn dg-btn-secondary" onClick={startNewNote}>
+                  Ləğv et
+                </button>
+              ) : null}
+              <button type="button" className="dg-btn dg-btn-primary" onClick={saveNote}>
+                Yadda saxla
+              </button>
+            </div>
+          </section>
+
+          {notes.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Hələ qeyd yoxdur</div>
+              <div className="dg-empty-state-desc">Yeni qeyd yazaraq reminder vaxtı təyin edə bilərsiniz.</div>
+            </div>
+          ) : (
+            <div className="dg-notes-list" role="list" aria-label="Qeydlər siyahısı">
+              {notes.map((n) => (
+                <div key={n.id} className={`dg-note-row ${n.done ? "is-done" : ""}`} role="listitem">
+                  <button type="button" className="dg-note-check" onClick={() => toggleNoteDone(n.id)} aria-label="Tamamlandı">
+                    {n.done ? "✓" : ""}
+                  </button>
+                  <div className="dg-note-main">
+                    <div className="dg-note-title" title={n.title}>
+                      {n.title || "Qeyd"}
+                    </div>
+                    <div className="dg-note-sub">
+                      {n.remindAt ? `⏰ ${n.remindAt.replace("T", " ")}` : "—"} · {new Date(n.updatedAt).toLocaleString("az-AZ")}
+                    </div>
+                  </div>
+                  <div className="dg-note-actions">
+                    <button type="button" className="dg-btn dg-btn-secondary" onClick={() => startEditNote(n)}>
+                      Düzəliş
+                    </button>
+                    <button type="button" className="dg-btn dg-btn-danger" onClick={() => deleteNote(n.id)}>
+                      Sil
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const headerPrimaryAction =
     module === "companies" && companyMode === "list"
       ? { label: "Yeni şirkət", onClick: startNewCompany }
@@ -2276,6 +2463,7 @@ export default function App() {
               {module === "companies" ? renderCompaniesModule() : null}
               {module === "projects" ? renderProjectsModule() : null}
               {module === "folders" ? renderFoldersModule() : null}
+              {module === "notes" ? renderNotesModule() : null}
               {module === "settings" ? renderSettingsModule() : null}
             </main>
           </section>

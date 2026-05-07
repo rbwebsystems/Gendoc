@@ -1,6 +1,7 @@
 import type {
   CompanyProfile,
   WorkspaceFolderRecord,
+  NoteRecord,
   DocWorkspace,
   DocWorkspaceV2,
   GeneratorState,
@@ -116,6 +117,20 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     // company folder-lar ancaq mövcud şirkətlərə bağlı qalsın
     .filter((f) => (f.kind === "company" ? Boolean(f.companyId && companyIds.has(f.companyId)) : true));
 
+  const notesRaw = Array.isArray(w.notes) ? w.notes : [];
+  const notes: NoteRecord[] = notesRaw
+    .filter((n) => n && typeof n.id === "string")
+    .map((n) => ({
+      id: String((n as { id: string }).id),
+      title: typeof (n as { title?: unknown }).title === "string" ? String((n as { title: string }).title) : "",
+      body: typeof (n as { body?: unknown }).body === "string" ? String((n as { body: string }).body) : "",
+      createdAt: typeof (n as { createdAt?: unknown }).createdAt === "number" ? Number((n as { createdAt: number }).createdAt) : Date.now(),
+      updatedAt: typeof (n as { updatedAt?: unknown }).updatedAt === "number" ? Number((n as { updatedAt: number }).updatedAt) : Date.now(),
+      remindAt: typeof (n as { remindAt?: unknown }).remindAt === "string" ? String((n as { remindAt: string }).remindAt) : undefined,
+      remindedAt: typeof (n as { remindedAt?: unknown }).remindedAt === "number" ? Number((n as { remindedAt: number }).remindedAt) : undefined,
+      done: Boolean((n as { done?: unknown }).done),
+    }));
+
   return {
     version: 3,
     settings: {
@@ -129,6 +144,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     companies,
     projects,
     folders,
+    notes,
   };
 }
 

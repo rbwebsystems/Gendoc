@@ -100,6 +100,19 @@ export interface WorkspaceFolderRecord {
   files: FolderFileRecord[];
 }
 
+export interface NoteRecord {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: number;
+  updatedAt: number;
+  /** ISO datetime-local string (e.g. "2026-05-08T12:30") */
+  remindAt?: string;
+  /** one-shot reminder marker */
+  remindedAt?: number;
+  done?: boolean;
+}
+
 export interface DocWorkspace {
   version: 3;
   /** Ayarlarda: daimi satıcı */
@@ -114,6 +127,7 @@ export interface DocWorkspace {
   companies: SavedCompanyRecord[];
   projects: ProjectRecord[];
   folders?: WorkspaceFolderRecord[];
+  notes?: NoteRecord[];
 }
 
 /** Köçürmə üçün köhnə format */
