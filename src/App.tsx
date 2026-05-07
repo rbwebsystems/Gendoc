@@ -453,6 +453,9 @@ export default function App() {
     body: "",
     remindAt: "",
   }));
+  const noteDialogRef = useRef<HTMLDialogElement>(null);
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteDraftStartedAt, setNoteDraftStartedAt] = useState<number>(() => Date.now());
 
   const [companyMode, setCompanyMode] = useState<CompanyFormMode>("list");
   const [companyEditId, setCompanyEditId] = useState<string | null>(null);
@@ -571,6 +574,15 @@ export default function App() {
       window.setTimeout(() => promptInputRef.current?.focus(), 0);
     } else el.close();
   }, [promptDialog]);
+
+  useEffect(() => {
+    const el = noteDialogRef.current;
+    if (!el) return;
+    if (noteDialogOpen) {
+      softBeep();
+      el.showModal();
+    } else el.close();
+  }, [noteDialogOpen]);
 
   useEffect(() => {
     const onResize = () => {
@@ -1973,11 +1985,17 @@ export default function App() {
   const startNewNote = () => {
     setNoteEditId(null);
     setNoteDraft({ title: "", body: "", remindAt: "" });
+    setNoteDraftStartedAt(Date.now());
   };
 
   const startEditNote = (n: NoteRecord) => {
     setNoteEditId(n.id);
     setNoteDraft({ title: n.title || "", body: n.body || "", remindAt: n.remindAt || "" });
+  };
+
+  const openNewNoteDialog = () => {
+    startNewNote();
+    setNoteDialogOpen(true);
   };
 
   const saveNote = () => {
@@ -2013,6 +2031,7 @@ export default function App() {
       flash(setToast, "Qeyd əlavə olundu");
     }
     startNewNote();
+    setNoteDialogOpen(false);
   };
 
   const deleteNote = async (id: string) => {
@@ -2048,38 +2067,14 @@ export default function App() {
           </div>
         </header>
         <div className="dg-form-page-body">
-          <section className="dg-form-inner-panel" aria-label="Qeyd formu">
-            <h2 className="dg-form-inner-panel-title">{noteEditId ? "Qeydi yenilə" : "Yeni qeyd"}</h2>
-            <div className="dg-grid dg-grid-2">
-              <label className="dg-field">
-                <span className="dg-label">Başlıq</span>
-                <input className="dg-input" value={noteDraft.title} onChange={(e) => setNoteDraft((d) => ({ ...d, title: e.target.value }))} />
-              </label>
-              <label className="dg-field">
-                <span className="dg-label">Reminder vaxtı</span>
-                <input
-                  className="dg-input"
-                  type="datetime-local"
-                  value={noteDraft.remindAt || ""}
-                  onChange={(e) => setNoteDraft((d) => ({ ...d, remindAt: e.target.value }))}
-                />
-              </label>
-              <label className="dg-field" style={{ gridColumn: "1 / -1" }}>
-                <span className="dg-label">Mətn</span>
-                <textarea className="dg-input" rows={4} value={noteDraft.body} onChange={(e) => setNoteDraft((d) => ({ ...d, body: e.target.value }))} />
-              </label>
-            </div>
-            <div className="dg-notes-actions">
-              {noteEditId ? (
-                <button type="button" className="dg-btn dg-btn-secondary" onClick={startNewNote}>
-                  Ləğv et
-                </button>
-              ) : null}
-              <button type="button" className="dg-btn dg-btn-primary" onClick={saveNote}>
-                Yadda saxla
+          <div className="dg-folders-toolbar" aria-label="Qeydlər alət paneli">
+            <div className="dg-folders-toolbar-left" />
+            <div className="dg-folders-toolbar-right">
+              <button type="button" className="dg-btn dg-btn-primary" onClick={openNewNoteDialog}>
+                Yeni qeyd
               </button>
             </div>
-          </section>
+          </div>
 
           {notes.length === 0 ? (
             <div className="dg-empty-state-card" role="status">
@@ -2359,6 +2354,48 @@ export default function App() {
               </button>
               <button type="submit" className="dg-btn dg-btn-primary">
                 {promptDialog.confirmLabel ?? "OK"}
+              </button>
+            </div>
+          </form>
+        </dialog>
+      ) : null}
+
+      {noteDialogOpen ? (
+        <dialog ref={noteDialogRef} className="dg-modal" onClose={() => setNoteDialogOpen(false)}>
+          <form
+            className="dg-modal-body"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveNote();
+            }}
+          >
+            <h2 className="dg-modal-title">Yeni qeyd</h2>
+            <p className="dg-modal-hint">Tarix: {new Date(noteDraftStartedAt).toLocaleString("az-AZ")}</p>
+            <div className="dg-grid dg-grid-2">
+              <label className="dg-field">
+                <span className="dg-label">Başlıq</span>
+                <input className="dg-input" value={noteDraft.title} onChange={(e) => setNoteDraft((d) => ({ ...d, title: e.target.value }))} />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Reminder vaxtı</span>
+                <input
+                  className="dg-input"
+                  type="datetime-local"
+                  value={noteDraft.remindAt || ""}
+                  onChange={(e) => setNoteDraft((d) => ({ ...d, remindAt: e.target.value }))}
+                />
+              </label>
+              <label className="dg-field" style={{ gridColumn: "1 / -1" }}>
+                <span className="dg-label">Mətn</span>
+                <textarea className="dg-input" rows={5} value={noteDraft.body} onChange={(e) => setNoteDraft((d) => ({ ...d, body: e.target.value }))} />
+              </label>
+            </div>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setNoteDialogOpen(false)}>
+                Ləğv et
+              </button>
+              <button type="submit" className="dg-btn dg-btn-primary">
+                Yadda saxla
               </button>
             </div>
           </form>
