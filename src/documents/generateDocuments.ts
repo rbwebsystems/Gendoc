@@ -1,6 +1,33 @@
 import type { GeneratorState } from "../types";
 import { escapeHtml, formatDateAzLong, moneyToWordsAz } from "../lib/text";
 
+/** `public/seller-signature-stamp.png` — bütün sənədlərdə satıcı imza/möhür */
+const SELLER_STAMP_FILE = "seller-signature-stamp.png";
+
+function sellerSignatureStampUrl(): string {
+  const basePath = String(import.meta.env.BASE_URL || "/");
+  if (typeof window !== "undefined" && window.location?.origin) {
+    const root = `${window.location.origin}${basePath.endsWith("/") ? basePath : `${basePath}/`}`;
+    return new URL(SELLER_STAMP_FILE, root).href;
+  }
+  const base = basePath.replace(/\/$/, "");
+  return `${base}/${SELLER_STAMP_FILE}`;
+}
+
+function sellerSignatureStampBlock(): string {
+  const src = escapeHtml(sellerSignatureStampUrl());
+  return `<div class="seller-stamp-wrap print-exact" aria-hidden="true"><img class="seller-stamp-img" src="${src}" alt="" /></div>`;
+}
+
+/** Hər sənədin <style> blokuna əlavə olunur */
+const SELLER_STAMP_CSS = `
+        .seller-stamp-wrap { margin-top: 4px; break-inside: avoid; page-break-inside: avoid; }
+        .seller-stamp-img { display: block; max-height: 92px; width: auto; max-width: 220px; object-fit: contain; }
+        @media print {
+            .seller-stamp-img { max-height: 88px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+`;
+
 export function computeTotals(state: GeneratorState) {
   const subtotal = state.rows.reduce((sum, r) => sum + r.qty * r.unitPrice, 0);
   const vatRate = Math.max(0, state.vatPercent || 0);
@@ -97,6 +124,8 @@ function printCssProtocol(): string {
         .gap-10 { gap: 2rem !important; }
         .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.45rem !important; }
         .mb-16 { margin-bottom: 2.5rem !important; }
+
+        ${SELLER_STAMP_CSS}
     `;
 }
 
@@ -230,6 +259,8 @@ export function buildInvoiceHtml(state: GeneratorState): string {
             border-top: none !important;
             border-bottom: none !important;
         }
+
+        ${SELLER_STAMP_CSS}
     </style>
 </head>
 <body>
@@ -332,14 +363,9 @@ export function buildInvoiceHtml(state: GeneratorState): string {
                 <p><span class="font-bold text-gray-900">Satıcı:</span> ${escapeHtml(sellerName)}</p>
                 ${director ? `<p><span class="font-bold text-gray-900">Rəhbər:</span> ${escapeHtml(director)}</p>` : ""}
             </div>
-            <div class="flex items-end gap-6">
-                <div class="flex-1">
-                    <p class="font-bold text-gray-900 mb-1">İmza</p>
-                    <div class="border-b border-gray-900 w-full"></div>
-                </div>
-                <div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center text-gray-400 text-xs font-bold shrink-0">
-                    M.Y.
-                </div>
+            <div>
+                <p class="font-bold text-gray-900 mb-1">İmza / möhür</p>
+                ${sellerSignatureStampBlock()}
             </div>
         </div>
 
@@ -471,6 +497,8 @@ export function buildDeliveryActHtml(state: GeneratorState): string {
             border-top: none !important;
             border-bottom: none !important;
         }
+
+        ${SELLER_STAMP_CSS}
     </style>
 </head>
 <body>
@@ -577,10 +605,10 @@ export function buildDeliveryActHtml(state: GeneratorState): string {
                 </div>
                 <div class="flex items-end gap-4 mt-auto">
                     <div class="flex-1">
-                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza</p>
-                        <div class="border-b border-gray-900 w-full"></div>
+                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza / möhür</p>
+                        ${sellerSignatureStampBlock()}
                     </div>
-                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
+                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0 opacity-40" aria-hidden="true">
                         M.Y.
                     </div>
                 </div>
@@ -715,6 +743,8 @@ export function buildDeliveryActNoPriceHtml(state: GeneratorState): string {
         td {
             font-size: 14px;
         }
+
+        ${SELLER_STAMP_CSS}
     </style>
 </head>
 <body>
@@ -800,10 +830,10 @@ export function buildDeliveryActNoPriceHtml(state: GeneratorState): string {
                 </div>
                 <div class="flex items-end gap-4 mt-auto">
                     <div class="flex-1">
-                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza</p>
-                        <div class="border-b border-gray-900 w-full"></div>
+                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza / möhür</p>
+                        ${sellerSignatureStampBlock()}
                     </div>
-                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
+                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0 opacity-40" aria-hidden="true">
                         M.Y.
                     </div>
                 </div>
@@ -973,8 +1003,8 @@ ${printCssProtocol()}
                     ${director ? `<p><span class="font-bold text-gray-900">Direktor:</span> ${escapeHtml(director)}</p>` : ""}
                 </div>
                 <div class="mt-auto">
-                    <p class="font-bold text-gray-900 mb-1">İmza</p>
-                    <div class="border-b border-gray-900 w-full"></div>
+                    <p class="font-bold text-gray-900 mb-1">İmza / möhür</p>
+                    ${sellerSignatureStampBlock()}
                 </div>
             </div>
             

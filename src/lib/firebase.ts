@@ -27,9 +27,20 @@ const firebaseConfig = {
   appId: env.VITE_FIREBASE_APP_ID as string | undefined,
 };
 
-export const firebaseEnabled: boolean = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId,
-);
+const requiredKeys: Array<keyof typeof firebaseConfig> = [
+  "apiKey",
+  "authDomain",
+  "projectId",
+  "storageBucket",
+  "messagingSenderId",
+  "appId",
+];
+
+const missing = requiredKeys.filter((k) => !firebaseConfig[k]);
+
+export const firebaseEnabled: boolean = missing.length === 0;
+export const firebaseConfigError: string | null =
+  firebaseEnabled ? null : `Firebase config missing: ${missing.join(", ")}`;
 
 let _app: FirebaseApp | null = null;
 let _auth: Auth | null = null;

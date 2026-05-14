@@ -36,7 +36,7 @@ import type {
   WorkspaceFolderRecord,
 } from "./types";
 import html2pdf from "html2pdf.js";
-import { auth, firebaseEnabled } from "./lib/firebase";
+import { auth, firebaseConfigError, firebaseEnabled } from "./lib/firebase";
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -2938,6 +2938,27 @@ export default function App() {
   return (
     <>
       <div className="pg-root biz-ui rb-desktop">
+        {!firebaseEnabled ? (
+          <div
+            style={{
+              position: "fixed",
+              left: 12,
+              bottom: 12,
+              zIndex: 200,
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "1px solid rgba(239, 68, 68, 0.35)",
+              background: "rgba(239, 68, 68, 0.10)",
+              color: "rgba(153, 27, 27, 0.95)",
+              fontSize: 12,
+              fontWeight: 700,
+              maxWidth: 520,
+            }}
+            role="status"
+          >
+            Sync OFF — Firebase qoşulmayıb. {firebaseConfigError || ""}
+          </div>
+        ) : null}
         <button
           type="button"
           className={`rb-sidebar-backdrop ${sidebarOpen ? "is-visible" : ""}`}
