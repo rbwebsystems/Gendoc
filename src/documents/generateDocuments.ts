@@ -21,10 +21,32 @@ function sellerSignatureStampBlock(): string {
 
 /** Hər sənədin <style> blokuna əlavə olunur */
 const SELLER_STAMP_CSS = `
-        .seller-stamp-wrap { margin-top: 4px; break-inside: avoid; page-break-inside: avoid; }
-        .seller-stamp-img { display: block; max-height: 92px; width: auto; max-width: 220px; object-fit: contain; }
+        /* Normal möhür ölçüsü; ağ fon sənəd üzərində demək olar ki, görünməsin (multiply) */
+        .seller-stamp-wrap {
+            margin-top: 6px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            background: transparent;
+            display: inline-block;
+            line-height: 0;
+        }
+        .seller-stamp-img {
+            display: block;
+            width: auto;
+            max-width: min(360px, 100%);
+            max-height: 175px;
+            height: auto;
+            object-fit: contain;
+            mix-blend-mode: multiply;
+            background: transparent;
+        }
         @media print {
-            .seller-stamp-img { max-height: 88px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .seller-stamp-img {
+                max-width: min(380px, 92vw);
+                max-height: 185px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
 `;
 
