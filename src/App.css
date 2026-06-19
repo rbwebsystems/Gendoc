@@ -1047,6 +1047,43 @@ textarea.dg-input::placeholder {
   flex-wrap: wrap;
 }
 
+.dg-suppliers-tabs {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.dg-suppliers-tab {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(15, 23, 42, 0.72);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.dg-suppliers-tab.is-active {
+  background: #ffffff;
+  color: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+}
+
+.dg-suppliers-tab:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.55);
+}
+
 .dg-empty-card {
   border: 1px dashed rgba(15, 23, 42, 0.18);
   border-radius: 14px;

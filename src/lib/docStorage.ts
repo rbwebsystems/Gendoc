@@ -2,6 +2,8 @@ import type {
   CompanyProfile,
   WorkspaceFolderRecord,
   NoteRecord,
+  SupplierRecord,
+  SupplierQuoteRecord,
   DocWorkspace,
   DocWorkspaceV2,
   GeneratorState,
@@ -144,6 +146,45 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       done: Boolean((n as { done?: unknown }).done),
     }));
 
+  const suppliersRaw = Array.isArray(w.suppliers) ? w.suppliers : [];
+  const suppliers: SupplierRecord[] = suppliersRaw
+    .filter((s) => s && typeof (s as { id?: unknown }).id === "string")
+    .map((s) => ({
+      id: String((s as { id: string }).id),
+      name: typeof (s as { name?: unknown }).name === "string" ? String((s as { name: string }).name).trim() : "",
+      phone: typeof (s as { phone?: unknown }).phone === "string" ? String((s as { phone: string }).phone) : undefined,
+      note: typeof (s as { note?: unknown }).note === "string" ? String((s as { note: string }).note) : undefined,
+      createdAt: typeof (s as { createdAt?: unknown }).createdAt === "number" ? Number((s as { createdAt: number }).createdAt) : Date.now(),
+      updatedAt: typeof (s as { updatedAt?: unknown }).updatedAt === "number" ? Number((s as { updatedAt: number }).updatedAt) : Date.now(),
+    }))
+    .filter((s) => s.name.length > 0);
+
+  const supplierIds = new Set(suppliers.map((s) => s.id));
+  const projectIds = new Set(projects.map((p) => p.id));
+
+  const quotesRaw = Array.isArray(w.supplierQuotes) ? w.supplierQuotes : [];
+  const supplierQuotes: SupplierQuoteRecord[] = quotesRaw
+    .filter((q) => q && typeof (q as { id?: unknown }).id === "string")
+    .map((q) => {
+      const supplierId = typeof (q as { supplierId?: unknown }).supplierId === "string" ? String((q as { supplierId: string }).supplierId) : "";
+      const projectIdRaw = typeof (q as { projectId?: unknown }).projectId === "string" ? String((q as { projectId: string }).projectId) : "";
+      const projectId = projectIdRaw && projectIds.has(projectIdRaw) ? projectIdRaw : undefined;
+      const quoteDateRaw = typeof (q as { quoteDate?: unknown }).quoteDate === "string" ? String((q as { quoteDate: string }).quoteDate) : "";
+      const quoteDate = /^\d{4}-\d{2}-\d{2}$/.test(quoteDateRaw) ? quoteDateRaw : new Date().toISOString().slice(0, 10);
+      return {
+        id: String((q as { id: string }).id),
+        supplierId: supplierIds.has(supplierId) ? supplierId : "",
+        projectId,
+        quoteDate,
+        amount: Number((q as { amount?: unknown }).amount) || 0,
+        description: typeof (q as { description?: unknown }).description === "string" ? String((q as { description: string }).description) : undefined,
+        note: typeof (q as { note?: unknown }).note === "string" ? String((q as { note: string }).note) : undefined,
+        createdAt: typeof (q as { createdAt?: unknown }).createdAt === "number" ? Number((q as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (q as { updatedAt?: unknown }).updatedAt === "number" ? Number((q as { updatedAt: number }).updatedAt) : Date.now(),
+      };
+    })
+    .filter((q) => q.supplierId);
+
   return {
     version: 3,
     settings: {
@@ -158,6 +199,8 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     projects,
     folders,
     notes,
+    suppliers,
+    supplierQuotes,
   };
 }
 

@@ -117,6 +117,32 @@ export interface NoteRecord {
   done?: boolean;
 }
 
+/** Təchizatçı kartı */
+export interface SupplierRecord {
+  id: string;
+  name: string;
+  phone?: string;
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Təchizatçıdan alınan qiymət qeydi */
+export interface SupplierQuoteRecord {
+  id: string;
+  supplierId: string;
+  /** Təklif/sifariş FK */
+  projectId?: string;
+  /** Qiymət alınma tarixi (YYYY-MM-DD) */
+  quoteDate: string;
+  amount: number;
+  /** Məhsul / təsvir */
+  description?: string;
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DocWorkspace {
   version: 3;
   /** Ayarlarda: daimi satıcı */
@@ -132,6 +158,8 @@ export interface DocWorkspace {
   projects: ProjectRecord[];
   folders?: WorkspaceFolderRecord[];
   notes?: NoteRecord[];
+  suppliers?: SupplierRecord[];
+  supplierQuotes?: SupplierQuoteRecord[];
 }
 
 /** Köçürmə üçün köhnə format */

@@ -33,6 +33,8 @@ import type {
   ProductRow,
   ProjectRecord,
   SavedCompanyRecord,
+  SupplierQuoteRecord,
+  SupplierRecord,
   WorkspaceFolderRecord,
 } from "./types";
 import html2pdf from "html2pdf.js";
@@ -152,7 +154,7 @@ function mm(iso: string): string {
   return m && m.length === 2 ? m : String(new Date().getMonth() + 1).padStart(2, "0");
 }
 
-type SidebarModule = "companies" | "projects" | "folders" | "notes" | "settings";
+type SidebarModule = "companies" | "projects" | "folders" | "notes" | "suppliers" | "settings";
 
 type CompanyFormMode = "list" | "form";
 type ProjectFormMode = "list" | "form";
@@ -220,16 +222,18 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "projects", label: "Təkliflər" },
   { id: "folders", label: "Qovluqlar" },
   { id: "notes", label: "Qeydlər" },
+  { id: "suppliers", label: "Təchizatçılar" },
   { id: "settings", label: "Ayarlar" },
 ];
 
-const SIDEBAR_MAIN_IDS: SidebarModule[] = ["companies", "projects", "folders", "notes"];
+const SIDEBAR_MAIN_IDS: SidebarModule[] = ["companies", "projects", "folders", "notes", "suppliers"];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
   companies: "",
   projects: "",
   folders: "",
   notes: "",
+  suppliers: "",
   settings: "",
 };
 
@@ -378,6 +382,19 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
           <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 8h6M9 12h6M9 16h6" />
         </svg>
       );
+    case "suppliers":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 7h11v10H3V7zm11 3h4l3 3v4h-7v-7z"
+          />
+          <circle cx="7.5" cy="18" r="1.5" strokeWidth="2" />
+          <circle cx="17.5" cy="18" r="1.5" strokeWidth="2" />
+        </svg>
+      );
     case "settings":
       return (
         <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
@@ -521,6 +538,35 @@ export default function App() {
   const noteDialogRef = useRef<HTMLDialogElement>(null);
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteDraftStartedAt, setNoteDraftStartedAt] = useState<number>(() => Date.now());
+
+  type SupplierPanel = "quotes" | "directory";
+  const [supplierPanel, setSupplierPanel] = useState<SupplierPanel>("quotes");
+  const [quoteEditId, setQuoteEditId] = useState<string | null>(null);
+  const [quoteDraft, setQuoteDraft] = useState<{
+    supplierId: string;
+    projectId: string;
+    quoteDate: string;
+    amount: string;
+    description: string;
+    note: string;
+  }>(() => ({
+    supplierId: "",
+    projectId: "",
+    quoteDate: new Date().toISOString().slice(0, 10),
+    amount: "",
+    description: "",
+    note: "",
+  }));
+  const quoteDialogRef = useRef<HTMLDialogElement>(null);
+  const [quoteDialogOpen, setQuoteDialogOpen] = useState(false);
+  const [supplierEditId, setSupplierEditId] = useState<string | null>(null);
+  const [supplierDraft, setSupplierDraft] = useState<{ name: string; phone: string; note: string }>(() => ({
+    name: "",
+    phone: "",
+    note: "",
+  }));
+  const supplierDialogRef = useRef<HTMLDialogElement>(null);
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
 
   const [companyMode, setCompanyMode] = useState<CompanyFormMode>("list");
   const [companyEditId, setCompanyEditId] = useState<string | null>(null);
@@ -752,6 +798,24 @@ export default function App() {
   }, [noteDialogOpen]);
 
   useEffect(() => {
+    const el = quoteDialogRef.current;
+    if (!el) return;
+    if (quoteDialogOpen) {
+      softBeep();
+      el.showModal();
+    } else el.close();
+  }, [quoteDialogOpen]);
+
+  useEffect(() => {
+    const el = supplierDialogRef.current;
+    if (!el) return;
+    if (supplierDialogOpen) {
+      softBeep();
+      el.showModal();
+    } else el.close();
+  }, [supplierDialogOpen]);
+
+  useEffect(() => {
     const el = reminderDialogRef.current;
     if (!el) return;
     if (reminderNote) {
@@ -803,6 +867,39 @@ export default function App() {
 
   const sortedProjects = useMemo(() => sortProjectsByDate(workspace.projects), [workspace.projects]);
 
+  const sortedSuppliers = useMemo(() => {
+    return [...(workspace.suppliers ?? [])].sort((a, b) =>
+      (a.name || "").localeCompare(b.name || "", "az", { sensitivity: "base" }),
+    );
+  }, [workspace.suppliers]);
+
+  const supplierById = useMemo(() => {
+    const m = new Map<string, SupplierRecord>();
+    for (const s of workspace.suppliers ?? []) m.set(s.id, s);
+    return m;
+  }, [workspace.suppliers]);
+
+  const projectLabel = useCallback(
+    (projectId?: string) => {
+      if (!projectId) return "—";
+      const p = workspace.projects.find((x) => x.id === projectId);
+      if (!p) return "—";
+      const company = workspace.companies.find((c) => c.id === p.companyId);
+      const companyName = company?.profile.name?.trim();
+      return companyName ? `${p.title} (${companyName})` : p.title;
+    },
+    [workspace.projects, workspace.companies],
+  );
+
+  const sortedSupplierQuotes = useMemo(() => {
+    return [...(workspace.supplierQuotes ?? [])].sort((a, b) => {
+      const da = a.quoteDate || "";
+      const db = b.quoteDate || "";
+      if (da !== db) return db.localeCompare(da);
+      return b.updatedAt - a.updatedAt;
+    });
+  }, [workspace.supplierQuotes]);
+
   const filteredMainNavIds = useMemo(() => {
     const q = navSearch.trim().toLowerCase();
     return SIDEBAR_MAIN_IDS.filter((id) => {
@@ -832,6 +929,9 @@ export default function App() {
     }
     if (module === "notes") {
       return { title: "Qeydlər", sub: MODULE_TAGLINE.notes };
+    }
+    if (module === "suppliers") {
+      return { title: "Təchizatçılar", sub: MODULE_TAGLINE.suppliers };
     }
     return { title: "", sub: "" };
   }, [module, companyMode, projectMode, companyEditId, projectEditId]);
@@ -2309,6 +2409,313 @@ export default function App() {
     }));
   };
 
+  const resetQuoteDraft = () => {
+    setQuoteEditId(null);
+    setQuoteDraft({
+      supplierId: "",
+      projectId: "",
+      quoteDate: new Date().toISOString().slice(0, 10),
+      amount: "",
+      description: "",
+      note: "",
+    });
+  };
+
+  const openNewQuoteDialog = () => {
+    resetQuoteDraft();
+    setQuoteDialogOpen(true);
+  };
+
+  const startEditQuote = (q: SupplierQuoteRecord) => {
+    setQuoteEditId(q.id);
+    setQuoteDraft({
+      supplierId: q.supplierId,
+      projectId: q.projectId || "",
+      quoteDate: q.quoteDate || new Date().toISOString().slice(0, 10),
+      amount: q.amount > 0 ? String(q.amount) : "",
+      description: q.description || "",
+      note: q.note || "",
+    });
+    setQuoteDialogOpen(true);
+  };
+
+  const saveQuote = () => {
+    const supplierId = quoteDraft.supplierId.trim();
+    if (!supplierId) {
+      flash(setToast, "Təchizatçı seçin.", "error");
+      return;
+    }
+    const amount = Number(String(quoteDraft.amount).replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      flash(setToast, "Qiymət düzgün daxil edin.", "error");
+      return;
+    }
+    const quoteDate = (quoteDraft.quoteDate || "").trim() || new Date().toISOString().slice(0, 10);
+    const projectId = quoteDraft.projectId.trim() || undefined;
+    const description = quoteDraft.description.trim() || undefined;
+    const note = quoteDraft.note.trim() || undefined;
+    const now = Date.now();
+
+    if (quoteEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        supplierQuotes: (w.supplierQuotes ?? []).map((q) =>
+          q.id === quoteEditId
+            ? { ...q, supplierId, projectId, quoteDate, amount, description, note, updatedAt: now }
+            : q,
+        ),
+      }));
+      flash(setToast, "Qiymət qeydi yeniləndi");
+    } else {
+      const rec: SupplierQuoteRecord = {
+        id: crypto.randomUUID(),
+        supplierId,
+        projectId,
+        quoteDate,
+        amount,
+        description,
+        note,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setWorkspace((w) => ({ ...w, supplierQuotes: [...(w.supplierQuotes ?? []), rec] }));
+      flash(setToast, "Qiymət qeydi əlavə olundu");
+    }
+    resetQuoteDraft();
+    setQuoteDialogOpen(false);
+  };
+
+  const deleteQuote = async (id: string) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: "Bu qiymət qeydi silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, supplierQuotes: (w.supplierQuotes ?? []).filter((q) => q.id !== id) }));
+    if (quoteEditId === id) resetQuoteDraft();
+    flash(setToast, "Qiymət qeydi silindi");
+  };
+
+  const resetSupplierDraft = () => {
+    setSupplierEditId(null);
+    setSupplierDraft({ name: "", phone: "", note: "" });
+  };
+
+  const openNewSupplierDialog = () => {
+    resetSupplierDraft();
+    setSupplierDialogOpen(true);
+  };
+
+  const startEditSupplier = (s: SupplierRecord) => {
+    setSupplierEditId(s.id);
+    setSupplierDraft({ name: s.name, phone: s.phone || "", note: s.note || "" });
+    setSupplierDialogOpen(true);
+  };
+
+  const saveSupplier = () => {
+    const name = supplierDraft.name.trim();
+    if (!name) {
+      flash(setToast, "Təchizatçı adı daxil edin.", "error");
+      return;
+    }
+    const phone = supplierDraft.phone.trim() || undefined;
+    const note = supplierDraft.note.trim() || undefined;
+    const now = Date.now();
+
+    if (supplierEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        suppliers: (w.suppliers ?? []).map((s) =>
+          s.id === supplierEditId ? { ...s, name, phone, note, updatedAt: now } : s,
+        ),
+      }));
+      flash(setToast, "Təchizatçı yeniləndi");
+    } else {
+      const rec: SupplierRecord = {
+        id: crypto.randomUUID(),
+        name,
+        phone,
+        note,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setWorkspace((w) => ({ ...w, suppliers: [...(w.suppliers ?? []), rec] }));
+      flash(setToast, "Təchizatçı əlavə olundu");
+    }
+    resetSupplierDraft();
+    setSupplierDialogOpen(false);
+  };
+
+  const deleteSupplier = async (id: string) => {
+    const quoteCount = (workspace.supplierQuotes ?? []).filter((q) => q.supplierId === id).length;
+    const ok = await askConfirm({
+      title: "Təchizatçı silinsin?",
+      message:
+        quoteCount > 0
+          ? `Bu təchizatçı və ona bağlı ${quoteCount} qiymət qeydi silinsin?`
+          : "Bu təchizatçı silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({
+      ...w,
+      suppliers: (w.suppliers ?? []).filter((s) => s.id !== id),
+      supplierQuotes: (w.supplierQuotes ?? []).filter((q) => q.supplierId !== id),
+    }));
+    if (supplierEditId === id) resetSupplierDraft();
+    flash(setToast, "Təchizatçı silindi");
+  };
+
+  const renderSuppliersModule = () => {
+    const quotes = sortedSupplierQuotes;
+    const suppliers = sortedSuppliers;
+
+    return (
+      <div className="dg-form-page pg-panel" aria-label="Təchizatçılar">
+        <header className="dg-form-page-head">
+          <div>
+            <h1 className="dg-form-page-title">Təchizatçılar</h1>
+          </div>
+        </header>
+        <div className="dg-form-page-body">
+          <div className="dg-suppliers-tabs" role="tablist" aria-label="Təchizatçılar bölmələri">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={supplierPanel === "quotes"}
+              className={`dg-suppliers-tab ${supplierPanel === "quotes" ? "is-active" : ""}`}
+              onClick={() => setSupplierPanel("quotes")}
+            >
+              Qiymət qeydləri
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={supplierPanel === "directory"}
+              className={`dg-suppliers-tab ${supplierPanel === "directory" ? "is-active" : ""}`}
+              onClick={() => setSupplierPanel("directory")}
+            >
+              Təchizatçı siyahısı
+            </button>
+          </div>
+
+          {supplierPanel === "quotes" ? (
+            quotes.length === 0 ? (
+              <div className="dg-empty-state-card" role="status">
+                <div className="dg-empty-state-title">Hələ qiymət qeydi yoxdur</div>
+              </div>
+            ) : (
+              <div className="dg-table-wrap pg-grid-host">
+                <table className="dg-table dg-table--sales">
+                  <thead>
+                    <tr>
+                      <th className="dg-th-num">№</th>
+                      <th>Tarix</th>
+                      <th>Təchizatçı</th>
+                      <th>Sifariş / təklif</th>
+                      <th>Təsvir</th>
+                      <th className="dg-th-num">Qiymət</th>
+                      <th className="dg-th-actions">Əməliyyatlar</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quotes.map((q, i) => (
+                      <tr key={q.id}>
+                        <td className="dg-td-num">{i + 1}</td>
+                        <td>{formatDateAzLong(q.quoteDate)}</td>
+                        <td>{supplierById.get(q.supplierId)?.name || "—"}</td>
+                        <td>{projectLabel(q.projectId)}</td>
+                        <td>{q.description?.trim() || "—"}</td>
+                        <td className="dg-td-num">{formatMoney(q.amount)}</td>
+                        <td className="dg-td-actions">
+                          <div className="dg-icon-row">
+                            <button
+                              type="button"
+                              className="dg-icon-btn"
+                              title="Redaktə"
+                              aria-label="Redaktə"
+                              onClick={() => startEditQuote(q)}
+                            >
+                              <IconEdit />
+                            </button>
+                            <button
+                              type="button"
+                              className="dg-icon-btn dg-icon-btn-danger"
+                              title="Sil"
+                              aria-label="Sil"
+                              onClick={() => deleteQuote(q.id)}
+                            >
+                              <IconTrash />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : suppliers.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Hələ təchizatçı yoxdur</div>
+            </div>
+          ) : (
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table dg-table--sales">
+                <thead>
+                  <tr>
+                    <th className="dg-th-num">№</th>
+                    <th>Ad</th>
+                    <th>Telefon</th>
+                    <th>Qeyd</th>
+                    <th className="dg-th-actions">Əməliyyatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suppliers.map((s, i) => (
+                    <tr key={s.id}>
+                      <td className="dg-td-num">{i + 1}</td>
+                      <td>{s.name}</td>
+                      <td>{s.phone?.trim() || "—"}</td>
+                      <td>{s.note?.trim() || "—"}</td>
+                      <td className="dg-td-actions">
+                        <div className="dg-icon-row">
+                          <button
+                            type="button"
+                            className="dg-icon-btn"
+                            title="Redaktə"
+                            aria-label="Redaktə"
+                            onClick={() => startEditSupplier(s)}
+                          >
+                            <IconEdit />
+                          </button>
+                          <button
+                            type="button"
+                            className="dg-icon-btn dg-icon-btn-danger"
+                            title="Sil"
+                            aria-label="Sil"
+                            onClick={() => deleteSupplier(s.id)}
+                          >
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderNotesModule = () => {
     const notes = [...(workspace.notes ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
     return (
@@ -2480,6 +2887,10 @@ export default function App() {
           ? { label: "Yeni qovluq", onClick: () => createCustomFolder() }
           : module === "notes"
             ? { label: "Yeni qeyd", onClick: openNewNoteDialog }
+            : module === "suppliers" && supplierPanel === "quotes"
+              ? { label: "Yeni qiymət", onClick: openNewQuoteDialog }
+              : module === "suppliers" && supplierPanel === "directory"
+                ? { label: "Yeni təchizatçı", onClick: openNewSupplierDialog }
         : null;
 
   const modalLayer = (
@@ -2754,6 +3165,155 @@ export default function App() {
             </div>
             <div className="dg-modal-actions">
               <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setNoteDialogOpen(false)}>
+                Ləğv et
+              </button>
+              <button type="submit" className="dg-btn dg-btn-primary">
+                Yadda saxla
+              </button>
+            </div>
+          </form>
+        </dialog>
+      ) : null}
+
+      {quoteDialogOpen ? (
+        <dialog ref={quoteDialogRef} className="dg-modal dg-modal--wide" onClose={() => setQuoteDialogOpen(false)}>
+          <form
+            className="dg-modal-body"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveQuote();
+            }}
+          >
+            <h2 className="dg-modal-title">{quoteEditId ? "Qiymət qeydini yenilə" : "Yeni qiymət qeydi"}</h2>
+            <div className="dg-grid dg-grid-2">
+              <label className="dg-field">
+                <span className="dg-label">Təchizatçı</span>
+                <select
+                  className="dg-input"
+                  value={quoteDraft.supplierId}
+                  onChange={(e) => setQuoteDraft((d) => ({ ...d, supplierId: e.target.value }))}
+                  required
+                >
+                  <option value="">Seçin…</option>
+                  {sortedSuppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Qiymət alınma tarixi</span>
+                <input
+                  className="dg-input"
+                  type="date"
+                  value={quoteDraft.quoteDate}
+                  onChange={(e) => setQuoteDraft((d) => ({ ...d, quoteDate: e.target.value }))}
+                  required
+                />
+              </label>
+              <label className="dg-field" style={{ gridColumn: "1 / -1" }}>
+                <span className="dg-label">Sifariş / təklif</span>
+                <select
+                  className="dg-input"
+                  value={quoteDraft.projectId}
+                  onChange={(e) => setQuoteDraft((d) => ({ ...d, projectId: e.target.value }))}
+                >
+                  <option value="">Seçilməyib</option>
+                  {sortedProjects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {projectLabel(p.id)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Qiymət (AZN)</span>
+                <input
+                  className="dg-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={quoteDraft.amount}
+                  onChange={(e) => setQuoteDraft((d) => ({ ...d, amount: e.target.value }))}
+                  required
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Məhsul / təsvir</span>
+                <input
+                  className="dg-input"
+                  value={quoteDraft.description}
+                  onChange={(e) => setQuoteDraft((d) => ({ ...d, description: e.target.value }))}
+                  placeholder="Məs: Kabel, avadanlıq…"
+                />
+              </label>
+              <label className="dg-field" style={{ gridColumn: "1 / -1" }}>
+                <span className="dg-label">Qeyd</span>
+                <textarea
+                  className="dg-input"
+                  rows={3}
+                  value={quoteDraft.note}
+                  onChange={(e) => setQuoteDraft((d) => ({ ...d, note: e.target.value }))}
+                />
+              </label>
+            </div>
+            {sortedSuppliers.length === 0 ? (
+              <p className="dg-modal-hint">
+                Əvvəlcə «Təchizatçı siyahısı» tabında təchizatçı əlavə edin və ya topbar-dan «Yeni təchizatçı».
+              </p>
+            ) : null}
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setQuoteDialogOpen(false)}>
+                Ləğv et
+              </button>
+              <button type="submit" className="dg-btn dg-btn-primary" disabled={sortedSuppliers.length === 0}>
+                Yadda saxla
+              </button>
+            </div>
+          </form>
+        </dialog>
+      ) : null}
+
+      {supplierDialogOpen ? (
+        <dialog ref={supplierDialogRef} className="dg-modal dg-modal--wide" onClose={() => setSupplierDialogOpen(false)}>
+          <form
+            className="dg-modal-body"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveSupplier();
+            }}
+          >
+            <h2 className="dg-modal-title">{supplierEditId ? "Təchizatçını yenilə" : "Yeni təchizatçı"}</h2>
+            <div className="dg-grid dg-grid-2">
+              <label className="dg-field" style={{ gridColumn: "1 / -1" }}>
+                <span className="dg-label">Ad</span>
+                <input
+                  className="dg-input"
+                  value={supplierDraft.name}
+                  onChange={(e) => setSupplierDraft((d) => ({ ...d, name: e.target.value }))}
+                  required
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Telefon</span>
+                <input
+                  className="dg-input"
+                  value={supplierDraft.phone}
+                  onChange={(e) => setSupplierDraft((d) => ({ ...d, phone: e.target.value }))}
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Qeyd</span>
+                <input
+                  className="dg-input"
+                  value={supplierDraft.note}
+                  onChange={(e) => setSupplierDraft((d) => ({ ...d, note: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setSupplierDialogOpen(false)}>
                 Ləğv et
               </button>
               <button type="submit" className="dg-btn dg-btn-primary">
@@ -3101,6 +3661,7 @@ export default function App() {
               {module === "projects" ? renderProjectsModule() : null}
               {module === "folders" ? renderFoldersModule() : null}
               {module === "notes" ? renderNotesModule() : null}
+              {module === "suppliers" ? renderSuppliersModule() : null}
               {module === "settings" ? renderSettingsModule() : null}
             </main>
           </section>
