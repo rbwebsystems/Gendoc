@@ -15,6 +15,7 @@ import type {
 import { emptyCompany, emptyMeta } from "./defaults";
 
 const WS_KEY_V3 = "docgen_workspace_v3";
+const WS_KEY_V3_BACKUP = "docgen_workspace_v3_backup";
 const WS_KEY_V2 = "docgen_workspace_v2";
 const LEGACY_KEY = "docgen_state_v1";
 
@@ -368,13 +369,103 @@ export function saveWorkspaceLocal(w: DocWorkspace): void {
   localStorage.setItem(WS_KEY_V3, JSON.stringify(w));
 }
 
+function readRawLocal(key: string): DocWorkspace | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const w = JSON.parse(raw) as Partial<DocWorkspace>;
+    if (w?.version === 3) return normalizeWorkspace(w as DocWorkspace);
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** Lokal məlumat varmı (şirkət, təklif, qeyd və s.) */
+export function workspaceHasUserData(w: DocWorkspace): boolean {
+  const ws = normalizeWorkspace(w);
+  const hasSeller =
+    Boolean(ws.settings.seller.name?.trim()) ||
+    Boolean(ws.settings.seller.voen?.trim()) ||
+    Boolean(ws.settings.seller.accountManat?.trim());
+  const hasFolders = (ws.folders ?? []).some((f) => (f.files?.length ?? 0) > 0);
+  return (
+    ws.companies.length > 0 ||
+    ws.projects.length > 0 ||
+    (ws.notes?.length ?? 0) > 0 ||
+    (ws.suppliers?.length ?? 0) > 0 ||
+    (ws.supplierQuotes?.length ?? 0) > 0 ||
+    hasFolders ||
+    hasSeller
+  );
+}
+
+function workspaceLatestTouch(w: DocWorkspace): number {
+  const ws = normalizeWorkspace(w);
+  let t = 0;
+  const bump = (n: unknown) => {
+    if (typeof n === "number" && Number.isFinite(n)) t = Math.max(t, n);
+  };
+  for (const c of ws.companies) bump(c.updatedAt);
+  for (const p of ws.projects) bump(p.updatedAt);
+  for (const n of ws.notes ?? []) bump(n.updatedAt);
+  for (const s of ws.suppliers ?? []) bump(s.updatedAt);
+  for (const q of ws.supplierQuotes ?? []) bump(q.updatedAt);
+  for (const f of ws.folders ?? []) bump(f.updatedAt);
+  return t;
+}
+
+/** Lokal və remote arasında daha dolu / daha yeni olanı seç */
+export function pickPreferredWorkspace(
+  local: DocWorkspace | null,
+  remote: DocWorkspace | null,
+): DocWorkspace {
+  const l = local ? normalizeWorkspace(local) : null;
+  const r = remote ? normalizeWorkspace(remote) : null;
+  const lHas = l ? workspaceHasUserData(l) : false;
+  const rHas = r ? workspaceHasUserData(r) : false;
+  if (lHas && !rHas) return l!;
+  if (rHas && !lHas) return r!;
+  if (lHas && rHas) return workspaceLatestTouch(l!) >= workspaceLatestTouch(r!) ? l! : r!;
+  if (l) return l;
+  if (r) return r;
+  return normalizeWorkspace({
+    version: 3,
+    settings: { seller: emptyCompany() },
+    companies: [],
+    projects: [],
+  });
+}
+
+export function loadLocalWorkspaceBackup(): DocWorkspace | null {
+  return readRawLocal(WS_KEY_V3_BACKUP);
+}
+
+export function hasLocalWorkspaceBackup(): boolean {
+  try {
+    return Boolean(localStorage.getItem(WS_KEY_V3_BACKUP));
+  } catch {
+    return false;
+  }
+}
+
+export function backupLocalWorkspace(): void {
+  try {
+    const raw = localStorage.getItem(WS_KEY_V3);
+    if (raw) localStorage.setItem(WS_KEY_V3_BACKUP, raw);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Köhnə adlar — geriyə uyğunluq üçün ekvivalent funksiyalar */
 export const loadWorkspace = loadWorkspaceLocal;
 export const saveWorkspace = saveWorkspaceLocal;
 
-/** Əgər istifadəçi remote-a köçürülübsə, lokal nüsxəni təmizləmək üçün istifadə olunur */
+/** Lokal nüsxəni silməzdən əvvəl backup saxla */
 export function clearLocalWorkspace(): void {
   try {
+    backupLocalWorkspace();
     localStorage.removeItem(WS_KEY_V3);
   } catch {
     /* ignore */

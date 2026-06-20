@@ -12,14 +12,20 @@ import {
   computeTotals,
 } from "./documents/generateDocuments";
 import {
+  backupLocalWorkspace,
   clearLocalWorkspace,
+  hasLocalWorkspace,
+  hasLocalWorkspaceBackup,
+  loadLocalWorkspaceBackup,
   loadWorkspaceLocal,
   normalizeCompany,
   normalizeProductRows,
   normalizeWorkspace,
+  pickPreferredWorkspace,
   projectsUsingCompany,
   saveWorkspaceLocal,
   sortProjectsByDate,
+  workspaceHasUserData,
   workspaceToGeneratorState,
 } from "./lib/docStorage";
 import { emptyCompany, emptyMeta, newProductRow } from "./lib/defaults";
@@ -629,25 +635,34 @@ export default function App() {
     const uid = authState.user.uid;
     let cancelled = false;
 
-    // İlk dəfə: əgər remote-da workspace yoxdursa, cari (lokal) məlumatları köçür
+    // İlk dəfə: lokal + remote-u müqayisə et, daha dolu olanı saxla
     (async () => {
       try {
         const remote = await fetchWorkspaceOnce(uid);
         if (cancelled) return;
-        if (!remote) {
-          // Cari işçi sahəsindəki məlumatları (mount-da localStorage-dən gəlibsə də) seed kimi yaz
-          const seed = normalizeWorkspace(workspace);
-          await writeWorkspace(uid, seed);
-          // Lokal nüsxəni təmizləyirik ki, başqa istifadəçi daxil olduqda qarışmasın
-          clearLocalWorkspace();
-          if (!cancelled) {
-            lastSyncedJsonRef.current = JSON.stringify(seed);
-            setWorkspace(seed);
-            remoteReadyRef.current = true;
-          }
-        } else {
-          // Remote mövcuddur — lokal nüsxəni saxlamağa ehtiyac yoxdur
-          clearLocalWorkspace();
+
+        const localMain = hasLocalWorkspace() ? loadWorkspaceLocal() : null;
+        const localBackup = loadLocalWorkspaceBackup();
+        const local = pickPreferredWorkspace(localMain, localBackup);
+        const merged = pickPreferredWorkspace(local, remote);
+
+        const remoteNorm = remote ? normalizeWorkspace(remote) : null;
+        const needsUpload =
+          !remoteNorm ||
+          !workspaceHasUserData(remoteNorm) ||
+          JSON.stringify(merged) !== JSON.stringify(remoteNorm);
+
+        if (needsUpload) {
+          await writeWorkspace(uid, merged);
+        }
+
+        backupLocalWorkspace();
+        clearLocalWorkspace();
+
+        if (!cancelled) {
+          lastSyncedJsonRef.current = JSON.stringify(merged);
+          setWorkspace(merged);
+          remoteReadyRef.current = true;
         }
       } catch {
         /* ignore — onSnapshot da işə düşəcək */
@@ -1010,6 +1025,38 @@ export default function App() {
     },
     [],
   );
+
+  const restoreFromLocalBackup = useCallback(async () => {
+    const backup = loadLocalWorkspaceBackup();
+    const local = hasLocalWorkspace() ? loadWorkspaceLocal() : null;
+    const source = pickPreferredWorkspace(local, backup);
+    if (!workspaceHasUserData(source)) {
+      flash(setToast, "Bərpa ediləcək lokal məlumat tapılmadı.", "error");
+      return;
+    }
+    const ok = await askConfirm({
+      title: "Lokal məlumatları bərpa et",
+      message: "Brauzerdə saxlanmış köhnə məlumatlar cari hesaba yazılacaq. Davam edilsin?",
+      confirmLabel: "Bərpa et",
+      cancelLabel: "Ləğv et",
+    });
+    if (!ok) return;
+    const merged = normalizeWorkspace(source);
+    if (firebaseEnabled && authState.status === "signedIn") {
+      try {
+        await writeWorkspace(authState.user.uid, merged);
+        lastSyncedJsonRef.current = JSON.stringify(merged);
+        remoteReadyRef.current = true;
+      } catch {
+        flash(setToast, "Firestore-a yazılmadı", "error");
+        return;
+      }
+    } else {
+      saveWorkspaceLocal(merged);
+    }
+    setWorkspace(merged);
+    flash(setToast, "Məlumatlar bərpa olundu");
+  }, [askConfirm, authState]);
 
   const resolveConfirm = (v: boolean) => {
     confirmResolverRef.current?.(v);
@@ -1866,6 +1913,17 @@ export default function App() {
         </div>
       </header>
       <div className="dg-form-page-body">
+        {hasLocalWorkspaceBackup() || hasLocalWorkspace() ? (
+          <section className="dg-form-inner-panel" style={{ marginBottom: 16 }}>
+            <h2 className="dg-form-inner-panel-title">Məlumat bərpası</h2>
+            <p className="dg-muted" style={{ marginBottom: 12, fontSize: 13 }}>
+              Firebase-ə keçid zamanı köhnə brauzer məlumatları itibsə, lokal backup-dan bərpa edə bilərsiniz.
+            </p>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={() => restoreFromLocalBackup()}>
+              Lokal məlumatları bərpa et
+            </button>
+          </section>
+        ) : null}
         <h2 className="dg-form-inner-panel-title">Satıcı rekvizitləri</h2>
         <div className="rb-company-form-grid">
           <section className="dg-form-inner-panel rb-company-form-card" aria-label="Satıcı rekvizitləri 1">
