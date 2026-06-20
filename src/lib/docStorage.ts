@@ -76,6 +76,21 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
 
   projects = projects.filter((p) => p.companyId);
 
+  const suppliersRaw = Array.isArray(w.suppliers) ? w.suppliers : [];
+  const suppliers: SupplierRecord[] = suppliersRaw
+    .filter((s) => s && typeof (s as { id?: unknown }).id === "string")
+    .map((s) => ({
+      id: String((s as { id: string }).id),
+      name: typeof (s as { name?: unknown }).name === "string" ? String((s as { name: string }).name).trim() : "",
+      phone: typeof (s as { phone?: unknown }).phone === "string" ? String((s as { phone: string }).phone) : undefined,
+      note: typeof (s as { note?: unknown }).note === "string" ? String((s as { note: string }).note) : undefined,
+      createdAt: typeof (s as { createdAt?: unknown }).createdAt === "number" ? Number((s as { createdAt: number }).createdAt) : Date.now(),
+      updatedAt: typeof (s as { updatedAt?: unknown }).updatedAt === "number" ? Number((s as { updatedAt: number }).updatedAt) : Date.now(),
+    }))
+    .filter((s) => s.name.length > 0);
+
+  const supplierIds = new Set(suppliers.map((s) => s.id));
+
   const foldersRaw = Array.isArray(w.folders) ? w.folders : [];
   const folders: WorkspaceFolderRecord[] = foldersRaw
     .filter((f) => f && typeof f.id === "string")
@@ -84,22 +99,31 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       const legacyCompanyId = typeof (f as { companyId?: unknown }).companyId === "string" ? String((f as { companyId: string }).companyId) : "";
       const kindRaw = typeof (f as { kind?: unknown }).kind === "string" ? String((f as { kind: string }).kind) : "";
       const kind: WorkspaceFolderRecord["kind"] =
-        kindRaw === "custom" ? "custom" : "company";
+        kindRaw === "custom" ? "custom" : kindRaw === "supplier" ? "supplier" : "company";
 
       const companyId =
         kind === "company"
           ? (typeof (f as { companyId?: unknown }).companyId === "string" ? String((f as { companyId: string }).companyId) : legacyCompanyId)
           : undefined;
 
-      const safeKind: WorkspaceFolderRecord["kind"] =
-        kind === "company" && companyId && companyIds.has(companyId) ? "company" : kind === "custom" ? "custom" : "custom";
+      const supplierId =
+        kind === "supplier" && typeof (f as { supplierId?: unknown }).supplierId === "string"
+          ? String((f as { supplierId: string }).supplierId)
+          : undefined;
+
+      let safeKind: WorkspaceFolderRecord["kind"] = "custom";
+      if (kind === "company" && companyId && companyIds.has(companyId)) safeKind = "company";
+      else if (kind === "supplier" && supplierId && supplierIds.has(supplierId)) safeKind = "supplier";
+      else if (kind === "custom") safeKind = "custom";
 
       const safeCompanyId = safeKind === "company" ? companyId : undefined;
+      const safeSupplierId = safeKind === "supplier" ? supplierId : undefined;
 
       return {
         id: String((f as { id: string }).id),
         kind: safeKind,
         companyId: safeCompanyId,
+        supplierId: safeSupplierId,
         name: typeof (f as { name?: unknown }).name === "string" ? String((f as { name: string }).name) : "",
         createdAt: typeof (f as { createdAt?: unknown }).createdAt === "number" ? Number((f as { createdAt: number }).createdAt) : Date.now(),
         updatedAt: typeof (f as { updatedAt?: unknown }).updatedAt === "number" ? Number((f as { updatedAt: number }).updatedAt) : Date.now(),
@@ -130,8 +154,11 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
           : [],
       };
     })
-    // company folder-lar ancaq mövcud şirkətlərə bağlı qalsın
-    .filter((f) => (f.kind === "company" ? Boolean(f.companyId && companyIds.has(f.companyId)) : true));
+    .filter((f) => {
+      if (f.kind === "company") return Boolean(f.companyId && companyIds.has(f.companyId));
+      if (f.kind === "supplier") return Boolean(f.supplierId && supplierIds.has(f.supplierId));
+      return true;
+    });
 
   const notesRaw = Array.isArray(w.notes) ? w.notes : [];
   const notes: NoteRecord[] = notesRaw
@@ -147,20 +174,6 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       done: Boolean((n as { done?: unknown }).done),
     }));
 
-  const suppliersRaw = Array.isArray(w.suppliers) ? w.suppliers : [];
-  const suppliers: SupplierRecord[] = suppliersRaw
-    .filter((s) => s && typeof (s as { id?: unknown }).id === "string")
-    .map((s) => ({
-      id: String((s as { id: string }).id),
-      name: typeof (s as { name?: unknown }).name === "string" ? String((s as { name: string }).name).trim() : "",
-      phone: typeof (s as { phone?: unknown }).phone === "string" ? String((s as { phone: string }).phone) : undefined,
-      note: typeof (s as { note?: unknown }).note === "string" ? String((s as { note: string }).note) : undefined,
-      createdAt: typeof (s as { createdAt?: unknown }).createdAt === "number" ? Number((s as { createdAt: number }).createdAt) : Date.now(),
-      updatedAt: typeof (s as { updatedAt?: unknown }).updatedAt === "number" ? Number((s as { updatedAt: number }).updatedAt) : Date.now(),
-    }))
-    .filter((s) => s.name.length > 0);
-
-  const supplierIds = new Set(suppliers.map((s) => s.id));
   const projectIds = new Set(projects.map((p) => p.id));
 
   const quotesRaw = Array.isArray(w.supplierQuotes) ? w.supplierQuotes : [];

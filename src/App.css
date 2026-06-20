@@ -887,6 +887,19 @@ textarea.dg-input::placeholder {
   gap: 8px;
 }
 
+.dg-folders-section {
+  margin-bottom: 20px;
+}
+
+.dg-folders-section-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(15, 23, 42, 0.52);
+}
+
 .dg-empty-state-card {
   border: 1px solid rgba(15, 23, 42, 0.10);
   border-radius: 14px;

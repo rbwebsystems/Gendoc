@@ -90,14 +90,16 @@ export interface FolderFileRecord {
   url?: string;
 }
 
-export type WorkspaceFolderKind = "company" | "custom";
+export type WorkspaceFolderKind = "company" | "supplier" | "custom";
 
-/** Qovluq (şirkət qovluğu və ya manual qovluq) */
+/** Qovluq (şirkət, təchizatçı və ya manual qovluq) */
 export interface WorkspaceFolderRecord {
   id: string;
   kind: WorkspaceFolderKind;
   /** kind==="company" üçün */
   companyId?: string;
+  /** kind==="supplier" üçün */
+  supplierId?: string;
   name: string;
   createdAt: number;
   updatedAt: number;

@@ -770,6 +770,30 @@ export default function App() {
     }));
   }, [workspace.companies, workspace.folders]);
 
+  // Hər təchizatçı üçün avtomatik qovluq olsun
+  useEffect(() => {
+    const existing = new Set(
+      (workspace.folders ?? []).filter((f) => (f as WorkspaceFolderRecord).kind === "supplier").map((f) => (f as WorkspaceFolderRecord).supplierId),
+    );
+    const missing = (workspace.suppliers ?? []).filter((s) => !existing.has(s.id));
+    if (missing.length === 0) return;
+    setWorkspace((w) => ({
+      ...w,
+      folders: [
+        ...(w.folders ?? []),
+        ...missing.map((s) => ({
+          id: crypto.randomUUID(),
+          kind: "supplier" as const,
+          supplierId: s.id,
+          name: s.name || "Təchizatçı",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          files: [],
+        })),
+      ],
+    }));
+  }, [workspace.suppliers, workspace.folders]);
+
   useEffect(() => {
     const el = printDialogRef.current;
     if (!el) return;
@@ -1946,6 +1970,7 @@ export default function App() {
     kind: "folder" | "root";
     folderId?: string;
     companyId?: string;
+    supplierId?: string;
   }>(() => ({
     open: false,
     x: 0,
@@ -1953,12 +1978,21 @@ export default function App() {
     kind: "folder",
     folderId: undefined,
     companyId: undefined,
+    supplierId: undefined,
   }));
 
   const foldersByCompany = useMemo(() => {
     const m = new Map<string, WorkspaceFolderRecord>();
     for (const f of (workspace.folders ?? []).filter((x) => x.kind === "company" && x.companyId)) {
       m.set(f.companyId!, f as WorkspaceFolderRecord);
+    }
+    return m;
+  }, [workspace.folders]);
+
+  const foldersBySupplier = useMemo(() => {
+    const m = new Map<string, WorkspaceFolderRecord>();
+    for (const f of (workspace.folders ?? []).filter((x) => x.kind === "supplier" && x.supplierId)) {
+      m.set(f.supplierId!, f as WorkspaceFolderRecord);
     }
     return m;
   }, [workspace.folders]);
@@ -2094,7 +2128,7 @@ export default function App() {
     const toPurge = (workspace.folders ?? []).filter((f) => f.kind === "company" && f.companyId === cid);
     await purgeFoldersStorage(toPurge);
     setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => !(f.kind === "company" && f.companyId === cid)) }));
-    setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+    setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined, supplierId: undefined });
     flash(setToast, "Qovluq silindi");
   };
 
@@ -2112,7 +2146,24 @@ export default function App() {
     await purgeFoldersStorage(toPurge);
     setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => f.id !== fid) }));
     if (activeFolderId === fid) setActiveFolderId("");
-    setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+    setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined, supplierId: undefined });
+    flash(setToast, "Qovluq silindi");
+  };
+
+  const deleteSupplierFolder = async (sid: string) => {
+    const supplierName = supplierById.get(sid)?.name || "Qovluq";
+    const ok = await askConfirm({
+      title: "Qovluq silinsin?",
+      message: `«${supplierName}» qovluğu və içindəki bütün fayllar silinsin?`,
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    const toPurge = (workspace.folders ?? []).filter((f) => f.kind === "supplier" && f.supplierId === sid);
+    await purgeFoldersStorage(toPurge);
+    setWorkspace((w) => ({ ...w, folders: (w.folders ?? []).filter((f) => !(f.kind === "supplier" && f.supplierId === sid)) }));
+    setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined, supplierId: undefined });
     flash(setToast, "Qovluq silindi");
   };
 
@@ -2135,8 +2186,69 @@ export default function App() {
 
   const renderFoldersModule = () => {
     const companies = sortedCompanies;
+    const suppliers = sortedSuppliers;
     const folder = activeFolderId ? folderById.get(activeFolderId) : undefined;
     const anyFoldersExist = (workspace.folders ?? []).length > 0;
+    const nothingToShow = companies.length === 0 && suppliers.length === 0 && customFolders.length === 0;
+
+    const renderFolderTile = (
+      key: string,
+      folderRec: WorkspaceFolderRecord | undefined,
+      label: string,
+      ctx: { companyId?: string; supplierId?: string },
+    ) => {
+      if (!folderRec?.id) return null;
+      const thumbs = (folderRec.files ?? [])
+        .slice()
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .slice(0, 4);
+      return (
+        <button
+          key={key}
+          type="button"
+          className="dg-folder-tile"
+          role="listitem"
+          onDoubleClick={() => {
+            setActiveFolderId(folderRec.id);
+            setFolderView("folder");
+          }}
+          onClick={() => setActiveFolderId(folderRec.id)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setActiveFolderId(folderRec.id);
+            setFolderMenu({
+              open: true,
+              x: e.clientX,
+              y: e.clientY,
+              kind: "folder",
+              folderId: folderRec.id,
+              companyId: ctx.companyId,
+              supplierId: ctx.supplierId,
+            });
+          }}
+          title="Açmaq üçün iki dəfə klik"
+        >
+          <div className="dg-folder-icon-wrap" aria-hidden>
+            <IconFolder />
+            {thumbs.length > 0 ? (
+              <div className="dg-folder-thumbgrid">
+                {thumbs.map((t) => (
+                  <div key={t.id} className="dg-folder-thumbcell">
+                    {t.mime.startsWith("image/") ? (
+                      <img src={fileSrc(t)} alt="" loading="lazy" />
+                    ) : (
+                      <div className="dg-folder-thumbbadge">{t.mime === "application/pdf" ? "PDF" : "FILE"}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <div className="dg-folder-name">{label}</div>
+        </button>
+      );
+    };
+
     return (
       <div className="dg-form-page pg-panel" aria-label="Qovluqlar">
         <header className="dg-form-page-head">
@@ -2145,28 +2257,28 @@ export default function App() {
           </div>
         </header>
         <div className="dg-form-page-body">
-          {companies.length === 0 ? (
+          {nothingToShow ? (
             <div className="dg-empty-state-card" role="status" aria-label="Boş vəziyyət">
-              <div className="dg-empty-state-title">Əvvəl şirkət əlavə edin</div>
-              <div className="dg-empty-state-desc">
-                Qovluqlar bölməsindən istifadə etmək üçün əvvəlcə Şirkətlər bölməsində şirkət yaradılmalıdır.
-              </div>
-              <div className="dg-empty-state-actions">
-                <button
-                  type="button"
-                  className="dg-btn dg-btn-primary"
-                  onClick={() => {
-                    setModule("companies");
-                    setFolderView("grid");
-                  }}
-                >
-                  Şirkətlərə keç
+              <div className="dg-empty-state-title">Hələ qovluq yoxdur</div>
+              <div className="dg-empty-state-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setModule("companies")}>
+                  Şirkətlər
+                </button>
+                <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setModule("suppliers")}>
+                  Təchizatçılar
                 </button>
               </div>
             </div>
           ) : folderView === "grid" ? (
             <>
-              <div className="dg-folders-toolbar" aria-label="Qovluqlar alət paneli">
+              <div
+                className="dg-folders-toolbar"
+                aria-label="Qovluqlar alət paneli"
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "root" });
+                }}
+              >
                 <div className="dg-folders-toolbar-left">
                   <input className="dg-input dg-folders-search" type="search" placeholder="Qovluqlarda axtar..." aria-label="Qovluqlarda axtar" />
                 </div>
@@ -2176,93 +2288,80 @@ export default function App() {
               {!anyFoldersExist ? (
                 <div className="dg-empty-state-card" role="status">
                   <div className="dg-empty-state-title">Hələ qovluq yoxdur</div>
-                  <div className="dg-empty-state-desc">Yeni qovluq yaradaraq sənədləri qruplaşdırın.</div>
                 </div>
               ) : null}
-              <div
-                className="dg-folder-grid"
-                role="list"
-                aria-label="Qovluqlar"
-                onContextMenu={(e) => {
-                  if (e.target !== e.currentTarget) return;
-                  e.preventDefault();
-                  setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "root" });
-                }}
-              >
-                {customFolders.map((cf) => (
-                  <button
-                    key={cf.id}
-                    type="button"
-                    className="dg-folder-tile"
-                    role="listitem"
-                    onDoubleClick={() => {
-                      setActiveFolderId(cf.id);
-                      setFolderView("folder");
-                    }}
-                    onClick={() => setActiveFolderId(cf.id)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setActiveFolderId(cf.id);
-                      setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "folder", folderId: cf.id });
-                    }}
-                    title="Açmaq üçün iki dəfə klik"
-                  >
-                    <div className="dg-folder-icon-wrap" aria-hidden>
-                      <IconFolder />
-                    </div>
-                    <div className="dg-folder-name">{cf.name || "Qovluq"}</div>
-                  </button>
-                ))}
-                {companies.map((c) => {
-                  const f = foldersByCompany.get(c.id);
-                  const thumbs = (f?.files ?? [])
-                    .slice()
-                    .sort((a, b) => b.createdAt - a.createdAt)
-                    .slice(0, 4);
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className="dg-folder-tile"
-                      role="listitem"
-                      onDoubleClick={() => {
-                        if (f?.id) setActiveFolderId(f.id);
-                        setFolderView("folder");
-                      }}
-                      onClick={() => f?.id && setActiveFolderId(f.id)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        if (f?.id) setActiveFolderId(f.id);
-                        setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "folder", folderId: f?.id, companyId: c.id });
-                      }}
-                      title="Açmaq üçün iki dəfə klik"
-                    >
-                      <div className="dg-folder-icon-wrap" aria-hidden>
-                        <IconFolder />
-                        {thumbs.length > 0 ? (
-                          <div className="dg-folder-thumbgrid">
-                            {thumbs.map((t) => (
-                              <div key={t.id} className="dg-folder-thumbcell">
-                                {t.mime.startsWith("image/") ? (
-                                  <img src={fileSrc(t)} alt="" loading="lazy" />
-                                ) : (
-                                  <div className="dg-folder-thumbbadge">{t.mime === "application/pdf" ? "PDF" : "FILE"}</div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                      <div className="dg-folder-name">{c.profile.name || c.profile.voen || "Şirkət"}</div>
-                    </button>
-                  );
-                })}
-              </div>
+
+              {companies.length > 0 ? (
+                <section className="dg-folders-section" aria-label="Şirkət qovluqları">
+                  <h2 className="dg-folders-section-title">Şirkətlər</h2>
+                  <div className="dg-folder-grid" role="list">
+                    {companies.map((c) =>
+                      renderFolderTile(
+                        c.id,
+                        foldersByCompany.get(c.id),
+                        c.profile.name || c.profile.voen || "Şirkət",
+                        { companyId: c.id },
+                      ),
+                    )}
+                  </div>
+                </section>
+              ) : null}
+
+              {suppliers.length > 0 ? (
+                <section className="dg-folders-section" aria-label="Təchizatçı qovluqları">
+                  <h2 className="dg-folders-section-title">Təchizatçılar</h2>
+                  <div className="dg-folder-grid" role="list">
+                    {suppliers.map((s) =>
+                      renderFolderTile(s.id, foldersBySupplier.get(s.id), s.name || "Təchizatçı", { supplierId: s.id }),
+                    )}
+                  </div>
+                </section>
+              ) : null}
+
+              {customFolders.length > 0 ? (
+                <section
+                  className="dg-folders-section"
+                  aria-label="Digər qovluqlar"
+                  onContextMenu={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    e.preventDefault();
+                    setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "root" });
+                  }}
+                >
+                  <h2 className="dg-folders-section-title">Digər qovluqlar</h2>
+                  <div className="dg-folder-grid" role="list">
+                    {customFolders.map((cf) => (
+                      <button
+                        key={cf.id}
+                        type="button"
+                        className="dg-folder-tile"
+                        role="listitem"
+                        onDoubleClick={() => {
+                          setActiveFolderId(cf.id);
+                          setFolderView("folder");
+                        }}
+                        onClick={() => setActiveFolderId(cf.id)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setActiveFolderId(cf.id);
+                          setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "folder", folderId: cf.id });
+                        }}
+                        title="Açmaq üçün iki dəfə klik"
+                      >
+                        <div className="dg-folder-icon-wrap" aria-hidden>
+                          <IconFolder />
+                        </div>
+                        <div className="dg-folder-name">{cf.name || "Qovluq"}</div>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               {folderMenu.open ? (
                 <div
                   className="dg-context-menu-backdrop"
-                  onMouseDown={() => setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined })}
+                  onMouseDown={() => setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined, supplierId: undefined })}
                   aria-hidden
                 >
                   <div
@@ -2278,13 +2377,13 @@ export default function App() {
                       role="menuitem"
                       onClick={() => {
                         if (folderMenu.kind === "root") {
-                          setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+                          setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined, supplierId: undefined });
                           createCustomFolder();
                           return;
                         }
                         if (folderMenu.folderId) setActiveFolderId(folderMenu.folderId);
                         setFolderView("folder");
-                        setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined });
+                        setFolderMenu({ open: false, x: 0, y: 0, kind: "folder", folderId: undefined, companyId: undefined, supplierId: undefined });
                       }}
                     >
                       {folderMenu.kind === "root" ? "Yeni qovluq" : "Aç"}
@@ -2296,6 +2395,7 @@ export default function App() {
                         role="menuitem"
                         onClick={() => {
                           if (folderMenu.companyId) deleteCompanyFolder(folderMenu.companyId);
+                          else if (folderMenu.supplierId) deleteSupplierFolder(folderMenu.supplierId);
                           else if (folderMenu.folderId) deleteCustomFolder(folderMenu.folderId);
                         }}
                       >
@@ -2315,7 +2415,9 @@ export default function App() {
                 <div className="dg-folder-head-title">
                   {folder?.kind === "company"
                     ? sortedCompanies.find((c) => c.id === folder.companyId)?.profile.name || folder.name || "Qovluq"
-                    : folder?.name || "Qovluq"}
+                    : folder?.kind === "supplier"
+                      ? supplierById.get(folder.supplierId || "")?.name || folder.name || "Qovluq"
+                      : folder?.name || "Qovluq"}
                 </div>
               </div>
 
@@ -2589,18 +2691,37 @@ export default function App() {
         suppliers: (w.suppliers ?? []).map((s) =>
           s.id === supplierEditId ? { ...s, name, phone, note, updatedAt: now } : s,
         ),
+        folders: (w.folders ?? []).map((f) =>
+          f.kind === "supplier" && f.supplierId === supplierEditId ? { ...f, name, updatedAt: now } : f,
+        ),
       }));
       flash(setToast, "Təchizatçı yeniləndi");
     } else {
+      const id = crypto.randomUUID();
       const rec: SupplierRecord = {
-        id: crypto.randomUUID(),
+        id,
         name,
         phone,
         note,
         createdAt: now,
         updatedAt: now,
       };
-      setWorkspace((w) => ({ ...w, suppliers: [...(w.suppliers ?? []), rec] }));
+      setWorkspace((w) => ({
+        ...w,
+        suppliers: [...(w.suppliers ?? []), rec],
+        folders: [
+          ...(w.folders ?? []),
+          {
+            id: crypto.randomUUID(),
+            kind: "supplier" as const,
+            supplierId: id,
+            name,
+            createdAt: now,
+            updatedAt: now,
+            files: [],
+          },
+        ],
+      }));
       flash(setToast, "Təchizatçı əlavə olundu");
     }
     resetSupplierDraft();
@@ -2620,10 +2741,13 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
+    const toPurge = (workspace.folders ?? []).filter((f) => f.kind === "supplier" && f.supplierId === id);
+    await purgeFoldersStorage(toPurge);
     setWorkspace((w) => ({
       ...w,
       suppliers: (w.suppliers ?? []).filter((s) => s.id !== id),
       supplierQuotes: (w.supplierQuotes ?? []).filter((q) => q.supplierId !== id),
+      folders: (w.folders ?? []).filter((f) => !(f.kind === "supplier" && f.supplierId === id)),
     }));
     if (supplierEditId === id) resetSupplierDraft();
     flash(setToast, "Təchizatçı silindi");
@@ -2941,7 +3065,7 @@ export default function App() {
       ? { label: "Yeni şirkət", onClick: startNewCompany }
       : module === "projects" && projectMode === "list"
         ? { label: "Yeni təklif", onClick: startNewProject }
-        : module === "folders" && folderView === "grid" && workspace.companies.length > 0
+        : module === "folders" && folderView === "grid"
           ? { label: "Yeni qovluq", onClick: () => createCustomFolder() }
           : module === "notes"
             ? { label: "Yeni qeyd", onClick: openNewNoteDialog }
