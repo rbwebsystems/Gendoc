@@ -79,14 +79,20 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
   const suppliersRaw = Array.isArray(w.suppliers) ? w.suppliers : [];
   const suppliers: SupplierRecord[] = suppliersRaw
     .filter((s) => s && typeof (s as { id?: unknown }).id === "string")
-    .map((s) => ({
-      id: String((s as { id: string }).id),
-      name: typeof (s as { name?: unknown }).name === "string" ? String((s as { name: string }).name).trim() : "",
-      phone: typeof (s as { phone?: unknown }).phone === "string" ? String((s as { phone: string }).phone) : undefined,
-      note: typeof (s as { note?: unknown }).note === "string" ? String((s as { note: string }).note) : undefined,
-      createdAt: typeof (s as { createdAt?: unknown }).createdAt === "number" ? Number((s as { createdAt: number }).createdAt) : Date.now(),
-      updatedAt: typeof (s as { updatedAt?: unknown }).updatedAt === "number" ? Number((s as { updatedAt: number }).updatedAt) : Date.now(),
-    }))
+    .map((s) => {
+      const phone =
+        typeof (s as { phone?: unknown }).phone === "string" ? String((s as { phone: string }).phone).trim() : "";
+      const note =
+        typeof (s as { note?: unknown }).note === "string" ? String((s as { note: string }).note).trim() : "";
+      return {
+        id: String((s as { id: string }).id),
+        name: typeof (s as { name?: unknown }).name === "string" ? String((s as { name: string }).name).trim() : "",
+        ...(phone ? { phone } : {}),
+        ...(note ? { note } : {}),
+        createdAt: typeof (s as { createdAt?: unknown }).createdAt === "number" ? Number((s as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (s as { updatedAt?: unknown }).updatedAt === "number" ? Number((s as { updatedAt: number }).updatedAt) : Date.now(),
+      };
+    })
     .filter((s) => s.name.length > 0);
 
   const supplierIds = new Set(suppliers.map((s) => s.id));
@@ -122,8 +128,8 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       return {
         id: String((f as { id: string }).id),
         kind: safeKind,
-        companyId: safeCompanyId,
-        supplierId: safeSupplierId,
+        ...(safeCompanyId ? { companyId: safeCompanyId } : {}),
+        ...(safeSupplierId ? { supplierId: safeSupplierId } : {}),
         name: typeof (f as { name?: unknown }).name === "string" ? String((f as { name: string }).name) : "",
         createdAt: typeof (f as { createdAt?: unknown }).createdAt === "number" ? Number((f as { createdAt: number }).createdAt) : Date.now(),
         updatedAt: typeof (f as { updatedAt?: unknown }).updatedAt === "number" ? Number((f as { updatedAt: number }).updatedAt) : Date.now(),
@@ -163,16 +169,22 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
   const notesRaw = Array.isArray(w.notes) ? w.notes : [];
   const notes: NoteRecord[] = notesRaw
     .filter((n) => n && typeof n.id === "string")
-    .map((n) => ({
-      id: String((n as { id: string }).id),
-      title: typeof (n as { title?: unknown }).title === "string" ? String((n as { title: string }).title) : "",
-      body: typeof (n as { body?: unknown }).body === "string" ? String((n as { body: string }).body) : "",
-      createdAt: typeof (n as { createdAt?: unknown }).createdAt === "number" ? Number((n as { createdAt: number }).createdAt) : Date.now(),
-      updatedAt: typeof (n as { updatedAt?: unknown }).updatedAt === "number" ? Number((n as { updatedAt: number }).updatedAt) : Date.now(),
-      remindAt: typeof (n as { remindAt?: unknown }).remindAt === "string" ? String((n as { remindAt: string }).remindAt) : undefined,
-      remindedAt: typeof (n as { remindedAt?: unknown }).remindedAt === "number" ? Number((n as { remindedAt: number }).remindedAt) : undefined,
-      done: Boolean((n as { done?: unknown }).done),
-    }));
+    .map((n) => {
+      const remindAt =
+        typeof (n as { remindAt?: unknown }).remindAt === "string" ? String((n as { remindAt: string }).remindAt) : "";
+      const remindedAt =
+        typeof (n as { remindedAt?: unknown }).remindedAt === "number" ? Number((n as { remindedAt: number }).remindedAt) : undefined;
+      return {
+        id: String((n as { id: string }).id),
+        title: typeof (n as { title?: unknown }).title === "string" ? String((n as { title: string }).title) : "",
+        body: typeof (n as { body?: unknown }).body === "string" ? String((n as { body: string }).body) : "",
+        createdAt: typeof (n as { createdAt?: unknown }).createdAt === "number" ? Number((n as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (n as { updatedAt?: unknown }).updatedAt === "number" ? Number((n as { updatedAt: number }).updatedAt) : Date.now(),
+        ...(remindAt ? { remindAt } : {}),
+        ...(typeof remindedAt === "number" ? { remindedAt } : {}),
+        done: Boolean((n as { done?: unknown }).done),
+      };
+    });
 
   const projectIds = new Set(projects.map((p) => p.id));
 
@@ -185,14 +197,20 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       const projectId = projectIdRaw && projectIds.has(projectIdRaw) ? projectIdRaw : undefined;
       const quoteDateRaw = typeof (q as { quoteDate?: unknown }).quoteDate === "string" ? String((q as { quoteDate: string }).quoteDate) : "";
       const quoteDate = /^\d{4}-\d{2}-\d{2}$/.test(quoteDateRaw) ? quoteDateRaw : new Date().toISOString().slice(0, 10);
+      const description =
+        typeof (q as { description?: unknown }).description === "string"
+          ? String((q as { description: string }).description).trim()
+          : "";
+      const note =
+        typeof (q as { note?: unknown }).note === "string" ? String((q as { note: string }).note).trim() : "";
       return {
         id: String((q as { id: string }).id),
         supplierId: supplierIds.has(supplierId) ? supplierId : "",
-        projectId,
         quoteDate,
         amount: Number((q as { amount?: unknown }).amount) || 0,
-        description: typeof (q as { description?: unknown }).description === "string" ? String((q as { description: string }).description) : undefined,
-        note: typeof (q as { note?: unknown }).note === "string" ? String((q as { note: string }).note) : undefined,
+        ...(projectId ? { projectId } : {}),
+        ...(description ? { description } : {}),
+        ...(note ? { note } : {}),
         createdAt: typeof (q as { createdAt?: unknown }).createdAt === "number" ? Number((q as { createdAt: number }).createdAt) : Date.now(),
         updatedAt: typeof (q as { updatedAt?: unknown }).updatedAt === "number" ? Number((q as { updatedAt: number }).updatedAt) : Date.now(),
       };

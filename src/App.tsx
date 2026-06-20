@@ -660,7 +660,7 @@ export default function App() {
         clearLocalWorkspace();
 
         if (!cancelled) {
-          lastSyncedJsonRef.current = JSON.stringify(merged);
+          lastSyncedJsonRef.current = JSON.stringify(normalizeWorkspace(merged));
           setWorkspace(merged);
           remoteReadyRef.current = true;
         }
@@ -694,7 +694,7 @@ export default function App() {
 
   // 3) Workspace dəyişəndə debounced yazı (remote və ya lokal)
   useEffect(() => {
-    const json = JSON.stringify(workspace);
+    const json = JSON.stringify(normalizeWorkspace(workspace));
 
     // Remote rejim
     if (firebaseEnabled && authState.status === "signedIn") {
@@ -2611,33 +2611,43 @@ export default function App() {
       return;
     }
     const quoteDate = (quoteDraft.quoteDate || "").trim() || new Date().toISOString().slice(0, 10);
-    const projectId = quoteDraft.projectId.trim() || undefined;
-    const description = quoteDraft.description.trim() || undefined;
-    const note = quoteDraft.note.trim() || undefined;
+    const projectId = quoteDraft.projectId.trim();
+    const description = quoteDraft.description.trim();
+    const note = quoteDraft.note.trim();
     const now = Date.now();
 
     if (quoteEditId) {
       setWorkspace((w) => ({
         ...w,
-        supplierQuotes: (w.supplierQuotes ?? []).map((q) =>
-          q.id === quoteEditId
-            ? { ...q, supplierId, projectId, quoteDate, amount, description, note, updatedAt: now }
-            : q,
-        ),
+        supplierQuotes: (w.supplierQuotes ?? []).map((q) => {
+          if (q.id !== quoteEditId) return q;
+          const next: SupplierQuoteRecord = {
+            id: q.id,
+            supplierId,
+            quoteDate,
+            amount,
+            createdAt: q.createdAt,
+            updatedAt: now,
+          };
+          if (projectId) next.projectId = projectId;
+          if (description) next.description = description;
+          if (note) next.note = note;
+          return next;
+        }),
       }));
       flash(setToast, "Qiymət qeydi yeniləndi");
     } else {
       const rec: SupplierQuoteRecord = {
         id: crypto.randomUUID(),
         supplierId,
-        projectId,
         quoteDate,
         amount,
-        description,
-        note,
         createdAt: now,
         updatedAt: now,
       };
+      if (projectId) rec.projectId = projectId;
+      if (description) rec.description = description;
+      if (note) rec.note = note;
       setWorkspace((w) => ({ ...w, supplierQuotes: [...(w.supplierQuotes ?? []), rec] }));
       flash(setToast, "Qiymət qeydi əlavə olundu");
     }
@@ -2681,16 +2691,22 @@ export default function App() {
       flash(setToast, "Təchizatçı adı daxil edin.", "error");
       return;
     }
-    const phone = supplierDraft.phone.trim() || undefined;
-    const note = supplierDraft.note.trim() || undefined;
+    const phone = supplierDraft.phone.trim();
+    const note = supplierDraft.note.trim();
     const now = Date.now();
 
     if (supplierEditId) {
       setWorkspace((w) => ({
         ...w,
-        suppliers: (w.suppliers ?? []).map((s) =>
-          s.id === supplierEditId ? { ...s, name, phone, note, updatedAt: now } : s,
-        ),
+        suppliers: (w.suppliers ?? []).map((s) => {
+          if (s.id !== supplierEditId) return s;
+          const next: SupplierRecord = { ...s, name, updatedAt: now };
+          if (phone) next.phone = phone;
+          else delete next.phone;
+          if (note) next.note = note;
+          else delete next.note;
+          return next;
+        }),
         folders: (w.folders ?? []).map((f) =>
           f.kind === "supplier" && f.supplierId === supplierEditId ? { ...f, name, updatedAt: now } : f,
         ),
@@ -2701,11 +2717,11 @@ export default function App() {
       const rec: SupplierRecord = {
         id,
         name,
-        phone,
-        note,
         createdAt: now,
         updatedAt: now,
       };
+      if (phone) rec.phone = phone;
+      if (note) rec.note = note;
       setWorkspace((w) => ({
         ...w,
         suppliers: [...(w.suppliers ?? []), rec],

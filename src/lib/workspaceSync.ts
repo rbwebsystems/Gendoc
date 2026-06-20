@@ -13,7 +13,24 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { db, storage } from "./firebase";
+import { normalizeWorkspace } from "./docStorage";
 import type { DocWorkspace, FolderFileRecord } from "../types";
+
+/** Firestore undefined dəyərləri qəbul etmir — yazmadan əvvəl təmizlə */
+function stripUndefinedDeep<T>(value: T): T {
+  if (value === undefined || value === null) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => stripUndefinedDeep(item)) as T;
+  }
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v !== undefined) out[key] = stripUndefinedDeep(v);
+    }
+    return out as T;
+  }
+  return value;
+}
 
 const SCHEMA_VERSION = 3;
 
@@ -64,10 +81,11 @@ export async function fetchWorkspaceOnce(uid: string): Promise<DocWorkspace | nu
 
 export async function writeWorkspace(uid: string, workspace: DocWorkspace): Promise<void> {
   const ref = workspaceDocRef(uid);
+  const workspacePayload = stripUndefinedDeep(normalizeWorkspace(workspace));
   await setDoc(
     ref,
     {
-      workspace,
+      workspace: workspacePayload,
       schemaVersion: SCHEMA_VERSION,
       updatedAt: serverTimestamp(),
     },
