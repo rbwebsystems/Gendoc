@@ -166,6 +166,7 @@ type SidebarModule = "companies" | "projects" | "folders" | "notes" | "suppliers
 
 type CompanyFormMode = "list" | "form";
 type ProjectFormMode = "list" | "form";
+type OfferFormMode = "list" | "form";
 
 type ProjectDraft = {
   title: string;
@@ -613,8 +614,7 @@ export default function App() {
 
   const [offerEditId, setOfferEditId] = useState<string | null>(null);
   const [offerDraft, setOfferDraft] = useState<OfferDraft>(() => emptyOfferDraft());
-  const offerDialogRef = useRef<HTMLDialogElement>(null);
-  const [offerDialogOpen, setOfferDialogOpen] = useState(false);
+  const [offerMode, setOfferMode] = useState<OfferFormMode>("list");
 
   const [companyMode, setCompanyMode] = useState<CompanyFormMode>("list");
   const [companyEditId, setCompanyEditId] = useState<string | null>(null);
@@ -949,15 +949,6 @@ export default function App() {
   }, [noteDialogOpen]);
 
   useEffect(() => {
-    const el = offerDialogRef.current;
-    if (!el) return;
-    if (offerDialogOpen) {
-      softBeep();
-      el.showModal();
-    } else el.close();
-  }, [offerDialogOpen]);
-
-  useEffect(() => {
     const el = reminderDialogRef.current;
     if (!el) return;
     if (reminderNote) {
@@ -1067,10 +1058,14 @@ export default function App() {
       return { title: "Qeydlər", sub: MODULE_TAGLINE.notes };
     }
     if (module === "suppliers") {
-      return { title: "Təchizatçı təklifləri", sub: MODULE_TAGLINE.suppliers };
+      if (offerMode === "list") return { title: "Təchizatçı təklifləri", sub: MODULE_TAGLINE.suppliers };
+      return {
+        title: offerEditId ? "Təklif redaktəsi" : "Yeni təklif",
+        sub: offerEditId ? "Mövcud təchizatçı təklifini yeniləyin" : "Yeni təchizatçı təklifi əlavə edin",
+      };
     }
     return { title: "", sub: "" };
-  }, [module, companyMode, projectMode, companyEditId, projectEditId]);
+  }, [module, companyMode, projectMode, companyEditId, projectEditId, offerMode, offerEditId]);
 
   const patchSellerSettings = useCallback((key: keyof CompanyProfile, value: string) => {
     setWorkspace((w) => ({
@@ -2672,9 +2667,14 @@ export default function App() {
     setOfferDraft(emptyOfferDraft());
   };
 
-  const openNewOfferDialog = () => {
+  const openNewOfferForm = () => {
     resetOfferDraft();
-    setOfferDialogOpen(true);
+    setOfferMode("form");
+  };
+
+  const cancelOfferForm = () => {
+    resetOfferDraft();
+    setOfferMode("list");
   };
 
   const rowDraftToRecord = (r: OfferRowDraft): SupplierOfferRow | null => {
@@ -2737,7 +2737,7 @@ export default function App() {
       note: o.note || "",
       rows: o.rows.length > 0 ? o.rows.map(offerRowToDraft) : [emptyOfferRow()],
     });
-    setOfferDialogOpen(true);
+    setOfferMode("form");
   };
 
   const ensureSupplierForOffer = (w: DocWorkspace, name: string, now: number): { next: DocWorkspace; supplierId: string } => {
@@ -2821,7 +2821,7 @@ export default function App() {
 
     flash(setToast, offerEditId ? "Təklif yeniləndi" : "Təklif əlavə olundu");
     resetOfferDraft();
-    setOfferDialogOpen(false);
+    setOfferMode("list");
   };
 
   const deleteOffer = async (id: string) => {
@@ -2845,6 +2845,260 @@ export default function App() {
 
   const renderSuppliersModule = () => {
     const offers = sortedSupplierOffers;
+
+    if (offerMode === "form") {
+      const draftTotals = offerDraft.rows.reduce(
+        (acc, r) => {
+          const purchase = Number(String(r.purchasePrice).replace(",", ".")) || 0;
+          const qty = Number(String(r.qty).replace(",", ".")) || 0;
+          const sale = Number(String(r.salePrice).replace(",", ".")) || 0;
+          acc.purchase += purchase * qty;
+          acc.sale += sale * qty;
+          return acc;
+        },
+        { purchase: 0, sale: 0 },
+      );
+
+      return (
+        <div className="dg-form-page pg-panel" aria-label={offerEditId ? "Təklif redaktəsi" : "Yeni təklif"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">Təchizatçı təklifləri</h1>
+              <nav className="dg-form-bc" aria-label="Yol">
+                <span>Sənəd generatoru</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span>Təchizatçı təklifləri</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span className="dg-form-bc-current">{offerEditId ? "Redaktə" : "Yeni təklif"}</span>
+              </nav>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelOfferForm}>
+              Siyahı
+            </button>
+          </header>
+
+          <div className="dg-form-page-body dg-project-form-body">
+            <div className="dg-project-form-top-row dg-project-form-top-row--two">
+              <section className="dg-form-inner-panel dg-project-form-top-primary" aria-labelledby="dg-offer-base-heading">
+                <h2 id="dg-offer-base-heading" className="dg-form-inner-panel-title">
+                  Təchizatçı və şirkət
+                </h2>
+                <div className="dg-form-meta-grid dg-form-meta-grid--project">
+                  <label className="dg-field">
+                    <span className="dg-label">Təchizatçı adı</span>
+                    <input
+                      className="dg-input"
+                      list="dg-supplier-names"
+                      value={offerDraft.supplierName}
+                      onChange={(e) => setOfferDraft((d) => ({ ...d, supplierName: e.target.value }))}
+                      placeholder="Ad yazın və ya seçin"
+                    />
+                    <datalist id="dg-supplier-names">
+                      {sortedSuppliers.map((s) => (
+                        <option key={s.id} value={s.name} />
+                      ))}
+                    </datalist>
+                  </label>
+                  <label className="dg-field">
+                    <span className="dg-label">Təklif olunan şirkət</span>
+                    <select
+                      className="dg-input"
+                      value={offerDraft.companyId}
+                      onChange={(e) => setOfferDraft((d) => ({ ...d, companyId: e.target.value }))}
+                    >
+                      <option value="">Seçin…</option>
+                      {sortedCompanies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.profile.name?.trim() || c.profile.voen?.trim() || "Şirkət"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="dg-field">
+                    <span className="dg-label">Tarix</span>
+                    <input
+                      className="dg-input"
+                      type="date"
+                      value={offerDraft.offerDate}
+                      onChange={(e) => setOfferDraft((d) => ({ ...d, offerDate: e.target.value }))}
+                    />
+                  </label>
+                  <label className="dg-field">
+                    <span className="dg-label">Qeyd</span>
+                    <input
+                      className="dg-input"
+                      value={offerDraft.note}
+                      onChange={(e) => setOfferDraft((d) => ({ ...d, note: e.target.value }))}
+                      placeholder="İstəyə bağlı"
+                    />
+                  </label>
+                </div>
+                {sortedCompanies.length === 0 ? (
+                  <p className="dg-muted" style={{ marginTop: "0.75rem", fontSize: "0.9rem" }}>
+                    Əvvəlcə «Şirkətlər» bölməsində şirkət əlavə edin.
+                  </p>
+                ) : null}
+              </section>
+
+              <aside className="dg-form-inner-panel dg-project-summary-aside" aria-label="Yekunlar">
+                <h2 className="dg-form-inner-panel-title dg-form-inner-panel-title--sm">Yekun</h2>
+                <div className="dg-sales-summary">
+                  <div className="dg-sales-summary-row">
+                    <span>Alış cəmi (ƏDV-siz)</span>
+                    <span>{formatMoney(draftTotals.purchase)}</span>
+                  </div>
+                  <div className="dg-sales-summary-row dg-sales-summary-row--grand">
+                    <span>Satış cəmi</span>
+                    <span>{formatMoney(draftTotals.sale)}</span>
+                  </div>
+                  <div className="dg-sales-summary-row">
+                    <span>Marja</span>
+                    <span>{formatMoney(draftTotals.sale - draftTotals.purchase)}</span>
+                  </div>
+                </div>
+              </aside>
+            </div>
+
+            <section className="dg-form-inner-panel" aria-labelledby="dg-offer-products-heading">
+              <h2 id="dg-offer-products-heading" className="dg-form-inner-panel-title">
+                Məhsullar
+              </h2>
+              <div className="dg-product-toolbar">
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  onClick={() => setOfferDraft((d) => ({ ...d, rows: [...d.rows, emptyOfferRow()] }))}
+                >
+                  Sətir əlavə et
+                </button>
+              </div>
+              <div className="dg-table-wrap pg-grid-host dg-project-lines-wrap">
+                <table className="dg-table dg-table--sales">
+                  <thead>
+                    <tr>
+                      <th className="dg-th-num">№</th>
+                      <th>Məhsul adı</th>
+                      <th className="dg-th-num">Alış (ƏDV-siz)</th>
+                      <th className="dg-th-num">Miqdar</th>
+                      <th className="dg-th-num">Faiz %</th>
+                      <th className="dg-th-num">Satış qiyməti</th>
+                      <th className="dg-th-num">Alış cəmi</th>
+                      <th className="dg-th-num">Satış cəmi</th>
+                      <th className="dg-th-actions">Sil</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {offerDraft.rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="dg-empty-cell">
+                          «Sətir əlavə et» düyməsi ilə məhsul əlavə edin.
+                        </td>
+                      </tr>
+                    ) : (
+                      offerDraft.rows.map((r, idx) => {
+                        const purchase = Number(String(r.purchasePrice).replace(",", ".")) || 0;
+                        const qty = Number(String(r.qty).replace(",", ".")) || 0;
+                        const sale = Number(String(r.salePrice).replace(",", ".")) || 0;
+                        return (
+                          <tr key={r.id}>
+                            <td className="dg-td-num">{idx + 1}</td>
+                            <td>
+                              <input
+                                className="dg-input dg-input-table"
+                                value={r.name}
+                                onChange={(e) => updateOfferRow(r.id, { name: e.target.value })}
+                                placeholder="Məhsul"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="dg-input dg-input-table dg-input-num"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={r.purchasePrice}
+                                onChange={(e) => updateOfferRow(r.id, { purchasePrice: e.target.value })}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="dg-input dg-input-table dg-input-num"
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={r.qty}
+                                onChange={(e) => updateOfferRow(r.id, { qty: e.target.value })}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="dg-input dg-input-table dg-input-num"
+                                type="number"
+                                step="0.01"
+                                value={r.marginPercent}
+                                onChange={(e) => updateOfferRow(r.id, { marginPercent: e.target.value })}
+                                placeholder="%"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="dg-input dg-input-table dg-input-num"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={r.salePrice}
+                                onChange={(e) => updateOfferRow(r.id, { salePrice: e.target.value })}
+                              />
+                            </td>
+                            <td className="dg-td-num">{formatMoney(purchase * qty)}</td>
+                            <td className="dg-td-num">{formatMoney(sale * qty)}</td>
+                            <td className="dg-td-actions">
+                              <button
+                                type="button"
+                                className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
+                                aria-label="Sil"
+                                title="Sil"
+                                onClick={() =>
+                                  setOfferDraft((d) => ({
+                                    ...d,
+                                    rows: d.rows.length <= 1 ? d.rows : d.rows.filter((x) => x.id !== r.id),
+                                  }))
+                                }
+                                disabled={offerDraft.rows.length <= 1}
+                              >
+                                <IconTrash />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelOfferForm}>
+                Bağla
+              </button>
+              <button
+                type="button"
+                className="dg-btn dg-btn-primary"
+                onClick={saveOffer}
+                disabled={sortedCompanies.length === 0}
+              >
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="dg-form-page pg-panel" aria-label="Təchizatçı təklifləri">
@@ -3091,8 +3345,8 @@ export default function App() {
           ? { label: "Yeni qovluq", onClick: () => createCustomFolder() }
           : module === "notes"
             ? { label: "Yeni qeyd", onClick: openNewNoteDialog }
-            : module === "suppliers"
-              ? { label: "Yeni təklif", onClick: openNewOfferDialog }
+            : module === "suppliers" && offerMode === "list"
+              ? { label: "Yeni təklif", onClick: openNewOfferForm }
         : null;
 
   const modalLayer = (
@@ -3370,202 +3624,6 @@ export default function App() {
                 Ləğv et
               </button>
               <button type="submit" className="dg-btn dg-btn-primary">
-                Yadda saxla
-              </button>
-            </div>
-          </form>
-        </dialog>
-      ) : null}
-
-      {offerDialogOpen ? (
-        <dialog ref={offerDialogRef} className="dg-modal dg-modal--wide" onClose={() => setOfferDialogOpen(false)}>
-          <form
-            className="dg-modal-body dg-modal-body--scroll"
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveOffer();
-            }}
-          >
-            <h2 className="dg-modal-title">{offerEditId ? "Təklifi yenilə" : "Yeni təklif"}</h2>
-            <div className="dg-grid dg-grid-2">
-              <label className="dg-field">
-                <span className="dg-label">Təchizatçı adı</span>
-                <input
-                  className="dg-input"
-                  list="dg-supplier-names"
-                  value={offerDraft.supplierName}
-                  onChange={(e) => setOfferDraft((d) => ({ ...d, supplierName: e.target.value }))}
-                  placeholder="Ad yazın və ya seçin"
-                  required
-                />
-                <datalist id="dg-supplier-names">
-                  {sortedSuppliers.map((s) => (
-                    <option key={s.id} value={s.name} />
-                  ))}
-                </datalist>
-              </label>
-              <label className="dg-field">
-                <span className="dg-label">Təklif olunan şirkət</span>
-                <select
-                  className="dg-input"
-                  value={offerDraft.companyId}
-                  onChange={(e) => setOfferDraft((d) => ({ ...d, companyId: e.target.value }))}
-                  required
-                >
-                  <option value="">Seçin…</option>
-                  {sortedCompanies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.profile.name?.trim() || c.profile.voen?.trim() || "Şirkət"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="dg-field">
-                <span className="dg-label">Tarix</span>
-                <input
-                  className="dg-input"
-                  type="date"
-                  value={offerDraft.offerDate}
-                  onChange={(e) => setOfferDraft((d) => ({ ...d, offerDate: e.target.value }))}
-                  required
-                />
-              </label>
-              <label className="dg-field">
-                <span className="dg-label">Qeyd</span>
-                <input
-                  className="dg-input"
-                  value={offerDraft.note}
-                  onChange={(e) => setOfferDraft((d) => ({ ...d, note: e.target.value }))}
-                  placeholder="İstəyə bağlı"
-                />
-              </label>
-            </div>
-
-            <div className="dg-project-lines-toolbar" style={{ marginTop: "1rem" }}>
-              <span className="dg-form-inner-panel-title dg-form-inner-panel-title--sm">Məhsullar</span>
-              <button
-                type="button"
-                className="dg-btn dg-btn-secondary"
-                onClick={() => setOfferDraft((d) => ({ ...d, rows: [...d.rows, emptyOfferRow()] }))}
-              >
-                Sətir əlavə et
-              </button>
-            </div>
-
-            <div className="dg-table-wrap pg-grid-host dg-project-lines-wrap">
-              <table className="dg-table dg-table--sales">
-                <thead>
-                  <tr>
-                    <th className="dg-th-num">№</th>
-                    <th>Məhsul adı</th>
-                    <th className="dg-th-num">Alış (ƏDV-siz)</th>
-                    <th className="dg-th-num">Miqdar</th>
-                    <th className="dg-th-num">Faiz %</th>
-                    <th className="dg-th-num">Satış qiyməti</th>
-                    <th className="dg-th-num">Alış cəmi</th>
-                    <th className="dg-th-num">Satış cəmi</th>
-                    <th className="dg-th-actions">Sil</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {offerDraft.rows.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="dg-empty-cell">
-                        «Sətir əlavə et» düyməsi ilə məhsul əlavə edin.
-                      </td>
-                    </tr>
-                  ) : (
-                    offerDraft.rows.map((r, idx) => {
-                      const purchase = Number(String(r.purchasePrice).replace(",", ".")) || 0;
-                      const qty = Number(String(r.qty).replace(",", ".")) || 0;
-                      const sale = Number(String(r.salePrice).replace(",", ".")) || 0;
-                      return (
-                        <tr key={r.id}>
-                          <td className="dg-td-num">{idx + 1}</td>
-                          <td>
-                            <input
-                              className="dg-input dg-input-table"
-                              value={r.name}
-                              onChange={(e) => updateOfferRow(r.id, { name: e.target.value })}
-                              placeholder="Məhsul"
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="dg-input dg-input-table dg-input-num"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={r.purchasePrice}
-                              onChange={(e) => updateOfferRow(r.id, { purchasePrice: e.target.value })}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="dg-input dg-input-table dg-input-num"
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={r.qty}
-                              onChange={(e) => updateOfferRow(r.id, { qty: e.target.value })}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="dg-input dg-input-table dg-input-num"
-                              type="number"
-                              step="0.01"
-                              value={r.marginPercent}
-                              onChange={(e) => updateOfferRow(r.id, { marginPercent: e.target.value })}
-                              placeholder="%"
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="dg-input dg-input-table dg-input-num"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={r.salePrice}
-                              onChange={(e) => updateOfferRow(r.id, { salePrice: e.target.value })}
-                            />
-                          </td>
-                          <td className="dg-td-num">{formatMoney(purchase * qty)}</td>
-                          <td className="dg-td-num">{formatMoney(sale * qty)}</td>
-                          <td className="dg-td-actions">
-                            <button
-                              type="button"
-                              className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
-                              aria-label="Sil"
-                              title="Sil"
-                              onClick={() =>
-                                setOfferDraft((d) => ({
-                                  ...d,
-                                  rows: d.rows.length <= 1 ? d.rows : d.rows.filter((x) => x.id !== r.id),
-                                }))
-                              }
-                              disabled={offerDraft.rows.length <= 1}
-                            >
-                              <IconTrash />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {sortedCompanies.length === 0 ? (
-              <p className="dg-modal-hint">Əvvəlcə «Şirkətlər» bölməsində şirkət əlavə edin.</p>
-            ) : null}
-
-            <div className="dg-modal-actions">
-              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setOfferDialogOpen(false)}>
-                Ləğv et
-              </button>
-              <button type="submit" className="dg-btn dg-btn-primary" disabled={sortedCompanies.length === 0}>
                 Yadda saxla
               </button>
             </div>
