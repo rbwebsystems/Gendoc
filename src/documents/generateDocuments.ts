@@ -61,11 +61,13 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
             min-height: 297mm;
             margin: 0 auto;
             background: ${DOC_THEME.white};
-            padding: 20mm;
+            padding: 18mm 18mm 16mm 22mm;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
             border-radius: 4px;
             position: relative;
             color: ${DOC_THEME.text};
+            display: flex;
+            flex-direction: column;
         }
 
         .page-container::before {
@@ -74,9 +76,168 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
             top: 0;
             left: 0;
             right: 0;
-            height: 5px;
+            height: 4px;
             background: ${DOC_THEME.brand};
             border-radius: 4px 4px 0 0;
+        }
+
+        .page-container::after {
+            content: "";
+            position: absolute;
+            top: 12mm;
+            bottom: 12mm;
+            left: 10mm;
+            width: 3px;
+            background: linear-gradient(180deg, ${DOC_THEME.brand} 0%, ${DOC_THEME.brand} 72%, transparent 100%);
+            border-radius: 2px;
+        }
+
+        .doc-body {
+            flex: 1 1 auto;
+        }
+
+        /* Korporativ letterhead */
+        .doc-letterhead {
+            margin-bottom: 1.35rem;
+        }
+
+        .doc-letterhead-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            background: linear-gradient(135deg, #fafafa 0%, ${DOC_THEME.white} 100%);
+            border: 1px solid ${DOC_THEME.borderLight};
+            border-left: 4px solid ${DOC_THEME.brand};
+            padding: 14px 18px;
+            border-radius: 0 6px 6px 0;
+        }
+
+        .doc-letterhead-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .doc-letterhead-mark {
+            width: 6px;
+            height: 44px;
+            background: ${DOC_THEME.brand};
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .doc-letterhead-brand .doc-brand {
+            font-family: 'Merriweather', serif;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.15;
+            letter-spacing: -0.02em;
+        }
+
+        .doc-letterhead-meta {
+            margin: 5px 0 0;
+            font-size: 10.5px;
+            color: ${DOC_THEME.textMuted};
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .doc-letterhead-contact {
+            text-align: right;
+            font-size: 11px;
+            line-height: 1.55;
+            max-width: 46%;
+        }
+
+        .doc-letterhead-contact .doc-label {
+            color: ${DOC_THEME.brand};
+            font-weight: 600;
+        }
+
+        .doc-letterhead-rule {
+            height: 2px;
+            margin-top: 10px;
+            background: linear-gradient(90deg, ${DOC_THEME.brand} 0%, ${DOC_THEME.brand} 100px, ${DOC_THEME.borderLight} 100px);
+        }
+
+        .doc-doc-title {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.65rem;
+            border-bottom: 1px solid ${DOC_THEME.borderLight};
+        }
+
+        .doc-doc-title h2 {
+            font-family: 'Merriweather', serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: ${DOC_THEME.text};
+            margin: 0;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .doc-doc-title-sub {
+            margin: 8px 0 0;
+            font-size: 12px;
+            color: ${DOC_THEME.textMuted};
+            font-weight: 500;
+        }
+
+        .doc-doc-title::after {
+            content: "";
+            display: block;
+            width: 64px;
+            height: 3px;
+            background: ${DOC_THEME.brand};
+            margin: 10px auto 0;
+            border-radius: 1px;
+        }
+
+        .doc-requisites {
+            border-left: 4px solid ${DOC_THEME.brand} !important;
+            border-radius: 0 8px 8px 0 !important;
+            background: linear-gradient(135deg, ${DOC_THEME.rowMuted} 0%, ${DOC_THEME.white} 100%) !important;
+        }
+
+        .doc-letterfoot {
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px solid ${DOC_THEME.borderLight};
+            position: relative;
+        }
+
+        .doc-letterfoot::before {
+            content: "";
+            position: absolute;
+            top: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: ${DOC_THEME.brand};
+        }
+
+        .doc-letterfoot-inner {
+            font-size: 9.5px;
+            color: ${DOC_THEME.textMuted};
+            text-align: center;
+            letter-spacing: 0.04em;
+            line-height: 1.5;
+        }
+
+        .doc-letterfoot-name {
+            font-weight: 700;
+            color: ${DOC_THEME.brand};
+        }
+
+        .doc-letterfoot-sep {
+            margin: 0 7px;
+            opacity: 0.45;
         }
 
         /* Yalnız firma adı qırmızı */
@@ -101,10 +262,6 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
         }
         .page-container .doc-company-panel h3 {
             border-color: ${DOC_THEME.borderLight} !important;
-        }
-
-        .page-container .doc-page-head {
-            border-color: ${DOC_THEME.brand} !important;
         }
 
         /* Ümumi mətn qara */
@@ -148,6 +305,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
                 border-radius: 0;
             }
             .page-container::before { border-radius: 0; }
+            .page-container::after { top: 10mm; bottom: 10mm; left: 8mm; }
             .print-exact {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
@@ -207,6 +365,57 @@ function printButton(label: string): string {
             ${escapeHtml(label)}
         </button>
     </div>`;
+}
+
+function renderLetterhead(state: GeneratorState): string {
+  const seller = state.seller;
+  const sellerName = seller.name?.trim() || "—";
+  const sellerAddr = seller.address?.trim() || "";
+  const sellerPhone = seller.phone?.trim() || "";
+  const sellerEmail = seller.email?.trim() || "";
+  const sellerVoen = seller.voen?.trim() || "";
+
+  const contact: string[] = [];
+  if (sellerAddr) contact.push(`<p><span class="doc-label">Ünvan:</span> ${escapeHtml(sellerAddr)}</p>`);
+  if (sellerPhone) contact.push(`<p><span class="doc-label">Tel:</span> ${escapeHtml(sellerPhone)}</p>`);
+  if (sellerEmail) contact.push(`<p><span class="doc-label">E-poçt:</span> ${escapeHtml(sellerEmail)}</p>`);
+
+  return `
+    <header class="doc-letterhead">
+      <div class="doc-letterhead-main">
+        <div class="doc-letterhead-brand">
+          <div class="doc-letterhead-mark" aria-hidden="true"></div>
+          <div>
+            <h1 class="doc-brand">${escapeHtml(sellerName)}</h1>
+            ${sellerVoen ? `<p class="doc-letterhead-meta">VÖEN ${escapeHtml(sellerVoen)}</p>` : ""}
+          </div>
+        </div>
+        ${contact.length ? `<div class="doc-company-panel doc-letterhead-contact">${contact.join("")}</div>` : ""}
+      </div>
+      <div class="doc-letterhead-rule" aria-hidden="true"></div>
+    </header>`;
+}
+
+function renderDocTitle(title: string, subtitle?: string): string {
+  return `
+    <div class="doc-doc-title">
+      <h2>${escapeHtml(title)}</h2>
+      ${subtitle ? `<p class="doc-doc-title-sub">${escapeHtml(subtitle)}</p>` : ""}
+    </div>`;
+}
+
+function renderLetterfoot(state: GeneratorState): string {
+  const sellerName = state.seller.name?.trim() || "";
+  if (!sellerName) return "";
+  const sellerVoen = state.seller.voen?.trim() || "";
+  const sellerPhone = state.seller.phone?.trim() || "";
+  const parts = [`<span class="doc-letterfoot-name">${escapeHtml(sellerName)}</span>`];
+  if (sellerVoen) parts.push(`<span>VÖEN ${escapeHtml(sellerVoen)}</span>`);
+  if (sellerPhone) parts.push(`<span>${escapeHtml(sellerPhone)}</span>`);
+  return `
+    <footer class="doc-letterfoot">
+      <div class="doc-letterfoot-inner">${parts.join('<span class="doc-letterfoot-sep">·</span>')}</div>
+    </footer>`;
 }
 
 export function computeTotals(state: GeneratorState) {
@@ -280,27 +489,15 @@ ${printCssDocument()}
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
-        
-        <!-- Başlıq Hissəsi -->
-        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
-            <div>
-                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
-            </div>
-            <div class="text-right text-sm text-gray-800 space-y-1">
-                <!-- Ünvan/E-poçt/Telefon göstərilmir -->
-            </div>
-        </div>
 
-        <!-- Sənədin Adı və Nömrəsi -->
-        <div class="text-center mb-8">
-            <h2 class="text-2xl font-bold text-gray-900 uppercase tracking-wide" style="font-family: 'Merriweather', serif;">
-                Hesab-Faktura № ${escapeHtml(m.invoiceNumber || "—")}
-            </h2>
-            <p class="text-sm font-medium text-gray-600 mt-2">Tarix: ${escapeHtml(formatDateAzLong(m.invoiceDate))}</p>
-        </div>
+        ${renderLetterhead(state)}
+
+        <div class="doc-body">
+
+        ${renderDocTitle(`Hesab-Faktura № ${m.invoiceNumber || "—"}`, `Tarix: ${formatDateAzLong(m.invoiceDate)}`)}
 
         <!-- Rekvizitlər (yalnız Satıcı) -->
-        <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4 doc-company-panel">
+        <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4 doc-company-panel doc-requisites">
           <div class="min-w-0 text-[12.5px]">
                 <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Satıcı rekvizitləri</h3>
                 <div class="grid grid-cols-[110px_minmax(0,1fr)] gap-y-1 gap-x-3">
@@ -379,6 +576,10 @@ ${printCssDocument()}
             </div>
         </div>
 
+        </div>
+
+        ${renderLetterfoot(state)}
+
     </div>
 
 </body>
@@ -388,8 +589,6 @@ ${printCssDocument()}
 export function buildDeliveryActHtml(state: GeneratorState): string {
   const m = state.meta;
   const sellerName = state.seller.name?.trim() || "";
-  const sellerAddr = state.seller.address?.trim() || "";
-  const sellerPhone = state.seller.phone?.trim() || "";
   const sellerVoen = state.seller.voen?.trim() || "";
   const sellerDirector = state.seller.director?.trim() || "";
 
@@ -444,17 +643,10 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
-        
-        <!-- Başlıq Hissəsi -->
-        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
-            <div>
-                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
-            </div>
-            <div class="doc-company-panel text-right text-sm space-y-1">
-                <p><span class="font-medium text-gray-600">Ünvan :</span> ${escapeHtml(sellerAddr)}</p>
-                <p><span class="font-medium text-gray-600">Əlaqə:</span> ${escapeHtml(sellerPhone)}</p>
-            </div>
-        </div>
+
+        ${renderLetterhead(state)}
+
+        <div class="doc-body">
 
         <!-- Məlumat Hissəsi -->
         <div class="mb-10 text-sm">
@@ -474,10 +666,7 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
             </div>
         </div>
 
-        <!-- Sənədin Adı -->
-        <h2 class="text-xl font-bold text-center text-gray-900 mb-6 uppercase tracking-wide" style="font-family: 'Merriweather', serif;">
-            Təhvil-Təslim Aktı
-        </h2>
+        ${renderDocTitle("Təhvil-Təslim Aktı")}
 
         <!-- Giriş Mətni -->
         <p class="text-sm text-gray-800 leading-relaxed mb-6 text-justify">
@@ -563,6 +752,10 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
             </div>
         </div>
 
+        </div>
+
+        ${renderLetterfoot(state)}
+
     </div>
 
 </body>
@@ -572,8 +765,6 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
 export function buildDeliveryActNoPriceHtml(state: GeneratorState): string {
   const m = state.meta;
   const sellerName = state.seller.name?.trim() || "";
-  const sellerAddr = state.seller.address?.trim() || "";
-  const sellerPhone = state.seller.phone?.trim() || "";
   const sellerVoen = state.seller.voen?.trim() || "";
   const sellerDirector = state.seller.director?.trim() || "";
 
@@ -617,17 +808,10 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
-        
-        <!-- Başlıq Hissəsi -->
-        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
-            <div>
-                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
-            </div>
-            <div class="doc-company-panel text-right text-sm space-y-1">
-                <p><span class="font-medium text-gray-600">Ünvan :</span> ${escapeHtml(sellerAddr)}</p>
-                <p><span class="font-medium text-gray-600">Əlaqə:</span> ${escapeHtml(sellerPhone)}</p>
-            </div>
-        </div>
+
+        ${renderLetterhead(state)}
+
+        <div class="doc-body">
 
         <!-- Məlumat Hissəsi -->
         <div class="mb-10 text-sm">
@@ -647,10 +831,7 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
             </div>
         </div>
 
-        <!-- Sənədin Adı -->
-        <h2 class="text-xl font-bold text-center text-gray-900 mb-6 uppercase tracking-wide" style="font-family: 'Merriweather', serif;">
-            Təhvil-Təslim Aktı
-        </h2>
+        ${renderDocTitle("Təhvil-Təslim Aktı")}
 
         <!-- Giriş Mətni -->
         <p class="text-sm text-gray-800 leading-relaxed mb-6 text-justify">
@@ -715,6 +896,10 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
             </div>
         </div>
 
+        </div>
+
+        ${renderLetterfoot(state)}
+
     </div>
 
 </body>
@@ -723,8 +908,6 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
 
 export function buildProtocolHtml(state: GeneratorState): string {
   const m = state.meta;
-  const sellerAddr = state.seller.address?.trim() || "";
-  const sellerPhone = state.seller.phone?.trim() || "";
   const buyerName = state.buyer.name?.trim() || "—";
   const sellerName = state.seller.name?.trim() || "—";
   const sellerVoen = state.seller.voen?.trim() || "";
@@ -771,17 +954,10 @@ ${printCssDocument({ compact: true })}
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
-        
-        <!-- Başlıq Hissəsi -->
-        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
-            <div>
-                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
-            </div>
-            <div class="doc-company-panel text-right text-sm space-y-1">
-                <p><span class="font-medium text-gray-600">Ünvan :</span> ${escapeHtml(sellerAddr)}</p>
-                <p><span class="font-medium text-gray-600">Əlaqə:</span> ${escapeHtml(sellerPhone)}</p>
-            </div>
-        </div>
+
+        ${renderLetterhead(state)}
+
+        <div class="doc-body">
 
         <!-- Məlumat Hissəsi -->
         <div class="mb-10 text-sm">
@@ -800,10 +976,7 @@ ${printCssDocument({ compact: true })}
             </div>
         </div>
 
-        <!-- Sənədin Adı -->
-        <h2 class="text-xl font-bold text-center text-gray-900 mb-6" style="font-family: 'Merriweather', serif;">
-            Qiymət razılaşdırma protokolu
-        </h2>
+        ${renderDocTitle("Qiymət razılaşdırma protokolu")}
 
         <!-- Giriş Mətni -->
         <p class="text-sm text-gray-800 leading-relaxed mb-6 text-justify">
@@ -871,6 +1044,10 @@ ${printCssDocument({ compact: true })}
                 </div>
             </div>
         </div>
+
+        </div>
+
+        ${renderLetterfoot(state)}
 
     </div>
 
