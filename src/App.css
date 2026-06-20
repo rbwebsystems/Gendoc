@@ -1953,6 +1953,24 @@ textarea.dg-input.dg-input-textarea-compact {
   white-space: nowrap;
 }
 
+.dg-offer-company-panel {
+  margin-bottom: 1rem;
+}
+
+.dg-offer-company-field {
+  max-width: min(100%, 420px);
+  margin-bottom: 0;
+}
+
+.dg-offer-company-hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.9rem;
+}
+
+.dg-offer-summary-aside {
+  margin-top: 1rem;
+}
+
 .dg-qty-wrap {
   display: inline-flex;
   align-items: stretch;
