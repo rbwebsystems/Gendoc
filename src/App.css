@@ -1848,6 +1848,63 @@ textarea.dg-input.dg-input-textarea-compact {
   background-color: color-mix(in srgb, var(--win-accent) 9%, transparent);
 }
 
+/* Təchizatçı təklifi — sütun enlikləri */
+.dg-table.dg-table--offer {
+  table-layout: fixed;
+  min-width: 920px;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-idx {
+  width: 2.75rem;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-product {
+  width: 11rem;
+  max-width: 11rem;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-price {
+  width: 7.5rem;
+  min-width: 7.5rem;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-qty {
+  width: 5.25rem;
+  min-width: 5.25rem;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-margin {
+  width: 4.75rem;
+  min-width: 4.75rem;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-total {
+  width: 7rem;
+  min-width: 7rem;
+  white-space: nowrap;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-actions {
+  width: 3rem;
+}
+
+.dg-table.dg-table--offer .dg-input-offer-product {
+  max-width: 100%;
+}
+
+.dg-table.dg-table--offer .dg-input-offer-num {
+  width: 100%;
+  min-width: 0;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dg-table.dg-table--offer tbody td {
+  overflow: hidden;
+}
+
 .dg-qty-wrap {
   display: inline-flex;
   align-items: stretch;

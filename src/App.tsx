@@ -2977,18 +2977,18 @@ export default function App() {
                 </button>
               </div>
               <div className="dg-table-wrap pg-grid-host dg-project-lines-wrap">
-                <table className="dg-table dg-table--sales">
+                <table className="dg-table dg-table--sales dg-table--offer">
                   <thead>
                     <tr>
-                      <th className="dg-th-num">№</th>
-                      <th>Məhsul adı</th>
-                      <th className="dg-th-num">Alış (ƏDV-siz)</th>
-                      <th className="dg-th-num">Miqdar</th>
-                      <th className="dg-th-num">Faiz %</th>
-                      <th className="dg-th-num">Satış qiyməti</th>
-                      <th className="dg-th-num">Alış cəmi</th>
-                      <th className="dg-th-num">Satış cəmi</th>
-                      <th className="dg-th-actions">Sil</th>
+                      <th className="dg-th-num dg-offer-col-idx">№</th>
+                      <th className="dg-offer-col-product">Məhsul adı</th>
+                      <th className="dg-th-num dg-offer-col-price">Alış (ƏDV-siz)</th>
+                      <th className="dg-th-num dg-offer-col-qty">Miqdar</th>
+                      <th className="dg-th-num dg-offer-col-margin">Faiz %</th>
+                      <th className="dg-th-num dg-offer-col-price">Satış qiyməti</th>
+                      <th className="dg-th-num dg-offer-col-total">Alış cəmi</th>
+                      <th className="dg-th-num dg-offer-col-total">Satış cəmi</th>
+                      <th className="dg-th-actions dg-offer-col-actions">Sil</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3006,17 +3006,17 @@ export default function App() {
                         return (
                           <tr key={r.id}>
                             <td className="dg-td-num">{idx + 1}</td>
-                            <td>
+                            <td className="dg-offer-col-product">
                               <input
-                                className="dg-input dg-input-table"
+                                className="dg-input dg-input-table dg-input-offer-product"
                                 value={r.name}
                                 onChange={(e) => updateOfferRow(r.id, { name: e.target.value })}
                                 placeholder="Məhsul"
                               />
                             </td>
-                            <td>
+                            <td className="dg-offer-col-price">
                               <input
-                                className="dg-input dg-input-table dg-input-num"
+                                className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
                                 min="0"
                                 step="0.01"
@@ -3024,9 +3024,9 @@ export default function App() {
                                 onChange={(e) => updateOfferRow(r.id, { purchasePrice: e.target.value })}
                               />
                             </td>
-                            <td>
+                            <td className="dg-offer-col-qty">
                               <input
-                                className="dg-input dg-input-table dg-input-num"
+                                className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
                                 min="0"
                                 step="any"
@@ -3034,9 +3034,9 @@ export default function App() {
                                 onChange={(e) => updateOfferRow(r.id, { qty: e.target.value })}
                               />
                             </td>
-                            <td>
+                            <td className="dg-offer-col-margin">
                               <input
-                                className="dg-input dg-input-table dg-input-num"
+                                className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
                                 step="0.01"
                                 value={r.marginPercent}
@@ -3044,9 +3044,9 @@ export default function App() {
                                 placeholder="%"
                               />
                             </td>
-                            <td>
+                            <td className="dg-offer-col-price">
                               <input
-                                className="dg-input dg-input-table dg-input-num"
+                                className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
                                 min="0"
                                 step="0.01"
@@ -3054,8 +3054,8 @@ export default function App() {
                                 onChange={(e) => updateOfferRow(r.id, { salePrice: e.target.value })}
                               />
                             </td>
-                            <td className="dg-td-num">{formatMoney(purchase * qty)}</td>
-                            <td className="dg-td-num">{formatMoney(sale * qty)}</td>
+                            <td className="dg-td-num dg-offer-col-total">{formatMoney(purchase * qty)}</td>
+                            <td className="dg-td-num dg-offer-col-total">{formatMoney(sale * qty)}</td>
                             <td className="dg-td-actions">
                               <button
                                 type="button"
