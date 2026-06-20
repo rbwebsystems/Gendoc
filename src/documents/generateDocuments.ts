@@ -1,60 +1,124 @@
 import type { GeneratorState } from "../types";
 import { escapeHtml, formatDateAzLong, moneyToWordsAz } from "../lib/text";
 
-export function computeTotals(state: GeneratorState) {
-  const subtotal = state.rows.reduce((sum, r) => sum + r.qty * r.unitPrice, 0);
-  const vatRate = Math.max(0, state.vatPercent || 0);
-  const vatAmount = subtotal * (vatRate / 100);
-  const grandTotal = subtotal + vatAmount;
-  return { subtotal, vatRate, vatAmount, grandTotal };
-}
+/** Firma blankı — qırmızı/ağ palitrası */
+const DOC_THEME = {
+  red: "#b91c1c",
+  redDark: "#7f1d1d",
+  redMedium: "#991b1b",
+  redLight: "#fef2f2",
+  redSoft: "#fecaca",
+  redBorder: "#dc2626",
+  redMuted: "#be123c",
+  white: "#ffffff",
+  pageTint: "#fffafa",
+  screenBg: "#fdf2f2",
+} as const;
 
-function printCssProtocol(): string {
+type PrintCssOptions = {
+  thFontSize?: string;
+  tdFontSize?: string;
+  thPadding?: string;
+  compact?: boolean;
+};
+
+function printCssDocument(opts: PrintCssOptions = {}): string {
+  const thFontSize = opts.thFontSize ?? "10.5px";
+  const tdFontSize = opts.tdFontSize ?? "11.5px";
+  const thPadding = opts.thPadding ?? "4px 8px";
+  const compactBlock = opts.compact
+    ? `
+        .mb-10 { margin-bottom: 1.75rem !important; }
+        .mb-6 { margin-bottom: 1.25rem !important; }
+        .mt-12 { margin-top: 2rem !important; }
+        .pb-4 { padding-bottom: 0.85rem !important; }
+        .gap-20 { gap: 3.5rem !important; }
+        .gap-10 { gap: 2rem !important; }
+        .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.45rem !important; }
+        .mb-16 { margin-bottom: 2.5rem !important; }
+    `
+    : "";
+
   return `
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700&display=swap');
-        
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-            color: #111827;
+            background-color: ${DOC_THEME.screenBg};
+            color: ${DOC_THEME.redDark};
             padding: 40px 20px;
         }
 
-        .page-container {
-            max-width: 210mm; /* A4 width */
-            min-height: 297mm; /* A4 height */
-            margin: 0 auto;
-            background: white;
-            padding: 20mm;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
+        .no-print button {
+            background-color: ${DOC_THEME.redMedium} !important;
+            color: ${DOC_THEME.white} !important;
+        }
+        .no-print button:hover {
+            background-color: ${DOC_THEME.redDark} !important;
         }
 
-        /* Çap üçün tənzimləmələr */
+        .page-container {
+            max-width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            background: ${DOC_THEME.white};
+            padding: 20mm;
+            box-shadow: 0 10px 25px -5px rgba(185, 28, 28, 0.12);
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .page-container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, ${DOC_THEME.redDark} 0%, ${DOC_THEME.red} 50%, ${DOC_THEME.redDark} 100%);
+            border-radius: 4px 4px 0 0;
+        }
+
+        /* Tailwind boz siniflərini firma qırmızısına çevir (forma eyni qalır) */
+        .page-container .text-gray-900 { color: ${DOC_THEME.redDark} !important; }
+        .page-container .text-gray-800 { color: ${DOC_THEME.redMedium} !important; }
+        .page-container .text-gray-700 { color: ${DOC_THEME.redMedium} !important; }
+        .page-container .text-gray-600 { color: ${DOC_THEME.red} !important; }
+        .page-container .text-gray-500 { color: #c24141 !important; }
+        .page-container .text-gray-400 { color: ${DOC_THEME.redBorder} !important; }
+        .page-container .border-gray-900,
+        .page-container .border-b.border-gray-900 { border-color: ${DOC_THEME.redDark} !important; }
+        .page-container .border-gray-400,
+        .page-container .border-gray-300 { border-color: ${DOC_THEME.redBorder} !important; }
+        .page-container .border-gray-200 { border-color: ${DOC_THEME.redSoft} !important; }
+        .page-container .bg-gray-50,
+        .page-container .bg-gray-50\\/60 { background-color: ${DOC_THEME.redLight} !important; }
+        .page-container .bg-gray-200 { background-color: ${DOC_THEME.redSoft} !important; color: ${DOC_THEME.redDark} !important; }
+
         @media print {
-            body { background: white; padding: 0; }
+            body { background: white; padding: 0; color: ${DOC_THEME.redDark}; }
             .no-print { display: none !important; }
-            .page-container { 
-                box-shadow: none; 
-                margin: 0; 
-                padding: 15mm; 
-                width: 100%; 
+            .page-container {
+                box-shadow: none;
+                margin: 0;
+                padding: 15mm;
+                width: 100%;
                 border-radius: 0;
             }
+            .page-container::before { border-radius: 0; }
             .print-exact {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            /* İmza blokları yarımçıq qırılmasın */
             .grid.grid-cols-2.gap-20.text-sm.mt-12,
             .grid.grid-cols-2.gap-16.text-sm.mt-12,
-            .mt-12.text-sm.w-1\/2 {
+            .mt-12.text-sm.w-1\\/2 {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
             .grid.grid-cols-2.gap-20.text-sm.mt-12 > div,
             .grid.grid-cols-2.gap-16.text-sm.mt-12 > div,
-            .mt-12.text-sm.w-1\/2 {
+            .mt-12.text-sm.w-1\\/2 {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
@@ -66,20 +130,22 @@ function printCssProtocol(): string {
         }
 
         th, td {
-            border: 1px solid #1f2937; /* Daha kəskin və rəsmi çərçivə */
-            padding: 4px 8px; /* Daha yığcam */
+            border: 1px solid ${DOC_THEME.redDark};
+            padding: ${thPadding};
         }
 
         th {
-            background-color: #f3f4f6;
+            background-color: ${DOC_THEME.redLight};
+            color: ${DOC_THEME.redDark};
             font-weight: 600;
-            font-size: 10.5px;
+            font-size: ${thFontSize};
             text-transform: uppercase;
             letter-spacing: 0.02em;
         }
 
         td {
-            font-size: 11.5px;
+            font-size: ${tdFontSize};
+            color: ${DOC_THEME.redMedium};
         }
 
         .border-none-left {
@@ -87,17 +153,26 @@ function printCssProtocol(): string {
             border-top: none !important;
             border-bottom: none !important;
         }
-
-        /* Ümumi sıxlaşdırma */
-        .mb-10 { margin-bottom: 1.75rem !important; }
-        .mb-6 { margin-bottom: 1.25rem !important; }
-        .mt-12 { margin-top: 2rem !important; }
-        .pb-4 { padding-bottom: 0.85rem !important; }
-        .gap-20 { gap: 3.5rem !important; }
-        .gap-10 { gap: 2rem !important; }
-        .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.45rem !important; }
-        .mb-16 { margin-bottom: 2.5rem !important; }
+        ${compactBlock}
     `;
+}
+
+function printButton(label: string): string {
+  return `
+    <div class="no-print flex justify-center mb-8">
+        <button onclick="window.print()" class="font-medium py-2.5 px-6 rounded-lg transition duration-200 shadow-md flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            ${escapeHtml(label)}
+        </button>
+    </div>`;
+}
+
+export function computeTotals(state: GeneratorState) {
+  const subtotal = state.rows.reduce((sum, r) => sum + r.qty * r.unitPrice, 0);
+  const vatRate = Math.max(0, state.vatPercent || 0);
+  const vatAmount = subtotal * (vatRate / 100);
+  const grandTotal = subtotal + vatAmount;
+  return { subtotal, vatRate, vatAmount, grandTotal };
 }
 
 // formatMoneyPlain artıq istifadə olunmur (şablonlarda lokal formatter var).
@@ -154,93 +229,12 @@ export function buildInvoiceHtml(state: GeneratorState): string {
     <title>Hesab-Faktura</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-            color: #111827;
-            padding: 40px 20px;
-        }
-
-        .page-container {
-            max-width: 210mm; /* A4 width */
-            min-height: 297mm; /* A4 height */
-            margin: 0 auto;
-            background: white;
-            padding: 20mm;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-        }
-
-        /* Çap üçün tənzimləmələr */
-        @media print {
-            body { background: white; padding: 0; }
-            .no-print { display: none !important; }
-            .page-container { 
-                box-shadow: none; 
-                margin: 0; 
-                padding: 15mm; 
-                width: 100%; 
-                border-radius: 0;
-            }
-            .print-exact {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            /* İmza blokları yarımçıq qırılmasın */
-            .grid.grid-cols-2.gap-20.text-sm.mt-12,
-            .grid.grid-cols-2.gap-16.text-sm.mt-12,
-            .mt-12.text-sm.w-1\/2 {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-            .grid.grid-cols-2.gap-20.text-sm.mt-12 > div,
-            .grid.grid-cols-2.gap-16.text-sm.mt-12 > div,
-            .mt-12.text-sm.w-1\/2 {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            border: 1px solid #1f2937; /* Kəskin və rəsmi çərçivə */
-            padding: 4px 8px;
-        }
-
-        th {
-            background-color: #f3f4f6;
-            font-weight: 600;
-            font-size: 10.5px;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-        }
-
-        td {
-            font-size: 11.5px;
-        }
-
-        .border-none-left {
-            border-left: none !important;
-            border-top: none !important;
-            border-bottom: none !important;
-        }
+${printCssDocument()}
     </style>
 </head>
 <body>
 
-    <!-- Çap düyməsi -->
-    <div class="no-print flex justify-center mb-8">
-        <button onclick="window.print()" class="bg-gray-800 hover:bg-black text-white font-medium py-2.5 px-6 rounded-lg transition duration-200 shadow-md flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Fakturanı Çap Et
-        </button>
-    </div>
+    ${printButton("Fakturanı Çap Et")}
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
@@ -399,89 +393,12 @@ export function buildDeliveryActHtml(state: GeneratorState): string {
     <title>Təhvil-Təslim Aktı</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-            color: #111827;
-            padding: 40px 20px;
-        }
-
-        .page-container {
-            max-width: 210mm; /* A4 width */
-            min-height: 297mm; /* A4 height */
-            margin: 0 auto;
-            background: white;
-            padding: 20mm;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-        }
-
-        /* Çap üçün tənzimləmələr */
-        @media print {
-            body { background: white; padding: 0; }
-            .no-print { display: none !important; }
-            .page-container { 
-                box-shadow: none; 
-                margin: 0; 
-                padding: 15mm; 
-                width: 100%; 
-                border-radius: 0;
-            }
-            .print-exact {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            /* İmza blokları yarımçıq qırılmasın */
-            .grid.grid-cols-2.gap-16.text-sm.mt-12 {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-            .grid.grid-cols-2.gap-16.text-sm.mt-12 > div {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            border: 1px solid #1f2937; /* Kəskin və rəsmi çərçivə */
-            padding: 6px 10px; /* Cədvəl xanalarının hündürlüyü (protokoldakı kimi) */
-        }
-
-        th {
-            background-color: #f3f4f6;
-            font-weight: 600;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-        }
-
-        td {
-            font-size: 13px;
-        }
-
-        .border-none-left {
-            border-left: none !important;
-            border-top: none !important;
-            border-bottom: none !important;
-        }
+${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10px" })}
     </style>
 </head>
 <body>
 
-    <!-- Çap düyməsi -->
-    <div class="no-print flex justify-center mb-8">
-        <button onclick="window.print()" class="bg-gray-800 hover:bg-black text-white font-medium py-2.5 px-6 rounded-lg transition duration-200 shadow-md flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Aktı Çap Et
-        </button>
-    </div>
+    ${printButton("Aktı Çap Et")}
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
@@ -649,83 +566,12 @@ export function buildDeliveryActNoPriceHtml(state: GeneratorState): string {
     <title>Qiymətsiz Təhvil-Təslim Aktı</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:wght@700&display=swap');
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-            color: #111827;
-            padding: 40px 20px;
-        }
-
-        .page-container {
-            max-width: 210mm; /* A4 width */
-            min-height: 297mm; /* A4 height */
-            margin: 0 auto;
-            background: white;
-            padding: 20mm;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            border-radius: 4px;
-        }
-
-        /* Çap üçün tənzimləmələr */
-        @media print {
-            body { background: white; padding: 0; }
-            .no-print { display: none !important; }
-            .page-container { 
-                box-shadow: none; 
-                margin: 0; 
-                padding: 15mm; 
-                width: 100%; 
-                border-radius: 0;
-            }
-            .print-exact {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
-            /* İmza blokları yarımçıq qırılmasın */
-            .grid.grid-cols-2.gap-16.text-sm.mt-12 {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-            .grid.grid-cols-2.gap-16.text-sm.mt-12 > div {
-                break-inside: avoid;
-                page-break-inside: avoid;
-            }
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            border: 1px solid #1f2937; /* Kəskin və rəsmi çərçivə */
-            padding: 8px 12px; /* Xanalar bir az genişləndirildi */
-        }
-
-        th {
-            background-color: #f3f4f6;
-            font-weight: 600;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.02em;
-        }
-
-        td {
-            font-size: 14px;
-        }
+${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12px" })}
     </style>
 </head>
 <body>
 
-    <!-- Çap düyməsi -->
-    <div class="no-print flex justify-center mb-8">
-        <button onclick="window.print()" class="bg-gray-800 hover:bg-black text-white font-medium py-2.5 px-6 rounded-lg transition duration-200 shadow-md flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Aktı Çap Et
-        </button>
-    </div>
+    ${printButton("Aktı Çap Et")}
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
@@ -874,18 +720,12 @@ export function buildProtocolHtml(state: GeneratorState): string {
     <title>Qiymət Razılaşdırma Protokolu</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-${printCssProtocol()}
+${printCssDocument({ compact: true })}
     </style>
 </head>
 <body>
 
-    <!-- Çap düyməsi -->
-    <div class="no-print flex justify-center mb-8">
-        <button onclick="window.print()" class="bg-gray-800 hover:bg-black text-white font-medium py-2.5 px-6 rounded-lg transition duration-200 shadow-md flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-            Sənədi Çap Et
-        </button>
-    </div>
+    ${printButton("Sənədi Çap Et")}
 
     <!-- Sənəd Konteyneri -->
     <div class="page-container">
