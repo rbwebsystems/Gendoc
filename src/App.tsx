@@ -624,7 +624,7 @@ export default function App() {
   const [projectEditId, setProjectEditId] = useState<string | null>(null);
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(() => emptyProjectDraft());
 
-  const [infoDialog, setInfoDialog] = useState<{ kind: "company" | "project"; id: string } | null>(null);
+  const [infoDialog, setInfoDialog] = useState<{ kind: "company" | "project" | "offer"; id: string } | null>(null);
   const printDialogRef = useRef<HTMLDialogElement>(null);
   const [printProjectId, setPrintProjectId] = useState<string | null>(null);
   const infoDialogRef = useRef<HTMLDialogElement>(null);
@@ -1426,6 +1426,9 @@ export default function App() {
 
   const infoCompany = infoDialog?.kind === "company" ? workspace.companies.find((c) => c.id === infoDialog.id) : undefined;
   const infoProject = infoDialog?.kind === "project" ? workspace.projects.find((p) => p.id === infoDialog.id) : undefined;
+  const infoOffer =
+    infoDialog?.kind === "offer" ? (workspace.supplierOffers ?? []).find((o) => o.id === infoDialog.id) : undefined;
+  const infoOfferTotals = infoOffer ? offerRowTotals(infoOffer.rows) : null;
   const infoProjectBuyer =
     infoProject && workspace.companies.find((c) => c.id === infoProject.companyId)?.profile;
 
@@ -3115,16 +3118,16 @@ export default function App() {
             </div>
           ) : (
             <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table dg-table--sales">
+              <table className="dg-table dg-table--sales dg-table--offer-list">
                 <thead>
                   <tr>
                     <th className="dg-th-num">№</th>
-                    <th>Tarix</th>
-                    <th>Təchizatçı</th>
-                    <th>Şirkət</th>
-                    <th className="dg-th-num">Sətir</th>
-                    <th className="dg-th-num">Alış cəmi</th>
-                    <th className="dg-th-num">Satış cəmi</th>
+                    <th className="dg-offer-list-col-date">Tarix</th>
+                    <th className="dg-offer-list-col-supplier">Təchizatçı</th>
+                    <th className="dg-offer-list-col-company">Şirkət</th>
+                    <th className="dg-th-amount dg-offer-list-col-rows">Sətir</th>
+                    <th className="dg-th-amount dg-offer-list-col-purchase">Alış cəmi</th>
+                    <th className="dg-th-amount dg-offer-list-col-sale">Satış cəmi</th>
                     <th className="dg-th-actions">Əməliyyatlar</th>
                   </tr>
                 </thead>
@@ -3134,14 +3137,23 @@ export default function App() {
                     return (
                       <tr key={o.id}>
                         <td className="dg-td-num">{i + 1}</td>
-                        <td>{formatDateAzLong(o.offerDate)}</td>
-                        <td>{supplierById.get(o.supplierId)?.name || "—"}</td>
-                        <td>{companyLabel(o.companyId)}</td>
-                        <td className="dg-td-num">{o.rows.length}</td>
-                        <td className="dg-td-num">{formatMoney(totals.purchase)}</td>
-                        <td className="dg-td-num">{formatMoney(totals.sale)}</td>
+                        <td className="dg-offer-list-col-date">{formatDateAzLong(o.offerDate)}</td>
+                        <td className="dg-offer-list-col-supplier">{supplierById.get(o.supplierId)?.name || "—"}</td>
+                        <td className="dg-offer-list-col-company">{companyLabel(o.companyId)}</td>
+                        <td className="dg-td-amount dg-offer-list-col-rows">{o.rows.length}</td>
+                        <td className="dg-td-amount dg-offer-list-col-purchase">{formatMoney(totals.purchase)}</td>
+                        <td className="dg-td-amount dg-offer-list-col-sale">{formatMoney(totals.sale)}</td>
                         <td className="dg-td-actions">
                           <div className="dg-icon-row">
+                            <button
+                              type="button"
+                              className="dg-icon-btn"
+                              title="Məlumat"
+                              aria-label="Məlumat"
+                              onClick={() => setInfoDialog({ kind: "offer", id: o.id })}
+                            >
+                              <IconInfo />
+                            </button>
                             <button
                               type="button"
                               className="dg-icon-btn"
@@ -3534,6 +3546,86 @@ export default function App() {
                   </div>
                 );
               })()}
+            </>
+          ) : null}
+          {infoDialog?.kind === "offer" && infoOffer && infoOfferTotals ? (
+            <>
+              <h2 className="dg-modal-title">Təchizatçı təklifi</h2>
+              <dl className="dg-info-dl">
+                <div className="dg-info-row">
+                  <dt>Tarix</dt>
+                  <dd>{formatDateAzLong(infoOffer.offerDate)}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Təchizatçı</dt>
+                  <dd>{supplierById.get(infoOffer.supplierId)?.name || "—"}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Şirkət</dt>
+                  <dd>{companyLabel(infoOffer.companyId)}</dd>
+                </div>
+                {infoOffer.note?.trim() ? (
+                  <div className="dg-info-row">
+                    <dt>Qeyd</dt>
+                    <dd>{infoOffer.note.trim()}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="dg-info-section-title">Məhsullar</div>
+              <div className="dg-info-table-wrap">
+                <table className="dg-info-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 54 }} className="dg-num">
+                        №
+                      </th>
+                      <th>Məhsul</th>
+                      <th style={{ width: 110 }} className="dg-num">
+                        Alış
+                      </th>
+                      <th style={{ width: 80 }} className="dg-num">
+                        Miqdar
+                      </th>
+                      <th style={{ width: 80 }} className="dg-num">
+                        Faiz %
+                      </th>
+                      <th style={{ width: 110 }} className="dg-num">
+                        Satış
+                      </th>
+                      <th style={{ width: 120 }} className="dg-num">
+                        Alış cəmi
+                      </th>
+                      <th style={{ width: 120 }} className="dg-num">
+                        Satış cəmi
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {infoOffer.rows.map((r, idx) => (
+                      <tr key={r.id}>
+                        <td className="dg-num">{idx + 1}</td>
+                        <td>{r.name || "—"}</td>
+                        <td className="dg-num">{formatMoney(r.purchasePrice)}</td>
+                        <td className="dg-num">{r.qty}</td>
+                        <td className="dg-num">
+                          {typeof r.marginPercent === "number" ? r.marginPercent.toLocaleString("az-AZ") : "—"}
+                        </td>
+                        <td className="dg-num">{formatMoney(r.salePrice)}</td>
+                        <td className="dg-num">{formatMoney(r.purchasePrice * r.qty)}</td>
+                        <td className="dg-num">{formatMoney(r.salePrice * r.qty)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="dg-info-totals" aria-label="Yekunlar">
+                <div className="k">Alış cəmi</div>
+                <div className="v">{formatMoney(infoOfferTotals.purchase)}</div>
+                <div className="k">Satış cəmi</div>
+                <div className="v">{formatMoney(infoOfferTotals.sale)}</div>
+                <div className="k">Marja</div>
+                <div className="v">{formatMoney(infoOfferTotals.sale - infoOfferTotals.purchase)}</div>
+              </div>
             </>
           ) : null}
           <button type="button" className="dg-btn dg-btn-primary dg-btn-block dg-modal-close" onClick={() => infoDialogRef.current?.close()}>

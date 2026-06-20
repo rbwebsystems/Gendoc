@@ -539,6 +539,18 @@ textarea.dg-input::placeholder {
   line-height: 1.25;
 }
 
+.dg-th-amount,
+.dg-td-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding: 0.6rem 0.85rem;
+}
+
+.dg-table.dg-table--sales thead th.dg-th-amount {
+  text-align: right;
+}
+
 .dg-icon-row {
   display: inline-flex;
   flex-direction: row;
@@ -1903,6 +1915,36 @@ textarea.dg-input.dg-input-textarea-compact {
 
 .dg-table.dg-table--offer tbody td {
   overflow: hidden;
+}
+
+.dg-table.dg-table--offer-list {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.dg-table.dg-table--offer-list .dg-offer-list-col-date {
+  width: 8.5rem;
+}
+
+.dg-table.dg-table--offer-list .dg-offer-list-col-supplier {
+  width: 16%;
+}
+
+.dg-table.dg-table--offer-list .dg-offer-list-col-company {
+  width: 16%;
+}
+
+.dg-table.dg-table--offer-list .dg-offer-list-col-rows {
+  width: 4.5rem;
+}
+
+.dg-table.dg-table--offer-list .dg-offer-list-col-purchase,
+.dg-table.dg-table--offer-list .dg-offer-list-col-sale {
+  width: 7.5rem;
+}
+
+.dg-table.dg-table--offer-list thead th {
+  white-space: nowrap;
 }
 
 .dg-qty-wrap {
