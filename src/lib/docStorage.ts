@@ -3,7 +3,8 @@ import type {
   WorkspaceFolderRecord,
   NoteRecord,
   SupplierRecord,
-  SupplierQuoteRecord,
+  SupplierOfferRecord,
+  SupplierOfferRow,
   DocWorkspace,
   DocWorkspaceV2,
   GeneratorState,
@@ -186,36 +187,88 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       };
     });
 
-  const projectIds = new Set(projects.map((p) => p.id));
+  const projectCompanyById = new Map(projects.map((p) => [p.id, p.companyId]));
 
-  const quotesRaw = Array.isArray(w.supplierQuotes) ? w.supplierQuotes : [];
-  const supplierQuotes: SupplierQuoteRecord[] = quotesRaw
-    .filter((q) => q && typeof (q as { id?: unknown }).id === "string")
-    .map((q) => {
-      const supplierId = typeof (q as { supplierId?: unknown }).supplierId === "string" ? String((q as { supplierId: string }).supplierId) : "";
-      const projectIdRaw = typeof (q as { projectId?: unknown }).projectId === "string" ? String((q as { projectId: string }).projectId) : "";
-      const projectId = projectIdRaw && projectIds.has(projectIdRaw) ? projectIdRaw : undefined;
-      const quoteDateRaw = typeof (q as { quoteDate?: unknown }).quoteDate === "string" ? String((q as { quoteDate: string }).quoteDate) : "";
-      const quoteDate = /^\d{4}-\d{2}-\d{2}$/.test(quoteDateRaw) ? quoteDateRaw : new Date().toISOString().slice(0, 10);
-      const description =
-        typeof (q as { description?: unknown }).description === "string"
-          ? String((q as { description: string }).description).trim()
-          : "";
-      const note =
-        typeof (q as { note?: unknown }).note === "string" ? String((q as { note: string }).note).trim() : "";
+  const offersRaw = Array.isArray(w.supplierOffers) ? w.supplierOffers : [];
+  let supplierOffers: SupplierOfferRecord[] = offersRaw
+    .filter((o) => o && typeof (o as { id?: unknown }).id === "string")
+    .map((o) => {
+      const supplierId =
+        typeof (o as { supplierId?: unknown }).supplierId === "string" ? String((o as { supplierId: string }).supplierId) : "";
+      const companyId =
+        typeof (o as { companyId?: unknown }).companyId === "string" ? String((o as { companyId: string }).companyId) : "";
+      const offerDateRaw = typeof (o as { offerDate?: unknown }).offerDate === "string" ? String((o as { offerDate: string }).offerDate) : "";
+      const offerDate = /^\d{4}-\d{2}-\d{2}$/.test(offerDateRaw) ? offerDateRaw : new Date().toISOString().slice(0, 10);
+      const note = typeof (o as { note?: unknown }).note === "string" ? String((o as { note: string }).note).trim() : "";
+      const rowsRaw = Array.isArray((o as { rows?: unknown }).rows) ? (o as { rows: unknown[] }).rows : [];
+      const rows: SupplierOfferRow[] = rowsRaw
+        .filter((r) => r && typeof (r as { id?: unknown }).id === "string")
+        .map((r) => {
+          const purchasePrice = Number((r as { purchasePrice?: unknown }).purchasePrice) || 0;
+          const qty = Number((r as { qty?: unknown }).qty) || 0;
+          const marginRaw = (r as { marginPercent?: unknown }).marginPercent;
+          const marginPercent = typeof marginRaw === "number" && Number.isFinite(marginRaw) ? marginRaw : undefined;
+          const saleRaw = Number((r as { salePrice?: unknown }).salePrice);
+          const salePrice = Number.isFinite(saleRaw) && saleRaw > 0 ? saleRaw : purchasePrice;
+          return {
+            id: String((r as { id: string }).id),
+            name: typeof (r as { name?: unknown }).name === "string" ? String((r as { name: string }).name).trim() : "",
+            purchasePrice,
+            qty,
+            salePrice,
+            ...(typeof marginPercent === "number" ? { marginPercent } : {}),
+          };
+        })
+        .filter((r) => r.name.length > 0);
       return {
-        id: String((q as { id: string }).id),
+        id: String((o as { id: string }).id),
         supplierId: supplierIds.has(supplierId) ? supplierId : "",
-        quoteDate,
-        amount: Number((q as { amount?: unknown }).amount) || 0,
-        ...(projectId ? { projectId } : {}),
-        ...(description ? { description } : {}),
+        companyId: companyIds.has(companyId) ? companyId : "",
+        offerDate,
+        rows,
+        createdAt: typeof (o as { createdAt?: unknown }).createdAt === "number" ? Number((o as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (o as { updatedAt?: unknown }).updatedAt === "number" ? Number((o as { updatedAt: number }).updatedAt) : Date.now(),
         ...(note ? { note } : {}),
-        createdAt: typeof (q as { createdAt?: unknown }).createdAt === "number" ? Number((q as { createdAt: number }).createdAt) : Date.now(),
-        updatedAt: typeof (q as { updatedAt?: unknown }).updatedAt === "number" ? Number((q as { updatedAt: number }).updatedAt) : Date.now(),
       };
     })
-    .filter((q) => q.supplierId);
+    .filter((o) => o.supplierId && o.companyId && o.rows.length > 0);
+
+  if (supplierOffers.length === 0) {
+    const quotesRaw = Array.isArray(w.supplierQuotes) ? w.supplierQuotes : [];
+    supplierOffers = quotesRaw
+      .filter((q) => q && typeof (q as { id?: unknown }).id === "string")
+      .map((q) => {
+        const supplierId = typeof (q as { supplierId?: unknown }).supplierId === "string" ? String((q as { supplierId: string }).supplierId) : "";
+        const projectIdRaw = typeof (q as { projectId?: unknown }).projectId === "string" ? String((q as { projectId: string }).projectId) : "";
+        const companyId = projectIdRaw ? projectCompanyById.get(projectIdRaw) || "" : "";
+        const quoteDateRaw = typeof (q as { quoteDate?: unknown }).quoteDate === "string" ? String((q as { quoteDate: string }).quoteDate) : "";
+        const offerDate = /^\d{4}-\d{2}-\d{2}$/.test(quoteDateRaw) ? quoteDateRaw : new Date().toISOString().slice(0, 10);
+        const amount = Number((q as { amount?: unknown }).amount) || 0;
+        const description =
+          typeof (q as { description?: unknown }).description === "string"
+            ? String((q as { description: string }).description).trim()
+            : "";
+        const note = typeof (q as { note?: unknown }).note === "string" ? String((q as { note: string }).note).trim() : "";
+        const row: SupplierOfferRow = {
+          id: crypto.randomUUID(),
+          name: description || "Məhsul",
+          purchasePrice: amount,
+          qty: 1,
+          salePrice: amount,
+        };
+        return {
+          id: String((q as { id: string }).id),
+          supplierId: supplierIds.has(supplierId) ? supplierId : "",
+          companyId: companyIds.has(companyId) ? companyId : "",
+          offerDate,
+          rows: [row],
+          createdAt: typeof (q as { createdAt?: unknown }).createdAt === "number" ? Number((q as { createdAt: number }).createdAt) : Date.now(),
+          updatedAt: typeof (q as { updatedAt?: unknown }).updatedAt === "number" ? Number((q as { updatedAt: number }).updatedAt) : Date.now(),
+          ...(note ? { note } : {}),
+        };
+      })
+      .filter((o) => o.supplierId && o.companyId);
+  }
 
   return {
     version: 3,
@@ -232,7 +285,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     folders,
     notes,
     suppliers,
-    supplierQuotes,
+    supplierOffers,
   };
 }
 
@@ -425,7 +478,7 @@ export function workspaceHasUserData(w: DocWorkspace): boolean {
     ws.projects.length > 0 ||
     (ws.notes?.length ?? 0) > 0 ||
     (ws.suppliers?.length ?? 0) > 0 ||
-    (ws.supplierQuotes?.length ?? 0) > 0 ||
+    (ws.supplierOffers?.length ?? 0) > 0 ||
     hasFolders ||
     hasSeller
   );
@@ -441,7 +494,7 @@ function workspaceLatestTouch(w: DocWorkspace): number {
   for (const p of ws.projects) bump(p.updatedAt);
   for (const n of ws.notes ?? []) bump(n.updatedAt);
   for (const s of ws.suppliers ?? []) bump(s.updatedAt);
-  for (const q of ws.supplierQuotes ?? []) bump(q.updatedAt);
+  for (const o of ws.supplierOffers ?? []) bump(o.updatedAt);
   for (const f of ws.folders ?? []) bump(f.updatedAt);
   return t;
 }

@@ -129,16 +129,40 @@ export interface SupplierRecord {
   updatedAt: number;
 }
 
-/** Təchizatçıdan alınan qiymət qeydi */
+/** Təchizatçı təklifində məhsul sətri */
+export interface SupplierOfferRow {
+  id: string;
+  name: string;
+  /** Alış qiyməti (ƏDV-siz) */
+  purchasePrice: number;
+  qty: number;
+  /** Satış faizi — alışa əlavə */
+  marginPercent?: number;
+  /** Satış qiyməti (ƏDV-siz) */
+  salePrice: number;
+}
+
+/** Təchizatçı təklifi */
+export interface SupplierOfferRecord {
+  id: string;
+  supplierId: string;
+  /** Təklif olunan şirkət */
+  companyId: string;
+  /** Təklif tarixi (YYYY-MM-DD) */
+  offerDate: string;
+  rows: SupplierOfferRow[];
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** @deprecated köhnə format — migrate olunur */
 export interface SupplierQuoteRecord {
   id: string;
   supplierId: string;
-  /** Təklif/sifariş FK */
   projectId?: string;
-  /** Qiymət alınma tarixi (YYYY-MM-DD) */
   quoteDate: string;
   amount: number;
-  /** Məhsul / təsvir */
   description?: string;
   note?: string;
   createdAt: number;
@@ -161,6 +185,8 @@ export interface DocWorkspace {
   folders?: WorkspaceFolderRecord[];
   notes?: NoteRecord[];
   suppliers?: SupplierRecord[];
+  supplierOffers?: SupplierOfferRecord[];
+  /** @deprecated migrate → supplierOffers */
   supplierQuotes?: SupplierQuoteRecord[];
 }
 
