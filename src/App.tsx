@@ -59,6 +59,7 @@ import {
   subscribeWorkspace,
   uploadFolderFile,
   writeWorkspace,
+  workspaceFingerprint,
 } from "./lib/workspaceSync";
 
 async function downloadPdfFromHtml(html: string, filename: string): Promise<void> {
@@ -524,8 +525,15 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState<string>("");
 
   const [workspace, setWorkspace] = useState<DocWorkspace>(() => normalizeWorkspace(loadWorkspaceLocal()));
+  const workspaceRef = useRef(workspace);
+  workspaceRef.current = workspace;
   // Remote ilə yerli arasında "echo" yazıların qarşısını almaq üçün son sinxronlaşmış JSON
   const lastSyncedJsonRef = useRef<string>("");
+  // Yerli dəyişiklik remote-a yazılmamışdırsa snapshot köhnə məlumatı geri qaytarmasın
+  const pendingLocalWriteRef = useRef(false);
+  const remoteWriteTimerRef = useRef<number | null>(null);
+  const remoteWriteRetryTimerRef = useRef<number | null>(null);
+  const remoteWriteInFlightRef = useRef(false);
   // İlk snapshot gəlmədən yazmaq olmaz (yoxsa migration ilə yaza bilərik)
   const remoteReadyRef = useRef<boolean>(false);
   const [module, setModule] = useState<SidebarModule>("companies");
@@ -624,10 +632,66 @@ export default function App() {
         // İstifadəçi çıxış edibsə remote sinxron izlərini sıfırla
         remoteReadyRef.current = false;
         lastSyncedJsonRef.current = "";
+        pendingLocalWriteRef.current = false;
+        if (remoteWriteTimerRef.current != null) {
+          window.clearTimeout(remoteWriteTimerRef.current);
+          remoteWriteTimerRef.current = null;
+        }
+        if (remoteWriteRetryTimerRef.current != null) {
+          window.clearTimeout(remoteWriteRetryTimerRef.current);
+          remoteWriteRetryTimerRef.current = null;
+        }
       }
     });
     return () => unsub();
   }, []);
+
+  const flushRemoteWrite = useCallback(
+    async (opts?: { retryMs?: number }) => {
+      if (!firebaseEnabled || authState.status !== "signedIn" || !remoteReadyRef.current) return;
+      if (remoteWriteInFlightRef.current) return;
+
+      const uid = authState.user.uid;
+      const payload = workspaceRef.current;
+      const json = workspaceFingerprint(payload);
+
+      if (json === lastSyncedJsonRef.current) {
+        pendingLocalWriteRef.current = false;
+        return;
+      }
+
+      pendingLocalWriteRef.current = true;
+      remoteWriteInFlightRef.current = true;
+
+      try {
+        await writeWorkspace(uid, payload);
+        lastSyncedJsonRef.current = json;
+        pendingLocalWriteRef.current = false;
+        if (remoteWriteRetryTimerRef.current != null) {
+          window.clearTimeout(remoteWriteRetryTimerRef.current);
+          remoteWriteRetryTimerRef.current = null;
+        }
+      } catch (e: unknown) {
+        pendingLocalWriteRef.current = true;
+        const msg =
+          e instanceof Error && e.message.includes("Workspace çox böyükdür")
+            ? e.message
+            : "Sinxronlaşma alınmadı";
+        flash(setToast, msg, "error");
+
+        if (remoteWriteRetryTimerRef.current == null) {
+          const retryMs = opts?.retryMs ?? 2500;
+          remoteWriteRetryTimerRef.current = window.setTimeout(() => {
+            remoteWriteRetryTimerRef.current = null;
+            void flushRemoteWrite({ retryMs: Math.min(retryMs * 2, 30_000) });
+          }, retryMs);
+        }
+      } finally {
+        remoteWriteInFlightRef.current = false;
+      }
+    },
+    [authState],
+  );
 
   // 2) Workspace abunəliyi (yalnız autentifikasiyadan sonra)
   useEffect(() => {
@@ -650,7 +714,7 @@ export default function App() {
         const needsUpload =
           !remoteNorm ||
           !workspaceHasUserData(remoteNorm) ||
-          JSON.stringify(merged) !== JSON.stringify(remoteNorm);
+          workspaceFingerprint(merged) !== workspaceFingerprint(remoteNorm);
 
         if (needsUpload) {
           await writeWorkspace(uid, merged);
@@ -660,7 +724,8 @@ export default function App() {
         clearLocalWorkspace();
 
         if (!cancelled) {
-          lastSyncedJsonRef.current = JSON.stringify(normalizeWorkspace(merged));
+          lastSyncedJsonRef.current = workspaceFingerprint(merged);
+          pendingLocalWriteRef.current = false;
           setWorkspace(merged);
           remoteReadyRef.current = true;
         }
@@ -675,9 +740,14 @@ export default function App() {
         return;
       }
       const normalized = normalizeWorkspace(remoteWs);
-      const json = JSON.stringify(normalized);
+      const json = workspaceFingerprint(normalized);
       // Echo qoruması: snapshot bizim öz yazımızdırsa, state-ə dəymə
       if (json === lastSyncedJsonRef.current) {
+        remoteReadyRef.current = true;
+        return;
+      }
+      // Yerli silmə/yeniləmə hələ yazılmayıbsa köhnə remote state-i geri qaytarmayın
+      if (pendingLocalWriteRef.current) {
         remoteReadyRef.current = true;
         return;
       }
@@ -694,23 +764,31 @@ export default function App() {
 
   // 3) Workspace dəyişəndə debounced yazı (remote və ya lokal)
   useEffect(() => {
-    const json = JSON.stringify(normalizeWorkspace(workspace));
+    const json = workspaceFingerprint(workspace);
 
     // Remote rejim
     if (firebaseEnabled && authState.status === "signedIn") {
       if (!remoteReadyRef.current) return; // hələ ilk snapshot gəlməyib
-      if (json === lastSyncedJsonRef.current) return; // remote ilə eyni
-      const uid = authState.user.uid;
-      const id = window.setTimeout(() => {
-        writeWorkspace(uid, workspace)
-          .then(() => {
-            lastSyncedJsonRef.current = json;
-          })
-          .catch(() => {
-            flash(setToast, "Sinxronlaşma alınmadı", "error");
-          });
+      if (json === lastSyncedJsonRef.current) {
+        pendingLocalWriteRef.current = false;
+        return;
+      }
+
+      pendingLocalWriteRef.current = true;
+      if (remoteWriteTimerRef.current != null) {
+        window.clearTimeout(remoteWriteTimerRef.current);
+      }
+      remoteWriteTimerRef.current = window.setTimeout(() => {
+        remoteWriteTimerRef.current = null;
+        void flushRemoteWrite();
       }, 600);
-      return () => window.clearTimeout(id);
+
+      return () => {
+        if (remoteWriteTimerRef.current != null) {
+          window.clearTimeout(remoteWriteTimerRef.current);
+          remoteWriteTimerRef.current = null;
+        }
+      };
     }
 
     // Lokal rejim — yalnız Firebase ümumiyyətlə deaktivdirsə
@@ -720,7 +798,7 @@ export default function App() {
     }
     // signedOut / loading vəziyyətində yazma — istifadəçilər arası məlumat sızmasın
     return;
-  }, [workspace, authState]);
+  }, [workspace, authState, flushRemoteWrite]);
 
   // Reminder: vaxt çatanda bir dəfə səsli xəbərdarlıq et
   useEffect(() => {
@@ -1069,7 +1147,8 @@ export default function App() {
     if (firebaseEnabled && authState.status === "signedIn") {
       try {
         await writeWorkspace(authState.user.uid, merged);
-        lastSyncedJsonRef.current = JSON.stringify(merged);
+        lastSyncedJsonRef.current = workspaceFingerprint(merged);
+        pendingLocalWriteRef.current = false;
         remoteReadyRef.current = true;
       } catch {
         flash(setToast, "Firestore-a yazılmadı", "error");

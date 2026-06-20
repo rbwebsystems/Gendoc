@@ -16,20 +16,43 @@ import { db, storage } from "./firebase";
 import { normalizeWorkspace } from "./docStorage";
 import type { DocWorkspace, FolderFileRecord } from "../types";
 
-/** Firestore undefined dəyərləri qəbul etmir — yazmadan əvvəl təmizlə */
-function stripUndefinedDeep<T>(value: T): T {
-  if (value === undefined || value === null) return value;
-  if (Array.isArray(value)) {
-    return value.map((item) => stripUndefinedDeep(item)) as T;
-  }
-  if (typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-      if (v !== undefined) out[key] = stripUndefinedDeep(v);
+/** Firestore undefined dəyərləri qəbul etmir; NaN/Infinity də səhvdir */
+export function prepareWorkspaceForFirestore(workspace: DocWorkspace): DocWorkspace {
+  const walk = (value: unknown): unknown => {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    if (typeof value === "string" || typeof value === "boolean") return value;
+    if (Array.isArray(value)) {
+      return value.map((item) => walk(item)).filter((item) => item !== undefined);
     }
-    return out as T;
+    if (typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+        const next = walk(v);
+        if (next !== undefined) out[key] = next;
+      }
+      return out;
+    }
+    return undefined;
+  };
+  return walk(normalizeWorkspace(workspace)) as DocWorkspace;
+}
+
+export function workspaceFingerprint(workspace: DocWorkspace): string {
+  return JSON.stringify(prepareWorkspaceForFirestore(workspace));
+}
+
+const FIRESTORE_DOC_LIMIT_BYTES = 1_048_576;
+const FIRESTORE_SAFE_MARGIN_BYTES = 32_768;
+
+function assertFirestorePayloadSize(payload: DocWorkspace): void {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload)).length;
+  if (bytes + FIRESTORE_SAFE_MARGIN_BYTES > FIRESTORE_DOC_LIMIT_BYTES) {
+    throw new Error(
+      `Workspace çox böyükdür (${Math.round(bytes / 1024)} KB). Qovluq fayllarını azaldın və ya Storage istifadə edin.`,
+    );
   }
-  return value;
 }
 
 const SCHEMA_VERSION = 3;
@@ -81,7 +104,8 @@ export async function fetchWorkspaceOnce(uid: string): Promise<DocWorkspace | nu
 
 export async function writeWorkspace(uid: string, workspace: DocWorkspace): Promise<void> {
   const ref = workspaceDocRef(uid);
-  const workspacePayload = stripUndefinedDeep(normalizeWorkspace(workspace));
+  const workspacePayload = prepareWorkspaceForFirestore(workspace);
+  assertFirestorePayloadSize(workspacePayload);
   await setDoc(
     ref,
     {
