@@ -1,18 +1,17 @@
 import type { GeneratorState } from "../types";
 import { escapeHtml, formatDateAzLong, moneyToWordsAz } from "../lib/text";
 
-/** Firma blankı — qırmızı/ağ palitrası */
+/** Firma blankı — #ff000d vurğu, qalan mətn qara */
 const DOC_THEME = {
-  red: "#b91c1c",
-  redDark: "#7f1d1d",
-  redMedium: "#991b1b",
-  redLight: "#fef2f2",
-  redSoft: "#fecaca",
-  redBorder: "#dc2626",
-  redMuted: "#be123c",
+  brand: "#ff000d",
+  text: "#111827",
+  textMuted: "#374151",
   white: "#ffffff",
-  pageTint: "#fffafa",
-  screenBg: "#fdf2f2",
+  border: "#374151",
+  borderLight: "#d1d5db",
+  rowMuted: "#f9fafb",
+  rowTotal: "#f3f4f6",
+  screenBg: "#f3f4f6",
 } as const;
 
 type PrintCssOptions = {
@@ -45,16 +44,16 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
         body {
             font-family: 'Inter', sans-serif;
             background-color: ${DOC_THEME.screenBg};
-            color: ${DOC_THEME.redDark};
+            color: ${DOC_THEME.text};
             padding: 40px 20px;
         }
 
         .no-print button {
-            background-color: ${DOC_THEME.redMedium} !important;
+            background-color: ${DOC_THEME.brand} !important;
             color: ${DOC_THEME.white} !important;
         }
         .no-print button:hover {
-            background-color: ${DOC_THEME.redDark} !important;
+            background-color: #cc000b !important;
         }
 
         .page-container {
@@ -63,9 +62,10 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
             margin: 0 auto;
             background: ${DOC_THEME.white};
             padding: 20mm;
-            box-shadow: 0 10px 25px -5px rgba(185, 28, 28, 0.12);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
             border-radius: 4px;
             position: relative;
+            color: ${DOC_THEME.text};
         }
 
         .page-container::before {
@@ -75,28 +75,70 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
             left: 0;
             right: 0;
             height: 5px;
-            background: linear-gradient(90deg, ${DOC_THEME.redDark} 0%, ${DOC_THEME.red} 50%, ${DOC_THEME.redDark} 100%);
+            background: ${DOC_THEME.brand};
             border-radius: 4px 4px 0 0;
         }
 
-        /* Tailwind boz siniflərini firma qırmızısına çevir (forma eyni qalır) */
-        .page-container .text-gray-900 { color: ${DOC_THEME.redDark} !important; }
-        .page-container .text-gray-800 { color: ${DOC_THEME.redMedium} !important; }
-        .page-container .text-gray-700 { color: ${DOC_THEME.redMedium} !important; }
-        .page-container .text-gray-600 { color: ${DOC_THEME.red} !important; }
-        .page-container .text-gray-500 { color: #c24141 !important; }
-        .page-container .text-gray-400 { color: ${DOC_THEME.redBorder} !important; }
+        /* Yalnız firma adı qırmızı */
+        .page-container .doc-brand {
+            color: ${DOC_THEME.brand} !important;
+        }
+
+        /* Şirkət məlumatları: etiketlər qırmızı, dəyərlər qara */
+        .page-container .doc-company-panel {
+            color: ${DOC_THEME.text};
+        }
+        .page-container .doc-company-panel h3,
+        .page-container .doc-company-panel h3.text-gray-900,
+        .page-container .doc-company-panel .font-semibold,
+        .page-container .doc-company-panel .font-medium {
+            color: ${DOC_THEME.brand} !important;
+        }
+        .page-container .doc-company-panel .text-gray-900,
+        .page-container .doc-company-panel p,
+        .page-container .doc-company-panel div.text-gray-900 {
+            color: ${DOC_THEME.text} !important;
+        }
+        .page-container .doc-company-panel h3 {
+            border-color: ${DOC_THEME.borderLight} !important;
+        }
+
+        .page-container .doc-page-head {
+            border-color: ${DOC_THEME.brand} !important;
+        }
+
+        /* Ümumi mətn qara */
+        .page-container .text-gray-900,
+        .page-container .text-gray-800,
+        .page-container .text-gray-700,
+        .page-container .text-gray-600,
+        .page-container .text-gray-500 {
+            color: ${DOC_THEME.text} !important;
+        }
+        .page-container .text-gray-400 {
+            color: ${DOC_THEME.textMuted} !important;
+        }
         .page-container .border-gray-900,
-        .page-container .border-b.border-gray-900 { border-color: ${DOC_THEME.redDark} !important; }
+        .page-container .border-b.border-gray-900,
         .page-container .border-gray-400,
-        .page-container .border-gray-300 { border-color: ${DOC_THEME.redBorder} !important; }
-        .page-container .border-gray-200 { border-color: ${DOC_THEME.redSoft} !important; }
+        .page-container .border-gray-300 {
+            border-color: ${DOC_THEME.border} !important;
+        }
+        .page-container .border-gray-200 {
+            border-color: ${DOC_THEME.borderLight} !important;
+        }
         .page-container .bg-gray-50,
-        .page-container .bg-gray-50\\/60 { background-color: ${DOC_THEME.redLight} !important; }
-        .page-container .bg-gray-200 { background-color: ${DOC_THEME.redSoft} !important; color: ${DOC_THEME.redDark} !important; }
+        .page-container .bg-gray-50\\/60 {
+            background-color: ${DOC_THEME.rowMuted} !important;
+            color: ${DOC_THEME.text} !important;
+        }
+        .page-container .bg-gray-200 {
+            background-color: ${DOC_THEME.rowTotal} !important;
+            color: ${DOC_THEME.text} !important;
+        }
 
         @media print {
-            body { background: white; padding: 0; color: ${DOC_THEME.redDark}; }
+            body { background: white; padding: 0; color: ${DOC_THEME.text}; }
             .no-print { display: none !important; }
             .page-container {
                 box-shadow: none;
@@ -130,13 +172,13 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
         }
 
         th, td {
-            border: 1px solid ${DOC_THEME.redDark};
+            border: 1px solid ${DOC_THEME.border};
             padding: ${thPadding};
         }
 
         th {
-            background-color: ${DOC_THEME.redLight};
-            color: ${DOC_THEME.redDark};
+            background-color: ${DOC_THEME.brand};
+            color: ${DOC_THEME.white};
             font-weight: 600;
             font-size: ${thFontSize};
             text-transform: uppercase;
@@ -145,7 +187,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
 
         td {
             font-size: ${tdFontSize};
-            color: ${DOC_THEME.redMedium};
+            color: ${DOC_THEME.text};
         }
 
         .border-none-left {
@@ -240,9 +282,9 @@ ${printCssDocument()}
     <div class="page-container">
         
         <!-- Başlıq Hissəsi -->
-        <div class="flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
+        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
             <div>
-                <h1 class="text-[28px] font-bold text-gray-900 tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
+                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
             </div>
             <div class="text-right text-sm text-gray-800 space-y-1">
                 <!-- Ünvan/E-poçt/Telefon göstərilmir -->
@@ -258,7 +300,7 @@ ${printCssDocument()}
         </div>
 
         <!-- Rekvizitlər (yalnız Satıcı) -->
-        <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4">
+        <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4 doc-company-panel">
           <div class="min-w-0 text-[12.5px]">
                 <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Satıcı rekvizitləri</h3>
                 <div class="grid grid-cols-[110px_minmax(0,1fr)] gap-y-1 gap-x-3">
@@ -404,11 +446,11 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
     <div class="page-container">
         
         <!-- Başlıq Hissəsi -->
-        <div class="flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
+        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
             <div>
-                <h1 class="text-[28px] font-bold text-gray-900 tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
+                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
             </div>
-            <div class="text-right text-sm text-gray-800 space-y-1">
+            <div class="doc-company-panel text-right text-sm space-y-1">
                 <p><span class="font-medium text-gray-600">Ünvan :</span> ${escapeHtml(sellerAddr)}</p>
                 <p><span class="font-medium text-gray-600">Əlaqə:</span> ${escapeHtml(sellerPhone)}</p>
             </div>
@@ -577,11 +619,11 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
     <div class="page-container">
         
         <!-- Başlıq Hissəsi -->
-        <div class="flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
+        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
             <div>
-                <h1 class="text-[28px] font-bold text-gray-900 tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
+                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
             </div>
-            <div class="text-right text-sm text-gray-800 space-y-1">
+            <div class="doc-company-panel text-right text-sm space-y-1">
                 <p><span class="font-medium text-gray-600">Ünvan :</span> ${escapeHtml(sellerAddr)}</p>
                 <p><span class="font-medium text-gray-600">Əlaqə:</span> ${escapeHtml(sellerPhone)}</p>
             </div>
@@ -731,11 +773,11 @@ ${printCssDocument({ compact: true })}
     <div class="page-container">
         
         <!-- Başlıq Hissəsi -->
-        <div class="flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
+        <div class="doc-page-head flex justify-between items-start border-b-2 border-gray-900 pb-4 mb-6">
             <div>
-                <h1 class="text-[28px] font-bold text-gray-900 tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
+                <h1 class="doc-brand text-[28px] font-bold tracking-tight" style="font-family: 'Merriweather', serif;">${escapeHtml(sellerName)}</h1>
             </div>
-            <div class="text-right text-sm text-gray-800 space-y-1">
+            <div class="doc-company-panel text-right text-sm space-y-1">
                 <p><span class="font-medium text-gray-600">Ünvan :</span> ${escapeHtml(sellerAddr)}</p>
                 <p><span class="font-medium text-gray-600">Əlaqə:</span> ${escapeHtml(sellerPhone)}</p>
             </div>
