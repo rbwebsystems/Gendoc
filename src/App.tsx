@@ -524,6 +524,7 @@ function calcSaleFromMargin(purchase: number, marginPercent: number): number {
 
 type OfferRowDraft = {
   id: string;
+  supplierName: string;
   name: string;
   purchasePrice: string;
   qty: string;
@@ -533,7 +534,6 @@ type OfferRowDraft = {
 };
 
 type OfferDraft = {
-  supplierName: string;
   companyId: string;
   offerDate: string;
   note: string;
@@ -543,6 +543,7 @@ type OfferDraft = {
 function emptyOfferRow(): OfferRowDraft {
   return {
     id: crypto.randomUUID(),
+    supplierName: "",
     name: "",
     purchasePrice: "",
     qty: "1",
@@ -554,7 +555,6 @@ function emptyOfferRow(): OfferRowDraft {
 
 function emptyOfferDraft(): OfferDraft {
   return {
-    supplierName: "",
     companyId: "",
     offerDate: new Date().toISOString().slice(0, 10),
     note: "",
@@ -571,6 +571,14 @@ function offerRowTotals(rows: SupplierOfferRow[]) {
     sale += (Number(r.salePrice) || 0) * q;
   }
   return { purchase, sale };
+}
+
+function offerSuppliersLabel(rows: SupplierOfferRow[]): string {
+  const names = [...new Set(rows.map((r) => r.supplierName.trim()).filter(Boolean))];
+  if (names.length === 0) return "—";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
 }
 
 export default function App() {
@@ -2681,14 +2689,16 @@ export default function App() {
   };
 
   const rowDraftToRecord = (r: OfferRowDraft): SupplierOfferRow | null => {
+    const supplierName = r.supplierName.trim();
     const name = r.name.trim();
     const purchasePrice = Number(String(r.purchasePrice).replace(",", "."));
     const qty = Number(String(r.qty).replace(",", "."));
     const marginPercent = Number(String(r.marginPercent).replace(",", "."));
     const salePrice = Number(String(r.salePrice).replace(",", "."));
-    if (!name || !Number.isFinite(purchasePrice) || purchasePrice <= 0 || !Number.isFinite(qty) || qty <= 0) return null;
+    if (!supplierName || !name || !Number.isFinite(purchasePrice) || purchasePrice <= 0 || !Number.isFinite(qty) || qty <= 0) return null;
     const row: SupplierOfferRow = {
       id: r.id,
+      supplierName,
       name,
       purchasePrice,
       qty,
@@ -2700,6 +2710,7 @@ export default function App() {
 
   const offerRowToDraft = (r: SupplierOfferRow): OfferRowDraft => ({
     id: r.id,
+    supplierName: r.supplierName,
     name: r.name,
     purchasePrice: r.purchasePrice > 0 ? String(r.purchasePrice) : "",
     qty: r.qty > 0 ? String(r.qty) : "1",
@@ -2734,7 +2745,6 @@ export default function App() {
   const startEditOffer = (o: SupplierOfferRecord) => {
     setOfferEditId(o.id);
     setOfferDraft({
-      supplierName: supplierById.get(o.supplierId)?.name || "",
       companyId: o.companyId,
       offerDate: o.offerDate || new Date().toISOString().slice(0, 10),
       note: o.note || "",
@@ -2743,10 +2753,10 @@ export default function App() {
     setOfferMode("form");
   };
 
-  const ensureSupplierForOffer = (w: DocWorkspace, name: string, now: number): { next: DocWorkspace; supplierId: string } => {
+  const ensureSupplierByName = (w: DocWorkspace, name: string, now: number): DocWorkspace => {
     const trimmed = name.trim();
     const existing = (w.suppliers ?? []).find((s) => s.name.trim().toLowerCase() === trimmed.toLowerCase());
-    if (existing) return { next: w, supplierId: existing.id };
+    if (existing) return w;
     const id = crypto.randomUUID();
     const rec: SupplierRecord = { id, name: trimmed, createdAt: now, updatedAt: now };
     const folder: WorkspaceFolderRecord = {
@@ -2759,29 +2769,21 @@ export default function App() {
       files: [],
     };
     return {
-      next: {
-        ...w,
-        suppliers: [...(w.suppliers ?? []), rec],
-        folders: [...(w.folders ?? []), folder],
-      },
-      supplierId: id,
+      ...w,
+      suppliers: [...(w.suppliers ?? []), rec],
+      folders: [...(w.folders ?? []), folder],
     };
   };
 
   const saveOffer = () => {
-    const supplierName = offerDraft.supplierName.trim();
     const companyId = offerDraft.companyId.trim();
-    if (!supplierName) {
-      flash(setToast, "Təchizatçı adı daxil edin.", "error");
-      return;
-    }
     if (!companyId) {
       flash(setToast, "Təklif olunan şirkəti seçin.", "error");
       return;
     }
     const rows = offerDraft.rows.map(rowDraftToRecord).filter((r): r is SupplierOfferRow => Boolean(r));
     if (rows.length === 0) {
-      flash(setToast, "Ən azı bir məhsul sətri daxil edin.", "error");
+      flash(setToast, "Hər sətirdə təchizatçı, məhsul və qiymət daxil edin.", "error");
       return;
     }
     const offerDate = (offerDraft.offerDate || "").trim() || new Date().toISOString().slice(0, 10);
@@ -2789,7 +2791,11 @@ export default function App() {
     const now = Date.now();
 
     setWorkspace((w) => {
-      const { next, supplierId } = ensureSupplierForOffer(w, supplierName, now);
+      let next = w;
+      const uniqueSuppliers = [...new Set(rows.map((r) => r.supplierName.trim()).filter(Boolean))];
+      for (const supplierName of uniqueSuppliers) {
+        next = ensureSupplierByName(next, supplierName, now);
+      }
       if (offerEditId) {
         return {
           ...next,
@@ -2797,7 +2803,6 @@ export default function App() {
             if (o.id !== offerEditId) return o;
             const rec: SupplierOfferRecord = {
               id: o.id,
-              supplierId,
               companyId,
               offerDate,
               rows,
@@ -2811,7 +2816,6 @@ export default function App() {
       }
       const rec: SupplierOfferRecord = {
         id: crypto.randomUUID(),
-        supplierId,
         companyId,
         offerDate,
         rows,
@@ -2888,24 +2892,9 @@ export default function App() {
             <div className="dg-project-form-top-row dg-project-form-top-row--two">
               <section className="dg-form-inner-panel dg-project-form-top-primary" aria-labelledby="dg-offer-base-heading">
                 <h2 id="dg-offer-base-heading" className="dg-form-inner-panel-title">
-                  Təchizatçı və şirkət
+                  Təklif məlumatları
                 </h2>
                 <div className="dg-form-meta-grid dg-form-meta-grid--project">
-                  <label className="dg-field">
-                    <span className="dg-label">Təchizatçı adı</span>
-                    <input
-                      className="dg-input"
-                      list="dg-supplier-names"
-                      value={offerDraft.supplierName}
-                      onChange={(e) => setOfferDraft((d) => ({ ...d, supplierName: e.target.value }))}
-                      placeholder="Ad yazın və ya seçin"
-                    />
-                    <datalist id="dg-supplier-names">
-                      {sortedSuppliers.map((s) => (
-                        <option key={s.id} value={s.name} />
-                      ))}
-                    </datalist>
-                  </label>
                   <label className="dg-field">
                     <span className="dg-label">Təklif olunan şirkət</span>
                     <select
@@ -2930,7 +2919,7 @@ export default function App() {
                       onChange={(e) => setOfferDraft((d) => ({ ...d, offerDate: e.target.value }))}
                     />
                   </label>
-                  <label className="dg-field">
+                  <label className="dg-field" style={{ gridColumn: "1 / -1" }}>
                     <span className="dg-label">Qeyd</span>
                     <input
                       className="dg-input"
@@ -2984,6 +2973,7 @@ export default function App() {
                   <thead>
                     <tr>
                       <th className="dg-th-num dg-offer-col-idx">№</th>
+                      <th className="dg-offer-col-supplier">Təchizatçı</th>
                       <th className="dg-offer-col-product">Məhsul adı</th>
                       <th className="dg-th-num dg-offer-col-price">Alış (ƏDV-siz)</th>
                       <th className="dg-th-num dg-offer-col-qty">Miqdar</th>
@@ -2997,7 +2987,7 @@ export default function App() {
                   <tbody>
                     {offerDraft.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="dg-empty-cell">
+                        <td colSpan={10} className="dg-empty-cell">
                           «Sətir əlavə et» düyməsi ilə məhsul əlavə edin.
                         </td>
                       </tr>
@@ -3009,6 +2999,15 @@ export default function App() {
                         return (
                           <tr key={r.id}>
                             <td className="dg-td-num">{idx + 1}</td>
+                            <td className="dg-offer-col-supplier">
+                              <input
+                                className="dg-input dg-input-table dg-input-offer-supplier"
+                                list="dg-supplier-names"
+                                value={r.supplierName}
+                                onChange={(e) => updateOfferRow(r.id, { supplierName: e.target.value })}
+                                placeholder="Təchizatçı"
+                              />
+                            </td>
                             <td className="dg-offer-col-product">
                               <input
                                 className="dg-input dg-input-table dg-input-offer-product"
@@ -3083,6 +3082,11 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+              <datalist id="dg-supplier-names">
+                {sortedSuppliers.map((s) => (
+                  <option key={s.id} value={s.name} />
+                ))}
+              </datalist>
             </section>
 
             <footer className="dg-form-footer-actions">
@@ -3138,7 +3142,7 @@ export default function App() {
                       <tr key={o.id}>
                         <td className="dg-td-num">{i + 1}</td>
                         <td className="dg-offer-list-col-date">{formatDateAzLong(o.offerDate)}</td>
-                        <td className="dg-offer-list-col-supplier">{supplierById.get(o.supplierId)?.name || "—"}</td>
+                        <td className="dg-offer-list-col-supplier">{offerSuppliersLabel(o.rows)}</td>
                         <td className="dg-offer-list-col-company">{companyLabel(o.companyId)}</td>
                         <td className="dg-td-amount dg-offer-list-col-rows">{o.rows.length}</td>
                         <td className="dg-td-amount dg-offer-list-col-purchase">{formatMoney(totals.purchase)}</td>
@@ -3557,12 +3561,12 @@ export default function App() {
                   <dd>{formatDateAzLong(infoOffer.offerDate)}</dd>
                 </div>
                 <div className="dg-info-row">
-                  <dt>Təchizatçı</dt>
-                  <dd>{supplierById.get(infoOffer.supplierId)?.name || "—"}</dd>
-                </div>
-                <div className="dg-info-row">
                   <dt>Şirkət</dt>
                   <dd>{companyLabel(infoOffer.companyId)}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Təchizatçılar</dt>
+                  <dd>{offerSuppliersLabel(infoOffer.rows)}</dd>
                 </div>
                 {infoOffer.note?.trim() ? (
                   <div className="dg-info-row">
@@ -3579,6 +3583,7 @@ export default function App() {
                       <th style={{ width: 54 }} className="dg-num">
                         №
                       </th>
+                      <th style={{ width: 140 }}>Təchizatçı</th>
                       <th>Məhsul</th>
                       <th style={{ width: 110 }} className="dg-num">
                         Alış
@@ -3604,6 +3609,7 @@ export default function App() {
                     {infoOffer.rows.map((r, idx) => (
                       <tr key={r.id}>
                         <td className="dg-num">{idx + 1}</td>
+                        <td>{r.supplierName || "—"}</td>
                         <td>{r.name || "—"}</td>
                         <td className="dg-num">{formatMoney(r.purchasePrice)}</td>
                         <td className="dg-num">{r.qty}</td>

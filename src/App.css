@@ -1863,16 +1863,21 @@ textarea.dg-input.dg-input-textarea-compact {
 /* Təchizatçı təklifi — sütun enlikləri */
 .dg-table.dg-table--offer {
   table-layout: fixed;
-  min-width: 920px;
+  min-width: 1020px;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-idx {
   width: 2.75rem;
 }
 
+.dg-table.dg-table--offer .dg-offer-col-supplier {
+  width: 9.5rem;
+  max-width: 9.5rem;
+}
+
 .dg-table.dg-table--offer .dg-offer-col-product {
-  width: 11rem;
-  max-width: 11rem;
+  width: 9.5rem;
+  max-width: 9.5rem;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-price {
@@ -1900,7 +1905,8 @@ textarea.dg-input.dg-input-textarea-compact {
   width: 3rem;
 }
 
-.dg-table.dg-table--offer .dg-input-offer-product {
+.dg-table.dg-table--offer .dg-input-offer-product,
+.dg-table.dg-table--offer .dg-input-offer-supplier {
   max-width: 100%;
 }
 

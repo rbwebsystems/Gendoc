@@ -188,13 +188,17 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     });
 
   const projectCompanyById = new Map(projects.map((p) => [p.id, p.companyId]));
+  const supplierNameById = new Map(suppliers.map((s) => [s.id, s.name.trim()]));
 
   const offersRaw = Array.isArray(w.supplierOffers) ? w.supplierOffers : [];
   let supplierOffers: SupplierOfferRecord[] = offersRaw
     .filter((o) => o && typeof (o as { id?: unknown }).id === "string")
     .map((o) => {
-      const supplierId =
-        typeof (o as { supplierId?: unknown }).supplierId === "string" ? String((o as { supplierId: string }).supplierId) : "";
+      const legacySupplierId =
+        typeof (o as unknown as { supplierId?: unknown }).supplierId === "string"
+          ? String((o as unknown as { supplierId: string }).supplierId)
+          : "";
+      const legacySupplierName = legacySupplierId ? supplierNameById.get(legacySupplierId) || "" : "";
       const companyId =
         typeof (o as { companyId?: unknown }).companyId === "string" ? String((o as { companyId: string }).companyId) : "";
       const offerDateRaw = typeof (o as { offerDate?: unknown }).offerDate === "string" ? String((o as { offerDate: string }).offerDate) : "";
@@ -210,8 +214,14 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
           const marginPercent = typeof marginRaw === "number" && Number.isFinite(marginRaw) ? marginRaw : undefined;
           const saleRaw = Number((r as { salePrice?: unknown }).salePrice);
           const salePrice = Number.isFinite(saleRaw) && saleRaw > 0 ? saleRaw : purchasePrice;
+          const rowSupplierRaw =
+            typeof (r as { supplierName?: unknown }).supplierName === "string"
+              ? String((r as { supplierName: string }).supplierName).trim()
+              : "";
+          const supplierName = rowSupplierRaw || legacySupplierName;
           return {
             id: String((r as { id: string }).id),
+            supplierName,
             name: typeof (r as { name?: unknown }).name === "string" ? String((r as { name: string }).name).trim() : "",
             purchasePrice,
             qty,
@@ -219,10 +229,9 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
             ...(typeof marginPercent === "number" ? { marginPercent } : {}),
           };
         })
-        .filter((r) => r.name.length > 0);
+        .filter((r) => r.name.length > 0 && r.supplierName.length > 0);
       return {
         id: String((o as { id: string }).id),
-        supplierId: supplierIds.has(supplierId) ? supplierId : "",
         companyId: companyIds.has(companyId) ? companyId : "",
         offerDate,
         rows,
@@ -231,7 +240,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         ...(note ? { note } : {}),
       };
     })
-    .filter((o) => o.supplierId && o.companyId && o.rows.length > 0);
+    .filter((o) => o.companyId && o.rows.length > 0);
 
   if (supplierOffers.length === 0) {
     const quotesRaw = Array.isArray(w.supplierQuotes) ? w.supplierQuotes : [];
@@ -249,8 +258,10 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
             ? String((q as { description: string }).description).trim()
             : "";
         const note = typeof (q as { note?: unknown }).note === "string" ? String((q as { note: string }).note).trim() : "";
+        const supplierName = supplierId ? supplierNameById.get(supplierId) || "" : "";
         const row: SupplierOfferRow = {
           id: crypto.randomUUID(),
+          supplierName,
           name: description || "Məhsul",
           purchasePrice: amount,
           qty: 1,
@@ -258,16 +269,15 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         };
         return {
           id: String((q as { id: string }).id),
-          supplierId: supplierIds.has(supplierId) ? supplierId : "",
           companyId: companyIds.has(companyId) ? companyId : "",
           offerDate,
-          rows: [row],
+          rows: supplierName ? [row] : [],
           createdAt: typeof (q as { createdAt?: unknown }).createdAt === "number" ? Number((q as { createdAt: number }).createdAt) : Date.now(),
           updatedAt: typeof (q as { updatedAt?: unknown }).updatedAt === "number" ? Number((q as { updatedAt: number }).updatedAt) : Date.now(),
           ...(note ? { note } : {}),
         };
       })
-      .filter((o) => o.supplierId && o.companyId);
+      .filter((o) => o.companyId && o.rows.length > 0);
   }
 
   return {

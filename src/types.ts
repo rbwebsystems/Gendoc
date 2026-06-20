@@ -132,6 +132,8 @@ export interface SupplierRecord {
 /** Təchizatçı təklifində məhsul sətri */
 export interface SupplierOfferRow {
   id: string;
+  /** Təchizatçı adı (hər sətir üçün ayrıca) */
+  supplierName: string;
   name: string;
   /** Alış qiyməti (ƏDV-siz) */
   purchasePrice: number;
@@ -145,7 +147,6 @@ export interface SupplierOfferRow {
 /** Təchizatçı təklifi */
 export interface SupplierOfferRecord {
   id: string;
-  supplierId: string;
   /** Təklif olunan şirkət */
   companyId: string;
   /** Təklif tarixi (YYYY-MM-DD) */
