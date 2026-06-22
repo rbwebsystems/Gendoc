@@ -1864,13 +1864,13 @@ textarea.dg-input.dg-input-textarea-compact {
 
 /* Təchizatçı təklifi — sütun enlikləri (səhifəyə sığır, scroll yox) */
 .dg-offer-table-wrap {
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .dg-table.dg-table--offer {
   table-layout: fixed;
   width: 100%;
-  min-width: 0;
+  min-width: 1180px;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-idx {
@@ -1901,8 +1901,15 @@ textarea.dg-input.dg-input-textarea-compact {
   width: 7%;
 }
 
+.dg-table.dg-table--offer .dg-offer-col-sale-computed {
+  width: 6.5%;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+}
+
 .dg-table.dg-table--offer .dg-offer-col-total {
-  width: 9%;
+  width: 6.5%;
   white-space: nowrap;
 }
 
@@ -2020,6 +2027,12 @@ textarea.dg-input.dg-input-textarea-compact {
 .dg-offer-summary-inline strong {
   color: var(--win-text);
   font-variant-numeric: tabular-nums;
+}
+
+.dg-offer-table-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 
 .dg-offer-form-footer {

@@ -175,6 +175,7 @@ type ProjectDraft = {
   rows: ProductRow[];
   meta: DocumentMeta;
   vatPercent: number;
+  billingMode?: "official" | "cash";
 };
 
 function emptyProjectDraft(): ProjectDraft {
@@ -593,6 +594,7 @@ function draftPurchaseForMargin(row: OfferRowDraft): number {
 
 type OfferDraft = {
   companyId: string;
+  offerDate: string;
   rows: OfferRowDraft[];
 };
 
@@ -615,8 +617,95 @@ function emptyOfferRow(): OfferRowDraft {
 function emptyOfferDraft(): OfferDraft {
   return {
     companyId: "",
+    offerDate: new Date().toISOString().slice(0, 10),
     rows: [emptyOfferRow()],
   };
+}
+
+function resolveOfferSalePriceSource(row: {
+  purchasePrice?: number;
+  purchasePriceWithVat?: number;
+  purchasePriceSource?: "ex" | "inc";
+}): "ex" | "inc" {
+  if (row.purchasePriceSource === "inc" || row.purchasePriceSource === "ex") return row.purchasePriceSource;
+  const ex = Number(row.purchasePrice) || 0;
+  const inc = Number(row.purchasePriceWithVat) || 0;
+  if (inc > 0 && ex <= 0) return "inc";
+  return "ex";
+}
+
+function resolveOfferSalePriceSourceFromDraft(row: OfferRowDraft): "ex" | "inc" {
+  return resolveOfferSalePriceSource({
+    purchasePrice: Number(String(row.purchasePrice).replace(",", ".")) || 0,
+    purchasePriceWithVat: Number(String(row.purchasePriceWithVat).replace(",", ".")) || 0,
+    purchasePriceSource: row.purchasePriceSource,
+  });
+}
+
+function resolveOfferSaleUnitPrice(row: SupplierOfferRow, billingMode: "official" | "cash" = "official"): number {
+  const margin = parseMarginPercent(row.marginPercent);
+  const ex = resolvePurchaseExVat(row);
+  const inc = resolvePurchaseIncVat(row);
+  const sale = Number(row.salePrice) || 0;
+  const source = resolveOfferSalePriceSource(row);
+
+  if (billingMode === "cash") {
+    if (offerRowHasIncPurchase(row)) {
+      if (sale > 0 && source === "inc") return sale;
+      if (margin != null && inc > 0) return calcSaleFromMargin(inc, margin);
+      if (inc > 0) return inc;
+    }
+    if (margin != null && inc > 0) return calcSaleFromMargin(inc, margin);
+    if (sale > 0 && source === "ex") return roundMoney(sale * offerVatMultiplier());
+    if (sale > 0) return sale;
+    return 0;
+  }
+
+  if (margin != null && ex > 0) return calcSaleFromMargin(ex, margin);
+  if (sale > 0 && source === "ex") return sale;
+  if (sale > 0 && source === "inc") return roundMoney(sale / offerVatMultiplier());
+  if (ex > 0) return ex;
+  return 0;
+}
+
+function resolveOfferSaleFromDraft(row: OfferRowDraft, billingMode: "official" | "cash" = "official"): number {
+  const margin = parseMarginPercent(row.marginPercent);
+  const ex = resolveOfferPurchaseFromDraft(row);
+  const inc = resolveOfferPurchaseIncFromDraft(row);
+  const sale = Number(String(row.salePrice).replace(",", ".")) || 0;
+  const source = resolveOfferSalePriceSourceFromDraft(row);
+
+  if (billingMode === "cash") {
+    if (offerDraftHasIncPurchase(row)) {
+      if (sale > 0 && source === "inc") return sale;
+      if (margin != null && inc > 0) return calcSaleFromMargin(inc, margin);
+      if (inc > 0) return inc;
+    }
+    if (margin != null && inc > 0) return calcSaleFromMargin(inc, margin);
+    if (sale > 0 && source === "ex") return roundMoney(sale * offerVatMultiplier());
+    if (sale > 0) return sale;
+    return 0;
+  }
+
+  if (margin != null && ex > 0) return calcSaleFromMargin(ex, margin);
+  if (sale > 0 && source === "ex") return sale;
+  if (sale > 0 && source === "inc") return roundMoney(sale / offerVatMultiplier());
+  if (ex > 0) return ex;
+  return 0;
+}
+
+function offerDraftTotals(rows: OfferRowDraft[]) {
+  return rows.reduce(
+    (acc, r) => {
+      const qty = Number(String(r.qty).replace(",", ".")) || 0;
+      acc.purchaseEx += resolveOfferPurchaseFromDraft(r) * qty;
+      acc.purchaseInc += resolveOfferPurchaseIncFromDraft(r) * qty;
+      acc.saleOfficial += resolveOfferSaleFromDraft(r, "official") * qty;
+      acc.saleCash += resolveOfferSaleFromDraft(r, "cash") * qty;
+      return acc;
+    },
+    { purchaseEx: 0, purchaseInc: 0, saleOfficial: 0, saleCash: 0 },
+  );
 }
 
 function offerRowTotals(rows: SupplierOfferRow[]) {
@@ -654,29 +743,23 @@ function resolveOfferProductNameFromDraft(row: OfferRowDraft): string {
   return row.name.trim();
 }
 
-function resolveOfferSaleUnitPrice(row: SupplierOfferRow, billingMode: "official" | "cash" = "official"): number {
-  const purchaseBase =
-    billingMode === "cash" ? resolvePurchaseIncVat(row) : resolvePurchaseExVat(row);
-  const sale = Number(row.salePrice) || 0;
-  const margin = row.marginPercent;
-  const fromMargin =
-    typeof margin === "number" && Number.isFinite(margin) && purchaseBase > 0
-      ? calcSaleFromMargin(purchaseBase, margin)
-      : null;
-  if (fromMargin != null) return fromMargin;
-  if (sale > 0) return sale;
-  return 0;
+function parseMarginPercent(value: string | number | undefined): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const n = Number(trimmed.replace(",", "."));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
 }
 
-function resolveOfferSaleFromDraft(row: OfferRowDraft, billingMode: "official" | "cash" = "official"): number {
-  const purchaseBase =
-    billingMode === "cash" ? resolveOfferPurchaseIncFromDraft(row) : resolveOfferPurchaseFromDraft(row);
-  const sale = Number(String(row.salePrice).replace(",", ".")) || 0;
-  const margin = Number(String(row.marginPercent).replace(",", "."));
-  const fromMargin = Number.isFinite(margin) && purchaseBase > 0 ? calcSaleFromMargin(purchaseBase, margin) : null;
-  if (fromMargin != null) return fromMargin;
-  if (sale > 0) return sale;
-  return 0;
+function offerRowHasIncPurchase(row: { purchasePriceWithVat?: number }): boolean {
+  return (Number(row.purchasePriceWithVat) || 0) > 0;
+}
+
+function offerDraftHasIncPurchase(row: OfferRowDraft): boolean {
+  return (Number(String(row.purchasePriceWithVat).replace(",", ".")) || 0) > 0;
 }
 
 function buildOfferProductRows(
@@ -1378,6 +1461,7 @@ export default function App() {
       rows: normalizeProductRows(p.rows),
       meta: { ...emptyMeta(), ...p.meta },
       vatPercent: p.vatPercent,
+      ...(p.billingMode === "official" || p.billingMode === "cash" ? { billingMode: p.billingMode } : {}),
     });
     setProjectEditId(p.id);
     setProjectMode("form");
@@ -1436,6 +1520,11 @@ export default function App() {
                 rows,
                 meta,
                 vatPercent: Number(projectDraft.vatPercent) || 0,
+                ...(projectDraft.billingMode === "official" || projectDraft.billingMode === "cash"
+                  ? { billingMode: projectDraft.billingMode }
+                  : p.billingMode
+                    ? { billingMode: p.billingMode }
+                    : {}),
                 updatedAt: now,
               }
             : p,
@@ -1775,6 +1864,7 @@ export default function App() {
                       <th className="dg-th-num">№</th>
                       <th>Tarix</th>
                       <th>Şirkət</th>
+                      <th>Növ</th>
                       <th>Təklif</th>
                       <th className="dg-th-actions">Əməliyyatlar</th>
                     </tr>
@@ -1787,6 +1877,15 @@ export default function App() {
                           <td className="dg-td-num">{i + 1}</td>
                           <td>{formatDateAzLong(p.meta.invoiceDate)}</td>
                           <td>{co?.profile.name ?? "—"}</td>
+                          <td>
+                            {p.billingMode === "cash"
+                              ? "Nağd"
+                              : p.billingMode === "official"
+                                ? "Rəsmi"
+                                : p.vatPercent > 0
+                                  ? `ƏDV ${p.vatPercent}%`
+                                  : "—"}
+                          </td>
                           <td>{p.title.trim() || "—"}</td>
                           <td className="dg-td-actions">
                             <div className="dg-icon-row">
@@ -2851,7 +2950,6 @@ export default function App() {
     const purchasePrice = Number(String(r.purchasePrice).replace(",", "."));
     const purchasePriceWithVat = Number(String(r.purchasePriceWithVat).replace(",", "."));
     const qty = Number(String(r.qty).replace(",", "."));
-    const marginPercent = Number(String(r.marginPercent).replace(",", "."));
     const salePrice = Number(String(r.salePrice).replace(",", "."));
     const hasEx = Number.isFinite(purchasePrice) && purchasePrice > 0;
     const hasInc = Number.isFinite(purchasePriceWithVat) && purchasePriceWithVat > 0;
@@ -2869,16 +2967,13 @@ export default function App() {
       name,
       purchasePrice: hasEx ? purchasePrice : 0,
       qty,
-      salePrice:
-        Number.isFinite(salePrice) && salePrice > 0
-          ? salePrice
-          : hasEx
-            ? purchasePrice
-            : purchasePriceWithVat,
+      salePrice: Number.isFinite(salePrice) && salePrice > 0 ? salePrice : 0,
+      purchasePriceSource: r.purchasePriceSource,
     };
     if (hasInc) row.purchasePriceWithVat = purchasePriceWithVat;
     if (replacementName) row.replacementName = replacementName;
-    if (Number.isFinite(marginPercent) && marginPercent !== 0) row.marginPercent = marginPercent;
+    const parsedMargin = parseMarginPercent(r.marginPercent);
+    if (parsedMargin != null) row.marginPercent = parsedMargin;
     return row;
   };
 
@@ -2889,7 +2984,9 @@ export default function App() {
     replacementName: r.replacementName?.trim() || "",
     purchasePrice: r.purchasePrice > 0 ? String(r.purchasePrice) : "",
     purchasePriceWithVat: (r.purchasePriceWithVat ?? 0) > 0 ? String(r.purchasePriceWithVat) : "",
-    purchasePriceSource: (r.purchasePriceWithVat ?? 0) > 0 && r.purchasePrice <= 0 ? "inc" : "ex",
+    purchasePriceSource:
+      r.purchasePriceSource ??
+      ((r.purchasePriceWithVat ?? 0) > 0 && r.purchasePrice <= 0 ? "inc" : "ex"),
     qty: r.qty > 0 ? String(r.qty) : "1",
     marginPercent: typeof r.marginPercent === "number" ? String(r.marginPercent) : "",
     salePrice: r.salePrice > 0 ? String(r.salePrice) : "",
@@ -2905,13 +3002,13 @@ export default function App() {
         if (patch.purchasePrice !== undefined) next.purchasePriceSource = "ex";
         if (patch.purchasePriceWithVat !== undefined) next.purchasePriceSource = "inc";
         const purchase = draftPurchaseForMargin(next);
-        const margin = Number(String(next.marginPercent).replace(",", "."));
+        const margin = parseMarginPercent(next.marginPercent);
         const shouldRecalc =
           !next.saleManual ||
           patch.purchasePrice !== undefined ||
           patch.purchasePriceWithVat !== undefined ||
           patch.marginPercent !== undefined;
-        if (shouldRecalc && Number.isFinite(purchase) && purchase > 0 && Number.isFinite(margin)) {
+        if (shouldRecalc && purchase > 0 && margin != null) {
           next.salePrice = String(calcSaleFromMargin(purchase, margin));
           next.saleManual = false;
         } else if (patch.salePrice !== undefined) {
@@ -2926,6 +3023,7 @@ export default function App() {
     setOfferEditId(o.id);
     setOfferDraft({
       companyId: o.companyId,
+      offerDate: o.offerDate,
       rows: o.rows.length > 0 ? o.rows.map(offerRowToDraft) : [emptyOfferRow()],
     });
     setOfferMode("form");
@@ -2964,11 +3062,7 @@ export default function App() {
       flash(setToast, "Hər sətirdə təchizatçı, məhsul və ya əvəz məhsul və alış qiyməti (ƏDV-siz və ya ƏDV daxil) daxil edin.", "error");
       return;
     }
-    const offerDate =
-      offerEditId != null
-        ? (workspace.supplierOffers ?? []).find((o) => o.id === offerEditId)?.offerDate ||
-          new Date().toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
+    const offerDate = offerDraft.offerDate.trim() || new Date().toISOString().slice(0, 10);
     const preservedNote =
       offerEditId != null
         ? (workspace.supplierOffers ?? []).find((o) => o.id === offerEditId)?.note?.trim() || ""
@@ -3062,6 +3156,9 @@ export default function App() {
       quoteNumber: `${pad3(seq.quote ?? 1)}/${yy(invoiceDate)}`,
     });
 
+    const hadOfficial = normOfficial.length > 0;
+    const hadCash = normCash.length > 0;
+
     setWorkspace((w) => {
       const seq = w.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1, quote: 1 };
       let nextSeq = { ...seq, quote: seq.quote ?? 1 };
@@ -3112,10 +3209,13 @@ export default function App() {
       };
     });
 
-    flash(
-      setToast,
-      "Rəsmi (ƏDV ilə) və nağd təkliflər yaradıldı — «Təkliflər» bölməsində çap edə bilərsiniz",
-    );
+    const toastMsg =
+      hadOfficial && hadCash
+        ? "Rəsmi və nağd təkliflər yaradıldı — «Təkliflər» bölməsində çap edə bilərsiniz"
+        : hadOfficial
+          ? "Rəsmi təklif yaradıldı — «Təkliflər» bölməsində çap edə bilərsiniz"
+          : "Nağd təklif yaradıldı — «Təkliflər» bölməsində çap edə bilərsiniz";
+    flash(setToast, toastMsg);
     setModule("projects");
     return true;
   };
@@ -3134,11 +3234,7 @@ export default function App() {
     }
     const officialRows = buildOfferProductRowsFromDraft(offerDraft.rows, "official");
     const cashRows = buildOfferProductRowsFromDraft(offerDraft.rows, "cash");
-    const offerDate =
-      offerEditId != null
-        ? (workspace.supplierOffers ?? []).find((o) => o.id === offerEditId)?.offerDate ||
-          new Date().toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
+    const offerDate = offerDraft.offerDate.trim() || new Date().toISOString().slice(0, 10);
     appendProjectFromOfferData(companyId, offerDate, officialRows, cashRows);
   };
 
@@ -3146,21 +3242,7 @@ export default function App() {
     const offers = sortedSupplierOffers;
 
     if (offerMode === "form") {
-      const draftTotals = offerDraft.rows.reduce(
-        (acc, r) => {
-          const purchaseEx = resolveOfferPurchaseFromDraft(r);
-          const purchaseInc = resolveOfferPurchaseIncFromDraft(r);
-          const qty = Number(String(r.qty).replace(",", ".")) || 0;
-          const saleOfficial = resolveOfferSaleFromDraft(r, "official");
-          const saleCash = resolveOfferSaleFromDraft(r, "cash");
-          acc.purchaseEx += purchaseEx * qty;
-          acc.purchaseInc += purchaseInc * qty;
-          acc.saleOfficial += saleOfficial * qty;
-          acc.saleCash += saleCash * qty;
-          return acc;
-        },
-        { purchaseEx: 0, purchaseInc: 0, saleOfficial: 0, saleCash: 0 },
-      );
+      const draftTotals = offerDraftTotals(offerDraft.rows);
 
       return (
         <div className="dg-form-page pg-panel" aria-label={offerEditId ? "Təklif redaktəsi" : "Yeni təklif"}>
@@ -3189,21 +3271,32 @@ export default function App() {
               <h2 id="dg-offer-base-heading" className="dg-form-inner-panel-title">
                 Təklif olunan şirkət
               </h2>
-              <label className="dg-field dg-offer-company-field">
-                <span className="dg-label">Şirkət</span>
-                <select
-                  className="dg-input"
-                  value={offerDraft.companyId}
-                  onChange={(e) => setOfferDraft((d) => ({ ...d, companyId: e.target.value }))}
-                >
-                  <option value="">Seçin…</option>
-                  {sortedCompanies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.profile.name?.trim() || c.profile.voen?.trim() || "Şirkət"}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="dg-form-meta-grid dg-form-meta-grid--project">
+                <label className="dg-field">
+                  <span className="dg-label">Şirkət</span>
+                  <select
+                    className="dg-input"
+                    value={offerDraft.companyId}
+                    onChange={(e) => setOfferDraft((d) => ({ ...d, companyId: e.target.value }))}
+                  >
+                    <option value="">Seçin…</option>
+                    {sortedCompanies.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.profile.name?.trim() || c.profile.voen?.trim() || "Şirkət"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="dg-field">
+                  <span className="dg-label">Təklif tarixi</span>
+                  <input
+                    className="dg-input"
+                    type="date"
+                    value={offerDraft.offerDate}
+                    onChange={(e) => setOfferDraft((d) => ({ ...d, offerDate: e.target.value }))}
+                  />
+                </label>
+              </div>
               {sortedCompanies.length === 0 ? (
                 <p className="dg-muted dg-offer-company-hint">Əvvəlcə «Şirkətlər» bölməsində şirkət əlavə edin.</p>
               ) : null}
@@ -3246,20 +3339,27 @@ export default function App() {
                       <th className="dg-offer-col-supplier">Təchizatçı</th>
                       <th className="dg-offer-col-product">Məhsul adı</th>
                       <th className="dg-offer-col-replacement">Əvəz məhsul</th>
-                      <th className="dg-th-num dg-offer-col-price">Alış (ƏDV-siz)</th>
-                      <th className="dg-th-num dg-offer-col-price">Alış (ƏDV daxil)</th>
-                      <th className="dg-th-num dg-offer-col-qty">Miqdar</th>
+                      <th className="dg-th-num dg-offer-col-price" title="ƏDV-siz alış">
+                        ƏDV-siz
+                      </th>
+                      <th className="dg-th-num dg-offer-col-price" title="ƏDV daxil alış">
+                        ƏDV daxil
+                      </th>
+                      <th className="dg-th-num dg-offer-col-qty">Miqd.</th>
                       <th className="dg-th-num dg-offer-col-margin">Faiz %</th>
-                      <th className="dg-th-num dg-offer-col-price">Satış qiyməti</th>
-                      <th className="dg-th-num dg-offer-col-total">Alış cəmi</th>
-                      <th className="dg-th-num dg-offer-col-total">Satış cəmi</th>
+                      <th className="dg-th-num dg-offer-col-price" title="Əl ilə satış (aktiv alış sütununa aiddir)">
+                        Satış*
+                      </th>
+                      <th className="dg-th-num dg-offer-col-total">Alış c.</th>
+                      <th className="dg-th-num dg-offer-col-sale-computed">Sat. rəsmi</th>
+                      <th className="dg-th-num dg-offer-col-sale-computed">Sat. nağd</th>
                       <th className="dg-th-actions dg-offer-col-actions">Sil</th>
                     </tr>
                   </thead>
                   <tbody>
                     {offerDraft.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="dg-empty-cell">
+                        <td colSpan={13} className="dg-empty-cell">
                           «Sətir əlavə et» düyməsi ilə məhsul əlavə edin.
                         </td>
                       </tr>
@@ -3272,8 +3372,7 @@ export default function App() {
                         const saleCash = resolveOfferSaleFromDraft(r, "cash");
                         const purchaseLineTotal =
                           r.purchasePriceSource === "inc" ? purchaseInc * qty : purchaseEx * qty;
-                        const saleLineTotal =
-                          r.purchasePriceSource === "inc" ? saleCash * qty : saleOfficial * qty;
+                        const saleSource = resolveOfferSalePriceSourceFromDraft(r);
                         return (
                           <tr key={r.id}>
                             <td className="dg-td-num">{idx + 1}</td>
@@ -3352,10 +3451,13 @@ export default function App() {
                                 step="0.01"
                                 value={r.salePrice}
                                 onChange={(e) => updateOfferRow(r.id, { salePrice: e.target.value })}
+                                placeholder={saleSource === "inc" ? "Nağd" : "Rəsmi"}
+                                title={saleSource === "inc" ? "Nağd satış (əl ilə)" : "Rəsmi satış (əl ilə)"}
                               />
                             </td>
                             <td className="dg-td-num dg-offer-col-total">{formatMoney(purchaseLineTotal)}</td>
-                            <td className="dg-td-num dg-offer-col-total">{formatMoney(saleLineTotal)}</td>
+                            <td className="dg-td-num dg-offer-col-sale-computed">{formatMoney(saleOfficial)}</td>
+                            <td className="dg-td-num dg-offer-col-sale-computed">{formatMoney(saleCash)}</td>
                             <td className="dg-td-actions">
                               <button
                                 type="button"
@@ -3380,6 +3482,10 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
+              <p className="dg-muted dg-offer-table-hint">
+                Satış* — son redaktə etdiyiniz alış sütununa (ƏDV-siz və ya ƏDV daxil) aiddir. «Sat. rəsmi» və «Sat. nağd»
+                sütunları avtomatik hesablanır.
+              </p>
               <datalist id="dg-supplier-names">
                 {sortedSuppliers.map((s) => (
                   <option key={s.id} value={s.name} />
@@ -3397,7 +3503,7 @@ export default function App() {
                 onClick={createProjectFromOfferDraft}
                 disabled={sortedCompanies.length === 0}
               >
-                Təklif yarat
+                Sənəd yarat
               </button>
               <button
                 type="button"
@@ -3436,8 +3542,9 @@ export default function App() {
                     <th className="dg-offer-list-col-supplier">Təchizatçı</th>
                     <th className="dg-offer-list-col-company">Şirkət</th>
                     <th className="dg-th-amount dg-offer-list-col-rows">Sətir</th>
-                    <th className="dg-th-amount dg-offer-list-col-purchase">Alış cəmi</th>
-                    <th className="dg-th-amount dg-offer-list-col-sale">Satış cəmi</th>
+                    <th className="dg-th-amount dg-offer-list-col-purchase">Alış (ƏDV-siz)</th>
+                    <th className="dg-th-amount dg-offer-list-col-sale">Satış (rəsmi)</th>
+                    <th className="dg-th-amount dg-offer-list-col-sale">Satış (nağd)</th>
                     <th className="dg-th-actions">Əməliyyatlar</th>
                   </tr>
                 </thead>
@@ -3451,8 +3558,9 @@ export default function App() {
                         <td className="dg-offer-list-col-supplier">{offerSuppliersLabel(o.rows)}</td>
                         <td className="dg-offer-list-col-company">{companyLabel(o.companyId)}</td>
                         <td className="dg-td-amount dg-offer-list-col-rows">{o.rows.length}</td>
-                        <td className="dg-td-amount dg-offer-list-col-purchase">{formatMoney(totals.purchase)}</td>
+                        <td className="dg-td-amount dg-offer-list-col-purchase">{formatMoney(totals.purchaseEx)}</td>
                         <td className="dg-td-amount dg-offer-list-col-sale">{formatMoney(totals.sale)}</td>
+                        <td className="dg-td-amount dg-offer-list-col-sale">{formatMoney(totals.saleCash)}</td>
                         <td className="dg-td-actions">
                           <div className="dg-offer-row-actions">
                             <div className="dg-icon-row">
@@ -3489,7 +3597,7 @@ export default function App() {
                               className="dg-btn dg-btn-secondary dg-offer-create-project-btn"
                               onClick={() => createProjectFromSupplierOffer(o)}
                             >
-                              Təklif yarat
+                              Sənəd yarat
                             </button>
                           </div>
                         </td>
@@ -3942,14 +4050,20 @@ export default function App() {
                       <th style={{ width: 80 }} className="dg-num">
                         Faiz %
                       </th>
-                      <th style={{ width: 110 }} className="dg-num">
-                        Satış
+                      <th style={{ width: 96 }} className="dg-num">
+                        Sat. rəsmi
                       </th>
-                      <th style={{ width: 120 }} className="dg-num">
-                        Alış cəmi
+                      <th style={{ width: 96 }} className="dg-num">
+                        Sat. nağd
                       </th>
-                      <th style={{ width: 120 }} className="dg-num">
-                        Satış cəmi
+                      <th style={{ width: 100 }} className="dg-num">
+                        Alış c.
+                      </th>
+                      <th style={{ width: 100 }} className="dg-num">
+                        Rəsmi c.
+                      </th>
+                      <th style={{ width: 100 }} className="dg-num">
+                        Nağd c.
                       </th>
                     </tr>
                   </thead>
@@ -3969,8 +4083,10 @@ export default function App() {
                           {typeof r.marginPercent === "number" ? r.marginPercent.toLocaleString("az-AZ") : "—"}
                         </td>
                         <td className="dg-num">{formatMoney(resolveOfferSaleUnitPrice(r, "official"))}</td>
+                        <td className="dg-num">{formatMoney(resolveOfferSaleUnitPrice(r, "cash"))}</td>
                         <td className="dg-num">{formatMoney(resolvePurchaseExVat(r) * r.qty)}</td>
                         <td className="dg-num">{formatMoney(resolveOfferSaleUnitPrice(r, "official") * r.qty)}</td>
+                        <td className="dg-num">{formatMoney(resolveOfferSaleUnitPrice(r, "cash") * r.qty)}</td>
                       </tr>
                     ))}
                   </tbody>

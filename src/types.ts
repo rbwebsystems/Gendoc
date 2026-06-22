@@ -145,6 +145,8 @@ export interface SupplierOfferRow {
   purchasePrice: number;
   /** Alış qiyməti (ƏDV daxil) — doldurulubsa nağd təklifdə birbaşa istifadə olunur */
   purchasePriceWithVat?: number;
+  /** Hansı alış sahəsi əsas götürülüb (satış daxil etmə üçün) */
+  purchasePriceSource?: "ex" | "inc";
   qty: number;
   /** Satış faizi — alışa əlavə */
   marginPercent?: number;

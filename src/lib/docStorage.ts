@@ -216,8 +216,13 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
           const qty = Number((r as { qty?: unknown }).qty) || 0;
           const marginRaw = (r as { marginPercent?: unknown }).marginPercent;
           const marginPercent = typeof marginRaw === "number" && Number.isFinite(marginRaw) ? marginRaw : undefined;
+          const purchasePriceSourceRaw = (r as { purchasePriceSource?: unknown }).purchasePriceSource;
+          const purchasePriceSource: "ex" | "inc" | undefined =
+            purchasePriceSourceRaw === "inc" || purchasePriceSourceRaw === "ex"
+              ? purchasePriceSourceRaw
+              : undefined;
           const saleRaw = Number((r as { salePrice?: unknown }).salePrice);
-          const salePrice = Number.isFinite(saleRaw) && saleRaw > 0 ? saleRaw : purchasePrice || purchasePriceWithVat || 0;
+          const salePrice = Number.isFinite(saleRaw) && saleRaw > 0 ? saleRaw : 0;
           const rowSupplierRaw =
             typeof (r as { supplierName?: unknown }).supplierName === "string"
               ? String((r as { supplierName: string }).supplierName).trim()
@@ -236,6 +241,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
             qty,
             salePrice,
             ...(purchasePriceWithVat != null ? { purchasePriceWithVat } : {}),
+            ...(purchasePriceSource ? { purchasePriceSource } : {}),
             ...(replacementRaw ? { replacementName: replacementRaw } : {}),
             ...(typeof marginPercent === "number" ? { marginPercent } : {}),
           };
