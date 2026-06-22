@@ -577,6 +577,8 @@ function offerSuppliersLabel(rows: SupplierOfferRow[]): string {
   return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
 }
 
+const SUPPLIER_OFFER_PROJECT_VAT_PERCENT = 18;
+
 function resolveOfferSaleUnitPrice(row: SupplierOfferRow): number {
   const purchase = Number(row.purchasePrice) || 0;
   const sale = Number(row.salePrice) || 0;
@@ -585,10 +587,9 @@ function resolveOfferSaleUnitPrice(row: SupplierOfferRow): number {
     typeof margin === "number" && Number.isFinite(margin) && purchase > 0
       ? calcSaleFromMargin(purchase, margin)
       : null;
-  if (fromMargin != null && sale > 0) return sale;
   if (sale > 0) return sale;
   if (fromMargin != null) return fromMargin;
-  return purchase > 0 ? purchase : 0;
+  return 0;
 }
 
 function resolveOfferSaleFromDraft(row: OfferRowDraft): number {
@@ -596,10 +597,9 @@ function resolveOfferSaleFromDraft(row: OfferRowDraft): number {
   const sale = Number(String(row.salePrice).replace(",", ".")) || 0;
   const margin = Number(String(row.marginPercent).replace(",", "."));
   const fromMargin = Number.isFinite(margin) && purchase > 0 ? calcSaleFromMargin(purchase, margin) : null;
-  if (fromMargin != null && sale > 0) return sale;
   if (sale > 0) return sale;
   if (fromMargin != null) return fromMargin;
-  return purchase > 0 ? purchase : 0;
+  return 0;
 }
 
 export default function App() {
@@ -2881,9 +2881,9 @@ export default function App() {
     productRows: ProductRow[],
     titleHint?: string,
   ) => {
-    const rows = normalizeProductRows(productRows);
+    const rows = normalizeProductRows(productRows).filter((r) => r.unitPrice > 0 && r.qty > 0);
     if (rows.length === 0) {
-      flash(setToast, "Ən azı bir məhsul sətri lazımdır.", "error");
+      flash(setToast, "Satış qiyməti olan ən azı bir məhsul sətri lazımdır.", "error");
       return false;
     }
     const invoiceDate = (offerDate || "").trim() || new Date().toISOString().slice(0, 10);
@@ -2918,7 +2918,7 @@ export default function App() {
             companyId,
             rows,
             meta,
-            vatPercent: 0,
+            vatPercent: SUPPLIER_OFFER_PROJECT_VAT_PERCENT,
             createdAt: now,
             updatedAt: now,
           },
@@ -2926,19 +2926,24 @@ export default function App() {
       };
     });
 
-    flash(setToast, "Təklif yaradıldı — «Təkliflər» bölməsində çap edə bilərsiniz");
+    flash(setToast, `Təklif yaradıldı (ƏDV ${SUPPLIER_OFFER_PROJECT_VAT_PERCENT}% ilə) — «Təkliflər» bölməsində çap edə bilərsiniz`);
     setModule("projects");
     return true;
   };
 
   const createProjectFromSupplierOffer = (offer: SupplierOfferRecord) => {
-    const productRows: ProductRow[] = offer.rows.map((r) => ({
-      id: crypto.randomUUID(),
-      name: r.name,
-      unit: "ədəd",
-      qty: r.qty,
-      unitPrice: resolveOfferSaleUnitPrice(r),
-    }));
+    const productRows: ProductRow[] = [];
+    for (const r of offer.rows) {
+      const unitPrice = resolveOfferSaleUnitPrice(r);
+      if (unitPrice <= 0) continue;
+      productRows.push({
+        id: crypto.randomUUID(),
+        name: r.name,
+        unit: "ədəd",
+        qty: r.qty,
+        unitPrice,
+      });
+    }
     appendProjectFromOfferData(offer.companyId, offer.offerDate, productRows);
   };
 
@@ -2953,13 +2958,14 @@ export default function App() {
       const supplierName = row.supplierName.trim();
       const name = row.name.trim();
       const qty = Number(String(row.qty).replace(",", "."));
-      if (!supplierName || !name || !Number.isFinite(qty) || qty <= 0) continue;
+      const unitPrice = resolveOfferSaleFromDraft(row);
+      if (!supplierName || !name || !Number.isFinite(qty) || qty <= 0 || unitPrice <= 0) continue;
       productRows.push({
         id: crypto.randomUUID(),
         name,
         unit: "ədəd",
         qty,
-        unitPrice: resolveOfferSaleFromDraft(row),
+        unitPrice,
       });
     }
     const offerDate =
