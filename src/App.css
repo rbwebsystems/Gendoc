@@ -1947,40 +1947,19 @@ textarea.dg-input.dg-input-textarea-compact {
   padding: 0.4rem 0.35rem;
 }
 
-.dg-table.dg-table--offer-list {
-  table-layout: fixed;
-  width: 100%;
-  min-width: 0;
-}
-
-.dg-table.dg-table--offer-list .dg-offer-list-col-date {
-  width: 9rem;
-}
-
-.dg-table.dg-table--offer-list .dg-offer-list-col-supplier,
-.dg-table.dg-table--offer-list .dg-offer-list-col-company {
-  width: 18%;
-  max-width: 0;
+.dg-table.dg-table--supplier-offers-list .dg-supplier-offer-ellipsis {
+  max-width: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dg-table.dg-table--offer-list .dg-offer-list-col-rows {
-  width: 3.5rem;
-}
-
-.dg-table.dg-table--offer-list .dg-offer-list-col-purchase,
-.dg-table.dg-table--offer-list .dg-offer-list-col-sale {
-  width: 6.5rem;
-}
-
-.dg-table.dg-table--offer-list .dg-th-actions,
-.dg-table.dg-table--offer-list .dg-td-actions {
-  width: 9.5rem;
-}
-
-.dg-table.dg-table--offer-list thead th {
+.dg-table.dg-table--supplier-offers-list .dg-offer-create-project-btn {
+  height: 30px;
+  min-width: 0;
+  padding: 0 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -2049,20 +2028,6 @@ textarea.dg-input.dg-input-textarea-compact {
 
 .dg-offer-form-footer .dg-btn {
   min-width: 120px;
-}
-
-.dg-offer-row-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.45rem;
-}
-
-.dg-offer-create-project-btn {
-  height: 30px;
-  padding: 0 0.55rem;
-  font-size: 0.75rem;
-  white-space: nowrap;
 }
 
 .dg-qty-wrap {

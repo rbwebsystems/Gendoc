@@ -241,10 +241,10 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = ["companies", "projects", "folders", "
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
   companies: "",
-  projects: "",
+  projects: "Sənəd təklifləri siyahısı",
   folders: "",
   notes: "",
-  suppliers: "Təchizatçı təklifləri",
+  suppliers: "Təchizatçı qiymət təklifləri",
   settings: "",
 };
 
@@ -3520,31 +3520,23 @@ export default function App() {
     }
 
     return (
-      <div className="dg-form-page pg-panel" aria-label="Təchizatçı təklifləri">
-        <header className="dg-form-page-head">
-          <div>
-            <h1 className="dg-form-page-title">Təchizatçı təklifləri</h1>
-          </div>
-        </header>
+      <div className="dg-form-page pg-panel" aria-label="Təchizatçı təklifləri siyahısı">
         <div className="dg-form-page-body">
           {offers.length === 0 ? (
-            <div className="dg-empty-state-card" role="status">
-              <div className="dg-empty-state-title">Hələ təklif yoxdur</div>
-              <div className="dg-empty-state-desc">«Yeni təklif» düyməsi ilə təchizatçı təklifi əlavə edin.</div>
-            </div>
+            <p className="dg-muted dg-form-page-empty">Hələ təklif yoxdur — «Yeni təklif» ilə əlavə edin.</p>
           ) : (
-            <div className="dg-table-wrap pg-grid-host dg-offer-table-wrap">
-              <table className="dg-table dg-table--sales dg-table--offer-list">
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table dg-table--sales dg-table--supplier-offers-list">
                 <thead>
                   <tr>
                     <th className="dg-th-num">№</th>
-                    <th className="dg-offer-list-col-date">Tarix</th>
-                    <th className="dg-offer-list-col-supplier">Təchizatçı</th>
-                    <th className="dg-offer-list-col-company">Şirkət</th>
-                    <th className="dg-th-amount dg-offer-list-col-rows">Sətir</th>
-                    <th className="dg-th-amount dg-offer-list-col-purchase">Alış (ƏDV-siz)</th>
-                    <th className="dg-th-amount dg-offer-list-col-sale">Satış (rəsmi)</th>
-                    <th className="dg-th-amount dg-offer-list-col-sale">Satış (nağd)</th>
+                    <th>Tarix</th>
+                    <th>Təchizatçı</th>
+                    <th>Şirkət</th>
+                    <th className="dg-th-amount">Sətir</th>
+                    <th className="dg-th-amount">Alış (ƏDV-siz)</th>
+                    <th className="dg-th-amount">Satış (rəsmi)</th>
+                    <th className="dg-th-amount">Satış (nağd)</th>
                     <th className="dg-th-actions">Əməliyyatlar</th>
                   </tr>
                 </thead>
@@ -3554,50 +3546,49 @@ export default function App() {
                     return (
                       <tr key={o.id}>
                         <td className="dg-td-num">{i + 1}</td>
-                        <td className="dg-offer-list-col-date">{formatDateAzLong(o.offerDate)}</td>
-                        <td className="dg-offer-list-col-supplier">{offerSuppliersLabel(o.rows)}</td>
-                        <td className="dg-offer-list-col-company">{companyLabel(o.companyId)}</td>
-                        <td className="dg-td-amount dg-offer-list-col-rows">{o.rows.length}</td>
-                        <td className="dg-td-amount dg-offer-list-col-purchase">{formatMoney(totals.purchaseEx)}</td>
-                        <td className="dg-td-amount dg-offer-list-col-sale">{formatMoney(totals.sale)}</td>
-                        <td className="dg-td-amount dg-offer-list-col-sale">{formatMoney(totals.saleCash)}</td>
+                        <td>{formatDateAzLong(o.offerDate)}</td>
+                        <td className="dg-supplier-offer-ellipsis">{offerSuppliersLabel(o.rows)}</td>
+                        <td className="dg-supplier-offer-ellipsis">{companyLabel(o.companyId)}</td>
+                        <td className="dg-td-amount">{o.rows.length}</td>
+                        <td className="dg-td-amount">{formatMoney(totals.purchaseEx)}</td>
+                        <td className="dg-td-amount">{formatMoney(totals.sale)}</td>
+                        <td className="dg-td-amount">{formatMoney(totals.saleCash)}</td>
                         <td className="dg-td-actions">
-                          <div className="dg-offer-row-actions">
-                            <div className="dg-icon-row">
-                              <button
-                                type="button"
-                                className="dg-icon-btn"
-                                title="Məlumat"
-                                aria-label="Məlumat"
-                                onClick={() => setInfoDialog({ kind: "offer", id: o.id })}
-                              >
-                                <IconInfo />
-                              </button>
-                              <button
-                                type="button"
-                                className="dg-icon-btn"
-                                title="Redaktə"
-                                aria-label="Redaktə"
-                                onClick={() => startEditOffer(o)}
-                              >
-                                <IconEdit />
-                              </button>
-                              <button
-                                type="button"
-                                className="dg-icon-btn dg-icon-btn-danger"
-                                title="Sil"
-                                aria-label="Sil"
-                                onClick={() => deleteOffer(o.id)}
-                              >
-                                <IconTrash />
-                              </button>
-                            </div>
+                          <div className="dg-icon-row">
+                            <button
+                              type="button"
+                              className="dg-icon-btn"
+                              title="Məlumat"
+                              aria-label="Məlumat"
+                              onClick={() => setInfoDialog({ kind: "offer", id: o.id })}
+                            >
+                              <IconInfo />
+                            </button>
+                            <button
+                              type="button"
+                              className="dg-icon-btn"
+                              title="Redaktə"
+                              aria-label="Redaktə"
+                              onClick={() => startEditOffer(o)}
+                            >
+                              <IconEdit />
+                            </button>
+                            <button
+                              type="button"
+                              className="dg-icon-btn dg-icon-btn-danger"
+                              title="Sil"
+                              aria-label="Sil"
+                              onClick={() => deleteOffer(o.id)}
+                            >
+                              <IconTrash />
+                            </button>
                             <button
                               type="button"
                               className="dg-btn dg-btn-secondary dg-offer-create-project-btn"
+                              title="Sənəd yarat"
                               onClick={() => createProjectFromSupplierOffer(o)}
                             >
-                              Sənəd yarat
+                              Sənəd
                             </button>
                           </div>
                         </td>
@@ -4501,6 +4492,7 @@ export default function App() {
                 </button>
                 <div className="rb-page-title">
                   <h1>{workspaceHeader.title}</h1>
+                  {workspaceHeader.sub ? <p>{workspaceHeader.sub}</p> : null}
                 </div>
               </div>
               <div className="rb-topbar-tools">
