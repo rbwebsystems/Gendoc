@@ -754,15 +754,18 @@
   box-shadow: 0 12px 34px rgba(15, 23, 42, 0.08);
 }
 
-.rb-desktop .dg-table.dg-table--sales thead th {
-  height: 44px;
-  padding: 0 12px;
-  font-size: 11px;
-  color: rgba(15, 23, 42, 0.72);
-  background: rgba(15, 23, 42, 0.04);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+.rb-desktop .dg-table thead th,
+.rb-desktop .dg-info-table thead th {
+  min-height: 44px;
+  padding: var(--table-header-padding-y) var(--table-header-padding-x);
+  font-size: var(--table-header-font-size);
+  font-weight: var(--table-header-font-weight);
+  line-height: var(--table-header-line-height);
+  color: var(--table-header-fg);
+  background: var(--table-header-bg);
+  border-bottom: none;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--table-header-letter-spacing);
 }
 
 .rb-desktop .dg-table.dg-table--sales tbody td {
