@@ -219,17 +219,23 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
               ? String((r as { supplierName: string }).supplierName).trim()
               : "";
           const supplierName = rowSupplierRaw || legacySupplierName;
+          const name = typeof (r as { name?: unknown }).name === "string" ? String((r as { name: string }).name).trim() : "";
+          const replacementRaw =
+            typeof (r as { replacementName?: unknown }).replacementName === "string"
+              ? String((r as { replacementName: string }).replacementName).trim()
+              : "";
           return {
             id: String((r as { id: string }).id),
             supplierName,
-            name: typeof (r as { name?: unknown }).name === "string" ? String((r as { name: string }).name).trim() : "",
+            name,
             purchasePrice,
             qty,
             salePrice,
+            ...(replacementRaw ? { replacementName: replacementRaw } : {}),
             ...(typeof marginPercent === "number" ? { marginPercent } : {}),
           };
         })
-        .filter((r) => r.name.length > 0 && r.supplierName.length > 0);
+        .filter((r) => (r.name.length > 0 || (r.replacementName?.length ?? 0) > 0) && r.supplierName.length > 0);
       return {
         id: String((o as { id: string }).id),
         companyId: companyIds.has(companyId) ? companyId : "",

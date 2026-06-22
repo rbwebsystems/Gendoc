@@ -135,6 +135,8 @@ export interface SupplierOfferRow {
   /** Təchizatçı adı (hər sətir üçün ayrıca) */
   supplierName: string;
   name: string;
+  /** Əsas məhsul yoxdursa əvəz verilən məhsul */
+  replacementName?: string;
   /** Alış qiyməti (ƏDV-siz) */
   purchasePrice: number;
   qty: number;

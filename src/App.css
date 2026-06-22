@@ -1878,15 +1878,19 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-table.dg-table--offer .dg-offer-col-supplier {
-  width: 11%;
+  width: 10%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-product {
-  width: 12%;
+  width: 10%;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-replacement {
+  width: 10%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-price {
-  width: 9%;
+  width: 8%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-qty {
@@ -1907,7 +1911,8 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-table.dg-table--offer .dg-input-offer-product,
-.dg-table.dg-table--offer .dg-input-offer-supplier {
+.dg-table.dg-table--offer .dg-input-offer-supplier,
+.dg-table.dg-table--offer .dg-input-offer-replacement {
   max-width: 100%;
   min-width: 0;
 }
