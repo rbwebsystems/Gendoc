@@ -346,15 +346,29 @@ textarea.dg-input::placeholder {
 }
 
 .dg-table th {
-  background: var(--table-header-bg);
-  font-weight: 700;
-  font-size: 0.6875rem;
-  line-height: 1.35;
-  color: var(--table-header-fg);
+  font-weight: var(--table-header-font-weight);
+  font-size: var(--table-header-font-size);
+  line-height: var(--table-header-line-height);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid color-mix(in srgb, var(--table-header-bg-dark) 45%, transparent);
-  box-shadow: none;
+  letter-spacing: var(--table-header-letter-spacing);
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+/* Bütün bölmələrdə cədvəl başlıqları — eyni qırmızı rəng və ölçü */
+.dg-table thead th,
+.dg-info-table thead th {
+  background: var(--table-header-bg);
+  color: var(--table-header-fg);
+  font-size: var(--table-header-font-size);
+  font-weight: var(--table-header-font-weight);
+  line-height: var(--table-header-line-height);
+  letter-spacing: var(--table-header-letter-spacing);
+  text-transform: uppercase;
+  border-bottom: none;
+  padding: var(--table-header-padding-y) var(--table-header-padding-x);
+  vertical-align: middle;
+  box-sizing: border-box;
 }
 
 .dg-table td {
@@ -1289,15 +1303,12 @@ select.dg-input:focus {
 
 .dg-info-table th,
 .dg-info-table td {
-  padding: 0.65rem 0.8rem;
   border-bottom: 1px solid var(--win-border);
   vertical-align: top;
 }
 
-.dg-info-table thead th {
-  background: var(--table-header-bg);
-  font-weight: 800;
-  color: var(--table-header-fg);
+.dg-info-table tbody td {
+  padding: 0.65rem 0.8rem;
 }
 
 .dg-info-table tbody tr:last-child td {
@@ -1838,17 +1849,6 @@ textarea.dg-input.dg-input-textarea-compact {
   min-width: min(100%, 220px);
 }
 
-.dg-table.dg-table--sales thead th {
-  background: var(--table-header-bg);
-  color: var(--table-header-fg);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.055em;
-  border-bottom: none;
-  padding: 0.8rem 0.7rem;
-}
-
 .dg-table.dg-table--sales thead th.dg-th-actions {
   text-align: right;
 }
@@ -1941,7 +1941,6 @@ textarea.dg-input.dg-input-textarea-compact {
   font-variant-numeric: tabular-nums;
 }
 
-.dg-table.dg-table--offer thead th,
 .dg-table.dg-table--offer tbody td {
   overflow: hidden;
   padding: 0.4rem 0.35rem;
@@ -1956,22 +1955,11 @@ textarea.dg-input.dg-input-textarea-compact {
   overflow-x: auto;
 }
 
-/* dg-table--sales-dan asılı olmadan — thead/tbody eyni padding */
-.dg-table.dg-table--supplier-offers-list thead th,
+/* Təchizatçı təklifləri siyahısı — sətir padding (başlıq ümumi thead qaydasındadır) */
 .dg-table.dg-table--supplier-offers-list tbody td {
-  padding: 0.55rem 0.65rem;
+  padding: 0.45rem 0.55rem;
   box-sizing: border-box;
   vertical-align: middle;
-}
-
-.dg-table.dg-table--supplier-offers-list thead th {
-  background: var(--table-header-bg);
-  color: var(--table-header-fg);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.055em;
-  border-bottom: none;
 }
 
 .dg-table.dg-table--supplier-offers-list tbody tr:nth-child(even) td {
