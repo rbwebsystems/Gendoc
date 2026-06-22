@@ -18,6 +18,27 @@ import type { DocWorkspace, FolderFileRecord } from "../types";
 
 /** Firestore undefined dəyərləri qəbul etmir; NaN/Infinity də səhvdir */
 export function prepareWorkspaceForFirestore(workspace: DocWorkspace): DocWorkspace {
+  const normalized = normalizeWorkspace(workspace);
+  const withoutHeavyFiles: DocWorkspace = {
+    ...normalized,
+    folders: (normalized.folders ?? []).map((folder) => ({
+      ...folder,
+      files: (folder.files ?? [])
+        .map((file) => {
+          // Storage URL varsa, Firestore-a base64 yazma (1MB limiti və sinxron problemləri)
+          if (file.url || file.storagePath) {
+            const { dataUrl: _drop, ...meta } = file;
+            return meta;
+          }
+          // Kiçik fayllar üçün dataUrl saxla (legacy / Storage olmayan rejim)
+          if (typeof file.dataUrl === "string" && file.dataUrl.length <= 240_000) {
+            return file;
+          }
+          return null;
+        })
+        .filter((file): file is NonNullable<typeof file> => file != null),
+    })),
+  };
   const walk = (value: unknown): unknown => {
     if (value === undefined) return undefined;
     if (value === null) return null;
@@ -36,7 +57,7 @@ export function prepareWorkspaceForFirestore(workspace: DocWorkspace): DocWorksp
     }
     return undefined;
   };
-  return walk(normalizeWorkspace(workspace)) as DocWorkspace;
+  return walk(withoutHeavyFiles) as DocWorkspace;
 }
 
 export function workspaceFingerprint(workspace: DocWorkspace): string {
@@ -130,6 +151,15 @@ export interface UploadFolderFileResult extends FolderFileRecord {
   url: string;
 }
 
+function guessFolderFileMime(file: File): string {
+  const t = (file.type || "").trim();
+  if (t) return t;
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (/\.(jpe?g|png|gif|webp|bmp|svg)$/.test(lower)) return "image/jpeg";
+  return "application/octet-stream";
+}
+
 export async function uploadFolderFile(
   uid: string,
   folderId: string,
@@ -139,12 +169,12 @@ export async function uploadFolderFile(
   const id = crypto.randomUUID();
   const path = storageFolderPath(uid, folderId, id, file.name);
   const r = ref(storage, path);
-  await uploadBytes(r, file, { contentType: file.type || "application/octet-stream" });
+  await uploadBytes(r, file, { contentType: guessFolderFileMime(file) });
   const url = await getDownloadURL(r);
   return {
     id,
     name: file.name,
-    mime: file.type || "application/octet-stream",
+    mime: guessFolderFileMime(file),
     size: file.size,
     createdAt: Date.now(),
     storagePath: path,

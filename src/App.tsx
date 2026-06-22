@@ -1061,7 +1061,7 @@ export default function App() {
       const id = window.setTimeout(() => saveWorkspaceLocal(workspace), 420);
       return () => window.clearTimeout(id);
     }
-    // signedOut / loading vəziyyətində yazma — istifadəçilər arası məlumat sızmasın
+    // signedOut / loading — yazma (istifadəçilər arası qarışıqlıq olmasın)
     return;
   }, [workspace, authState, flushRemoteWrite]);
 
@@ -2369,6 +2369,15 @@ export default function App() {
   // Faylı oxumaq üçün vahid mənbə (Storage URL → varsa, lokal dataUrl → fallback)
   const fileSrc = (f: FolderFileRecord): string => f.url || f.dataUrl || "";
 
+  const folderFileMime = (f: File): string => {
+    const t = (f.type || "").trim();
+    if (t) return t;
+    const lower = f.name.toLowerCase();
+    if (lower.endsWith(".pdf")) return "application/pdf";
+    if (/\.(jpe?g|png|gif|webp|bmp|svg)$/.test(lower)) return "image/*";
+    return "application/octet-stream";
+  };
+
   const readFileAsDataUrlRecord = (f: File): Promise<FolderFileRecord> => {
     return new Promise<FolderFileRecord>((resolve, reject) => {
       const r = new FileReader();
@@ -2377,7 +2386,7 @@ export default function App() {
         resolve({
           id: crypto.randomUUID(),
           name: f.name,
-          mime: f.type || "application/octet-stream",
+          mime: folderFileMime(f),
           size: f.size,
           createdAt: Date.now(),
           dataUrl: String(r.result || ""),
@@ -2388,44 +2397,76 @@ export default function App() {
 
   const onUploadToFolder = async (folderId: string, filesList: FileList | null) => {
     if (!folderId || !filesList || filesList.length === 0) return;
+    const folderExists = (workspace.folders ?? []).some((f) => f.id === folderId);
+    if (!folderExists) {
+      flash(setToast, "Qovluq tapılmadı — qovluğu bağlayıb yenidən açın.", "error");
+      return;
+    }
+
     const files = Array.from(filesList);
     const useRemote = firebaseEnabled && authState.status === "signedIn";
+
+    // Remote snapshot köhnə state ilə yükləməni əvəz etməsin deyə əvvəlcədən qoru
+    pendingLocalWriteRef.current = true;
+
     try {
       let added: FolderFileRecord[] = [];
       if (useRemote && authState.status === "signedIn") {
         const uid = authState.user.uid;
-        // Storage ola bilməz (billing tələb edə bilər). Bu halda dataUrl fallback edirik.
-        const results = await Promise.all(
-          files.map(async (f) => {
-            try {
-              return await uploadFolderFile(uid, folderId, f);
-            } catch {
-              return await readFileAsDataUrlRecord(f);
-            }
-          }),
-        );
+        const results: FolderFileRecord[] = [];
+        for (const f of files) {
+          try {
+            results.push(await uploadFolderFile(uid, folderId, f));
+          } catch {
+            results.push(await readFileAsDataUrlRecord(f));
+          }
+        }
         added = results;
         if (results.some((x) => Boolean(x.dataUrl) && !x.url)) {
-          flash(setToast, "Storage yoxdur — fayllar dataUrl kimi saxlanıldı", "error");
+          flash(
+            setToast,
+            "Storage işləmir — fayl bu cihazda görünür, sinxron üçün Storage yoxlayın.",
+            "error",
+          );
         }
       } else {
-        // Lokal rejim — eski dataUrl formatı
         added = await Promise.all(files.map(readFileAsDataUrlRecord));
       }
-      setWorkspace((w) => ({
-        ...w,
-        folders: (w.folders ?? []).map((fold) => {
+
+      if (added.length === 0) {
+        pendingLocalWriteRef.current = false;
+        flash(setToast, "Fayl yüklənmədi", "error");
+        return;
+      }
+
+      setWorkspace((w) => {
+        let touched = false;
+        const nextFolders = (w.folders ?? []).map((fold) => {
           if (fold.id !== folderId) return fold;
+          touched = true;
           const now = Date.now();
           return {
             ...fold,
             updatedAt: now,
             files: [...(fold.files ?? []), ...added],
           };
-        }),
-      }));
-      flash(setToast, "Fayllar əlavə olundu");
+        });
+        if (!touched) return w;
+        const next = { ...w, folders: nextFolders };
+        if (!useRemote && (!firebaseEnabled || authState.status === "disabled")) {
+          saveWorkspaceLocal(next);
+          pendingLocalWriteRef.current = false;
+        }
+        return next;
+      });
+
+      flash(setToast, added.length === 1 ? "Fayl əlavə olundu" : `${added.length} fayl əlavə olundu`);
+
+      if (useRemote) {
+        void flushRemoteWrite();
+      }
     } catch {
+      pendingLocalWriteRef.current = false;
       flash(setToast, "Fayl yüklənmədi", "error");
     }
   };
@@ -2596,7 +2637,7 @@ export default function App() {
                     {t.mime.startsWith("image/") ? (
                       <img src={fileSrc(t)} alt="" loading="lazy" />
                     ) : (
-                      <div className="dg-folder-thumbbadge">{t.mime === "application/pdf" ? "PDF" : "FILE"}</div>
+                      <div className="dg-folder-thumbbadge">{t.mime === "application/pdf" || t.name.toLowerCase().endsWith(".pdf") ? "PDF" : "FILE"}</div>
                     )}
                   </div>
                 ))}
@@ -2807,7 +2848,7 @@ export default function App() {
                     .sort((a, b) => b.createdAt - a.createdAt)
                     .map((f) => {
                       const isImg = f.mime.startsWith("image/");
-                      const isPdf = f.mime === "application/pdf";
+                      const isPdf = f.mime === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
                       return (
                         <div key={f.id} className="dg-file-tile" role="listitem">
                           <a className="dg-file-thumb" href={fileSrc(f)} target="_blank" rel="noreferrer" title="Aç">
