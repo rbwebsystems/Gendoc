@@ -7,6 +7,7 @@ import {
   buildDeliveryActHtml,
   buildDeliveryActNoPriceHtml,
   buildInvoiceHtml,
+  buildPriceQuoteHtml,
   buildProtocolHtml,
   openPrintableDocument,
   computeTotals,
@@ -522,17 +523,73 @@ function calcSaleFromMargin(purchase: number, marginPercent: number): number {
   return Math.round(purchase * (1 + marginPercent / 100) * 100) / 100;
 }
 
+const SUPPLIER_OFFER_PROJECT_VAT_PERCENT = 18;
+
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function offerVatMultiplier(): number {
+  return 1 + SUPPLIER_OFFER_PROJECT_VAT_PERCENT / 100;
+}
+
 type OfferRowDraft = {
   id: string;
   supplierName: string;
   name: string;
   replacementName: string;
   purchasePrice: string;
+  purchasePriceWithVat: string;
+  /** Son redaktə olunan alış sahəsi — faiz hesabı üçün */
+  purchasePriceSource: "ex" | "inc";
   qty: string;
   marginPercent: string;
   salePrice: string;
   saleManual: boolean;
 };
+
+function resolvePurchaseExVat(row: { purchasePrice?: number; purchasePriceWithVat?: number }): number {
+  const ex = Number(row.purchasePrice) || 0;
+  if (ex > 0) return ex;
+  const inc = Number(row.purchasePriceWithVat) || 0;
+  if (inc > 0) return roundMoney(inc / offerVatMultiplier());
+  return 0;
+}
+
+function resolvePurchaseIncVat(row: { purchasePrice?: number; purchasePriceWithVat?: number }): number {
+  const inc = Number(row.purchasePriceWithVat) || 0;
+  if (inc > 0) return inc;
+  const ex = Number(row.purchasePrice) || 0;
+  if (ex > 0) return roundMoney(ex * offerVatMultiplier());
+  return 0;
+}
+
+function resolveOfferPurchaseFromDraft(row: OfferRowDraft): number {
+  const ex = Number(String(row.purchasePrice).replace(",", ".")) || 0;
+  if (ex > 0) return ex;
+  const inc = Number(String(row.purchasePriceWithVat).replace(",", ".")) || 0;
+  if (inc > 0) return roundMoney(inc / offerVatMultiplier());
+  return 0;
+}
+
+function resolveOfferPurchaseIncFromDraft(row: OfferRowDraft): number {
+  const inc = Number(String(row.purchasePriceWithVat).replace(",", ".")) || 0;
+  if (inc > 0) return inc;
+  const ex = Number(String(row.purchasePrice).replace(",", ".")) || 0;
+  if (ex > 0) return roundMoney(ex * offerVatMultiplier());
+  return 0;
+}
+
+function draftPurchaseForMargin(row: OfferRowDraft): number {
+  if (row.purchasePriceSource === "inc") {
+    const inc = Number(String(row.purchasePriceWithVat).replace(",", ".")) || 0;
+    if (inc > 0) return inc;
+    return resolveOfferPurchaseIncFromDraft(row);
+  }
+  const ex = Number(String(row.purchasePrice).replace(",", ".")) || 0;
+  if (ex > 0) return ex;
+  return resolveOfferPurchaseFromDraft(row);
+}
 
 type OfferDraft = {
   companyId: string;
@@ -546,6 +603,8 @@ function emptyOfferRow(): OfferRowDraft {
     name: "",
     replacementName: "",
     purchasePrice: "",
+    purchasePriceWithVat: "",
+    purchasePriceSource: "ex",
     qty: "1",
     marginPercent: "",
     salePrice: "",
@@ -561,14 +620,18 @@ function emptyOfferDraft(): OfferDraft {
 }
 
 function offerRowTotals(rows: SupplierOfferRow[]) {
-  let purchase = 0;
-  let sale = 0;
+  let purchaseEx = 0;
+  let purchaseInc = 0;
+  let saleOfficial = 0;
+  let saleCash = 0;
   for (const r of rows) {
     const q = Number(r.qty) || 0;
-    purchase += (Number(r.purchasePrice) || 0) * q;
-    sale += (Number(r.salePrice) || 0) * q;
+    purchaseEx += resolvePurchaseExVat(r) * q;
+    purchaseInc += resolvePurchaseIncVat(r) * q;
+    saleOfficial += resolveOfferSaleUnitPrice(r, "official") * q;
+    saleCash += resolveOfferSaleUnitPrice(r, "cash") * q;
   }
-  return { purchase, sale };
+  return { purchaseEx, purchaseInc, purchase: purchaseEx, sale: saleOfficial, saleCash };
 }
 
 function offerSuppliersLabel(rows: SupplierOfferRow[]): string {
@@ -578,8 +641,6 @@ function offerSuppliersLabel(rows: SupplierOfferRow[]): string {
   if (names.length === 2) return names.join(", ");
   return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
 }
-
-const SUPPLIER_OFFER_PROJECT_VAT_PERCENT = 18;
 
 function resolveOfferProductName(row: { name: string; replacementName?: string }): string {
   const replacement = (row.replacementName ?? "").trim();
@@ -593,27 +654,71 @@ function resolveOfferProductNameFromDraft(row: OfferRowDraft): string {
   return row.name.trim();
 }
 
-function resolveOfferSaleUnitPrice(row: SupplierOfferRow): number {
-  const purchase = Number(row.purchasePrice) || 0;
+function resolveOfferSaleUnitPrice(row: SupplierOfferRow, billingMode: "official" | "cash" = "official"): number {
+  const purchaseBase =
+    billingMode === "cash" ? resolvePurchaseIncVat(row) : resolvePurchaseExVat(row);
   const sale = Number(row.salePrice) || 0;
   const margin = row.marginPercent;
   const fromMargin =
-    typeof margin === "number" && Number.isFinite(margin) && purchase > 0
-      ? calcSaleFromMargin(purchase, margin)
+    typeof margin === "number" && Number.isFinite(margin) && purchaseBase > 0
+      ? calcSaleFromMargin(purchaseBase, margin)
       : null;
-  if (sale > 0) return sale;
   if (fromMargin != null) return fromMargin;
+  if (sale > 0) return sale;
   return 0;
 }
 
-function resolveOfferSaleFromDraft(row: OfferRowDraft): number {
-  const purchase = Number(String(row.purchasePrice).replace(",", ".")) || 0;
+function resolveOfferSaleFromDraft(row: OfferRowDraft, billingMode: "official" | "cash" = "official"): number {
+  const purchaseBase =
+    billingMode === "cash" ? resolveOfferPurchaseIncFromDraft(row) : resolveOfferPurchaseFromDraft(row);
   const sale = Number(String(row.salePrice).replace(",", ".")) || 0;
   const margin = Number(String(row.marginPercent).replace(",", "."));
-  const fromMargin = Number.isFinite(margin) && purchase > 0 ? calcSaleFromMargin(purchase, margin) : null;
-  if (sale > 0) return sale;
+  const fromMargin = Number.isFinite(margin) && purchaseBase > 0 ? calcSaleFromMargin(purchaseBase, margin) : null;
   if (fromMargin != null) return fromMargin;
+  if (sale > 0) return sale;
   return 0;
+}
+
+function buildOfferProductRows(
+  rows: SupplierOfferRow[],
+  billingMode: "official" | "cash",
+): ProductRow[] {
+  const out: ProductRow[] = [];
+  for (const r of rows) {
+    const unitPrice = resolveOfferSaleUnitPrice(r, billingMode);
+    const name = resolveOfferProductName(r);
+    if (unitPrice <= 0 || !name) continue;
+    out.push({
+      id: crypto.randomUUID(),
+      name,
+      unit: "ədəd",
+      qty: r.qty,
+      unitPrice,
+    });
+  }
+  return out;
+}
+
+function buildOfferProductRowsFromDraft(
+  rows: OfferRowDraft[],
+  billingMode: "official" | "cash",
+): ProductRow[] {
+  const out: ProductRow[] = [];
+  for (const row of rows) {
+    const supplierName = row.supplierName.trim();
+    const name = resolveOfferProductNameFromDraft(row);
+    const qty = Number(String(row.qty).replace(",", "."));
+    const unitPrice = resolveOfferSaleFromDraft(row, billingMode);
+    if (!supplierName || !name || !Number.isFinite(qty) || qty <= 0 || unitPrice <= 0) continue;
+    out.push({
+      id: crypto.randomUUID(),
+      name,
+      unit: "ədəd",
+      qty,
+      unitPrice,
+    });
+  }
+  return out;
 }
 
 export default function App() {
@@ -1311,7 +1416,7 @@ export default function App() {
 
     // Sistem nömrələri (təkrar olmamaq şərtilə) avtomatik təyin edir.
     if (!meta.invoiceNumber?.trim()) {
-      const seq = workspace.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1 };
+      const seq = workspace.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1, quote: 1 };
       meta.invoiceNumber = `${yy(meta.invoiceDate)}${mm(meta.invoiceDate)}-${pad3(seq.invoice)}`;
       setWorkspace((w) => ({
         ...w,
@@ -1380,7 +1485,7 @@ export default function App() {
 
   const runExport = async (
     projectId: string,
-    kind: "invoice" | "delivery" | "deliveryNoPrice" | "protocol",
+    kind: "invoice" | "delivery" | "deliveryNoPrice" | "protocol" | "priceQuote",
     mode: "print" | "pdf",
   ) => {
     const proj = workspace.projects.find((p) => p.id === projectId);
@@ -1391,7 +1496,7 @@ export default function App() {
 
     // Çap zamanı nömrə dərhal HTML-də görünsün deyə burada sinxron hesablayırıq
     // və həm workspace-ə, həm də print paketin meta-sına tətbiq edirik.
-    const seq = workspace.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1 };
+    const seq = workspace.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1, quote: 1 };
     const d = proj.meta.invoiceDate || new Date().toISOString().slice(0, 10);
     let next = { ...seq };
     let meta = { ...proj.meta };
@@ -1410,6 +1515,11 @@ export default function App() {
     if (kind === "protocol" && !meta.protocolNumber?.trim()) {
       meta = { ...meta, protocolNumber: `${pad3(next.protocol)}/${yy(d)}` };
       next.protocol += 1;
+      changed = true;
+    }
+    if (kind === "priceQuote" && !meta.quoteNumber?.trim()) {
+      meta = { ...meta, quoteNumber: `${pad3(next.quote ?? 1)}/${yy(d)}` };
+      next.quote = (next.quote ?? 1) + 1;
       changed = true;
     }
 
@@ -1432,16 +1542,27 @@ export default function App() {
           ? buildDeliveryActHtml(pack)
           : kind === "deliveryNoPrice"
             ? buildDeliveryActNoPriceHtml(pack)
-          : buildProtocolHtml(pack);
+            : kind === "priceQuote"
+              ? buildPriceQuoteHtml(pack)
+              : buildProtocolHtml(pack);
     if (mode === "pdf") {
       const buyerName = workspace.companies.find((c) => c.id === proj.companyId)?.profile?.name?.trim();
-      const base = kind === "invoice" ? "hesab-faktura" : kind === "protocol" ? "protokol" : "tehvil-akti";
+      const base =
+        kind === "invoice"
+          ? "hesab-faktura"
+          : kind === "protocol"
+            ? "protokol"
+            : kind === "priceQuote"
+              ? "qiymet-teklifi"
+              : "tehvil-akti";
       const no =
         kind === "invoice"
           ? meta.invoiceNumber
           : kind === "protocol"
             ? meta.protocolNumber
-            : meta.deliveryActNumber;
+            : kind === "priceQuote"
+              ? meta.quoteNumber
+              : meta.deliveryActNumber;
       const safeBuyer = buyerName ? buyerName.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "") : "";
       const fname = `${base}${no ? "-" + no : ""}${safeBuyer ? "-" + safeBuyer : ""}.pdf`;
       await downloadPdfFromHtml(html, fname);
@@ -2728,14 +2849,16 @@ export default function App() {
     const name = r.name.trim();
     const replacementName = r.replacementName.trim();
     const purchasePrice = Number(String(r.purchasePrice).replace(",", "."));
+    const purchasePriceWithVat = Number(String(r.purchasePriceWithVat).replace(",", "."));
     const qty = Number(String(r.qty).replace(",", "."));
     const marginPercent = Number(String(r.marginPercent).replace(",", "."));
     const salePrice = Number(String(r.salePrice).replace(",", "."));
+    const hasEx = Number.isFinite(purchasePrice) && purchasePrice > 0;
+    const hasInc = Number.isFinite(purchasePriceWithVat) && purchasePriceWithVat > 0;
     if (
       !supplierName ||
       (!name && !replacementName) ||
-      !Number.isFinite(purchasePrice) ||
-      purchasePrice <= 0 ||
+      (!hasEx && !hasInc) ||
       !Number.isFinite(qty) ||
       qty <= 0
     )
@@ -2744,10 +2867,16 @@ export default function App() {
       id: r.id,
       supplierName,
       name,
-      purchasePrice,
+      purchasePrice: hasEx ? purchasePrice : 0,
       qty,
-      salePrice: Number.isFinite(salePrice) && salePrice > 0 ? salePrice : purchasePrice,
+      salePrice:
+        Number.isFinite(salePrice) && salePrice > 0
+          ? salePrice
+          : hasEx
+            ? purchasePrice
+            : purchasePriceWithVat,
     };
+    if (hasInc) row.purchasePriceWithVat = purchasePriceWithVat;
     if (replacementName) row.replacementName = replacementName;
     if (Number.isFinite(marginPercent) && marginPercent !== 0) row.marginPercent = marginPercent;
     return row;
@@ -2759,6 +2888,8 @@ export default function App() {
     name: r.name,
     replacementName: r.replacementName?.trim() || "",
     purchasePrice: r.purchasePrice > 0 ? String(r.purchasePrice) : "",
+    purchasePriceWithVat: (r.purchasePriceWithVat ?? 0) > 0 ? String(r.purchasePriceWithVat) : "",
+    purchasePriceSource: (r.purchasePriceWithVat ?? 0) > 0 && r.purchasePrice <= 0 ? "inc" : "ex",
     qty: r.qty > 0 ? String(r.qty) : "1",
     marginPercent: typeof r.marginPercent === "number" ? String(r.marginPercent) : "",
     salePrice: r.salePrice > 0 ? String(r.salePrice) : "",
@@ -2771,11 +2902,14 @@ export default function App() {
       rows: d.rows.map((row) => {
         if (row.id !== id) return row;
         const next = { ...row, ...patch };
-        const purchase = Number(String(next.purchasePrice).replace(",", "."));
+        if (patch.purchasePrice !== undefined) next.purchasePriceSource = "ex";
+        if (patch.purchasePriceWithVat !== undefined) next.purchasePriceSource = "inc";
+        const purchase = draftPurchaseForMargin(next);
         const margin = Number(String(next.marginPercent).replace(",", "."));
         const shouldRecalc =
           !next.saleManual ||
           patch.purchasePrice !== undefined ||
+          patch.purchasePriceWithVat !== undefined ||
           patch.marginPercent !== undefined;
         if (shouldRecalc && Number.isFinite(purchase) && purchase > 0 && Number.isFinite(margin)) {
           next.salePrice = String(calcSaleFromMargin(purchase, margin));
@@ -2827,7 +2961,7 @@ export default function App() {
     }
     const rows = offerDraft.rows.map(rowDraftToRecord).filter((r): r is SupplierOfferRow => Boolean(r));
     if (rows.length === 0) {
-      flash(setToast, "Hər sətirdə təchizatçı, məhsul və ya əvəz məhsul və qiymət daxil edin.", "error");
+      flash(setToast, "Hər sətirdə təchizatçı, məhsul və ya əvəz məhsul və alış qiyməti (ƏDV-siz və ya ƏDV daxil) daxil edin.", "error");
       return;
     }
     const offerDate =
@@ -2903,74 +3037,93 @@ export default function App() {
   const appendProjectFromOfferData = (
     companyId: string,
     offerDate: string,
-    productRows: ProductRow[],
+    officialRows: ProductRow[],
+    cashRows: ProductRow[],
     titleHint?: string,
   ) => {
-    const rows = normalizeProductRows(productRows).filter((r) => r.unitPrice > 0 && r.qty > 0);
-    if (rows.length === 0) {
+    const normOfficial = normalizeProductRows(officialRows).filter((r) => r.unitPrice > 0 && r.qty > 0);
+    const normCash = normalizeProductRows(cashRows).filter((r) => r.unitPrice > 0 && r.qty > 0);
+    if (normOfficial.length === 0 && normCash.length === 0) {
       flash(setToast, "Satış qiyməti olan ən azı bir məhsul sətri lazımdır.", "error");
       return false;
     }
     const invoiceDate = (offerDate || "").trim() || new Date().toISOString().slice(0, 10);
     const companyName = companyLabel(companyId);
+    const baseTitle = titleHint?.trim() || companyName;
+    const dateLabel = formatDateAzLong(invoiceDate);
     const now = Date.now();
 
+    const makeMeta = (seq: { invoice: number; delivery: number; protocol: number; quote?: number }): DocumentMeta => ({
+      ...emptyMeta(),
+      invoiceDate,
+      invoiceNumber: `${yy(invoiceDate)}${mm(invoiceDate)}-${pad3(seq.invoice)}`,
+      deliveryActNumber: `${pad3(seq.delivery)}/${yy(invoiceDate)}`,
+      protocolNumber: `${pad3(seq.protocol)}/${yy(invoiceDate)}`,
+      quoteNumber: `${pad3(seq.quote ?? 1)}/${yy(invoiceDate)}`,
+    });
+
     setWorkspace((w) => {
-      const seq = w.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1 };
-      const meta: DocumentMeta = {
-        ...emptyMeta(),
-        invoiceDate,
-        invoiceNumber: `${yy(invoiceDate)}${mm(invoiceDate)}-${pad3(seq.invoice)}`,
-        deliveryActNumber: `${pad3(seq.delivery)}/${yy(invoiceDate)}`,
-        protocolNumber: `${pad3(seq.protocol)}/${yy(invoiceDate)}`,
+      const seq = w.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1, quote: 1 };
+      let nextSeq = { ...seq, quote: seq.quote ?? 1 };
+      const nextProjects = [...w.projects];
+
+      const bumpSeq = () => {
+        nextSeq = {
+          invoice: nextSeq.invoice + 1,
+          delivery: nextSeq.delivery + 1,
+          protocol: nextSeq.protocol + 1,
+          quote: (nextSeq.quote ?? 1) + 1,
+        };
       };
-      const title = titleHint?.trim() || `${companyName} — ${formatDateAzLong(invoiceDate)}`;
+
+      const makeProject = (
+        billingMode: "official" | "cash",
+        vatPercent: number,
+        label: string,
+        metaSeq: typeof seq,
+        projectRows: ProductRow[],
+      ): ProjectRecord => ({
+        id: crypto.randomUUID(),
+        title: `${baseTitle} — ${label} — ${dateLabel}`,
+        companyId,
+        rows: projectRows,
+        meta: makeMeta(metaSeq),
+        vatPercent,
+        billingMode,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      if (normOfficial.length > 0) {
+        nextProjects.push(
+          makeProject("official", SUPPLIER_OFFER_PROJECT_VAT_PERCENT, "Rəsmi", nextSeq, normOfficial),
+        );
+        bumpSeq();
+      }
+      if (normCash.length > 0) {
+        nextProjects.push(makeProject("cash", 0, "Nağd", nextSeq, normCash));
+        bumpSeq();
+      }
+
       return {
         ...w,
-        settings: {
-          ...w.settings,
-          docSeq: {
-            invoice: seq.invoice + 1,
-            delivery: seq.delivery + 1,
-            protocol: seq.protocol + 1,
-          },
-        },
-        projects: [
-          ...w.projects,
-          {
-            id: crypto.randomUUID(),
-            title,
-            companyId,
-            rows,
-            meta,
-            vatPercent: SUPPLIER_OFFER_PROJECT_VAT_PERCENT,
-            createdAt: now,
-            updatedAt: now,
-          },
-        ],
+        settings: { ...w.settings, docSeq: nextSeq },
+        projects: nextProjects,
       };
     });
 
-    flash(setToast, `Təklif yaradıldı (ƏDV ${SUPPLIER_OFFER_PROJECT_VAT_PERCENT}% ilə) — «Təkliflər» bölməsində çap edə bilərsiniz`);
+    flash(
+      setToast,
+      "Rəsmi (ƏDV ilə) və nağd təkliflər yaradıldı — «Təkliflər» bölməsində çap edə bilərsiniz",
+    );
     setModule("projects");
     return true;
   };
 
   const createProjectFromSupplierOffer = (offer: SupplierOfferRecord) => {
-    const productRows: ProductRow[] = [];
-    for (const r of offer.rows) {
-      const unitPrice = resolveOfferSaleUnitPrice(r);
-      const name = resolveOfferProductName(r);
-      if (unitPrice <= 0 || !name) continue;
-      productRows.push({
-        id: crypto.randomUUID(),
-        name,
-        unit: "ədəd",
-        qty: r.qty,
-        unitPrice,
-      });
-    }
-    appendProjectFromOfferData(offer.companyId, offer.offerDate, productRows);
+    const officialRows = buildOfferProductRows(offer.rows, "official");
+    const cashRows = buildOfferProductRows(offer.rows, "cash");
+    appendProjectFromOfferData(offer.companyId, offer.offerDate, officialRows, cashRows);
   };
 
   const createProjectFromOfferDraft = () => {
@@ -2979,27 +3132,14 @@ export default function App() {
       flash(setToast, "Əvvəlcə şirkət seçin.", "error");
       return;
     }
-    const productRows: ProductRow[] = [];
-    for (const row of offerDraft.rows) {
-      const supplierName = row.supplierName.trim();
-      const name = resolveOfferProductNameFromDraft(row);
-      const qty = Number(String(row.qty).replace(",", "."));
-      const unitPrice = resolveOfferSaleFromDraft(row);
-      if (!supplierName || !name || !Number.isFinite(qty) || qty <= 0 || unitPrice <= 0) continue;
-      productRows.push({
-        id: crypto.randomUUID(),
-        name,
-        unit: "ədəd",
-        qty,
-        unitPrice,
-      });
-    }
+    const officialRows = buildOfferProductRowsFromDraft(offerDraft.rows, "official");
+    const cashRows = buildOfferProductRowsFromDraft(offerDraft.rows, "cash");
     const offerDate =
       offerEditId != null
         ? (workspace.supplierOffers ?? []).find((o) => o.id === offerEditId)?.offerDate ||
           new Date().toISOString().slice(0, 10)
         : new Date().toISOString().slice(0, 10);
-    appendProjectFromOfferData(companyId, offerDate, productRows);
+    appendProjectFromOfferData(companyId, offerDate, officialRows, cashRows);
   };
 
   const renderSuppliersModule = () => {
@@ -3008,14 +3148,18 @@ export default function App() {
     if (offerMode === "form") {
       const draftTotals = offerDraft.rows.reduce(
         (acc, r) => {
-          const purchase = Number(String(r.purchasePrice).replace(",", ".")) || 0;
+          const purchaseEx = resolveOfferPurchaseFromDraft(r);
+          const purchaseInc = resolveOfferPurchaseIncFromDraft(r);
           const qty = Number(String(r.qty).replace(",", ".")) || 0;
-          const sale = Number(String(r.salePrice).replace(",", ".")) || 0;
-          acc.purchase += purchase * qty;
-          acc.sale += sale * qty;
+          const saleOfficial = resolveOfferSaleFromDraft(r, "official");
+          const saleCash = resolveOfferSaleFromDraft(r, "cash");
+          acc.purchaseEx += purchaseEx * qty;
+          acc.purchaseInc += purchaseInc * qty;
+          acc.saleOfficial += saleOfficial * qty;
+          acc.saleCash += saleCash * qty;
           return acc;
         },
-        { purchase: 0, sale: 0 },
+        { purchaseEx: 0, purchaseInc: 0, saleOfficial: 0, saleCash: 0 },
       );
 
       return (
@@ -3073,13 +3217,16 @@ export default function App() {
                 <div className="dg-offer-products-head-right">
                   <div className="dg-offer-summary-inline" aria-label="Yekunlar">
                     <span>
-                      Alış: <strong>{formatMoney(draftTotals.purchase)}</strong>
+                      Alış (ƏDV-siz): <strong>{formatMoney(draftTotals.purchaseEx)}</strong>
                     </span>
                     <span>
-                      Satış: <strong>{formatMoney(draftTotals.sale)}</strong>
+                      Alış (ƏDV daxil): <strong>{formatMoney(draftTotals.purchaseInc)}</strong>
                     </span>
                     <span>
-                      Marja: <strong>{formatMoney(draftTotals.sale - draftTotals.purchase)}</strong>
+                      Satış (rəsmi): <strong>{formatMoney(draftTotals.saleOfficial)}</strong>
+                    </span>
+                    <span>
+                      Satış (nağd): <strong>{formatMoney(draftTotals.saleCash)}</strong>
                     </span>
                   </div>
                   <button
@@ -3100,6 +3247,7 @@ export default function App() {
                       <th className="dg-offer-col-product">Məhsul adı</th>
                       <th className="dg-offer-col-replacement">Əvəz məhsul</th>
                       <th className="dg-th-num dg-offer-col-price">Alış (ƏDV-siz)</th>
+                      <th className="dg-th-num dg-offer-col-price">Alış (ƏDV daxil)</th>
                       <th className="dg-th-num dg-offer-col-qty">Miqdar</th>
                       <th className="dg-th-num dg-offer-col-margin">Faiz %</th>
                       <th className="dg-th-num dg-offer-col-price">Satış qiyməti</th>
@@ -3111,15 +3259,21 @@ export default function App() {
                   <tbody>
                     {offerDraft.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="dg-empty-cell">
+                        <td colSpan={12} className="dg-empty-cell">
                           «Sətir əlavə et» düyməsi ilə məhsul əlavə edin.
                         </td>
                       </tr>
                     ) : (
                       offerDraft.rows.map((r, idx) => {
-                        const purchase = Number(String(r.purchasePrice).replace(",", ".")) || 0;
+                        const purchaseEx = resolveOfferPurchaseFromDraft(r);
+                        const purchaseInc = resolveOfferPurchaseIncFromDraft(r);
                         const qty = Number(String(r.qty).replace(",", ".")) || 0;
-                        const sale = Number(String(r.salePrice).replace(",", ".")) || 0;
+                        const saleOfficial = resolveOfferSaleFromDraft(r, "official");
+                        const saleCash = resolveOfferSaleFromDraft(r, "cash");
+                        const purchaseLineTotal =
+                          r.purchasePriceSource === "inc" ? purchaseInc * qty : purchaseEx * qty;
+                        const saleLineTotal =
+                          r.purchasePriceSource === "inc" ? saleCash * qty : saleOfficial * qty;
                         return (
                           <tr key={r.id}>
                             <td className="dg-td-num">{idx + 1}</td>
@@ -3156,6 +3310,18 @@ export default function App() {
                                 step="0.01"
                                 value={r.purchasePrice}
                                 onChange={(e) => updateOfferRow(r.id, { purchasePrice: e.target.value })}
+                                placeholder="ƏDV-siz"
+                              />
+                            </td>
+                            <td className="dg-offer-col-price">
+                              <input
+                                className="dg-input dg-input-table dg-input-num dg-input-offer-num"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={r.purchasePriceWithVat}
+                                onChange={(e) => updateOfferRow(r.id, { purchasePriceWithVat: e.target.value })}
+                                placeholder="ƏDV daxil"
                               />
                             </td>
                             <td className="dg-offer-col-qty">
@@ -3188,8 +3354,8 @@ export default function App() {
                                 onChange={(e) => updateOfferRow(r.id, { salePrice: e.target.value })}
                               />
                             </td>
-                            <td className="dg-td-num dg-offer-col-total">{formatMoney(purchase * qty)}</td>
-                            <td className="dg-td-num dg-offer-col-total">{formatMoney(sale * qty)}</td>
+                            <td className="dg-td-num dg-offer-col-total">{formatMoney(purchaseLineTotal)}</td>
+                            <td className="dg-td-num dg-offer-col-total">{formatMoney(saleLineTotal)}</td>
                             <td className="dg-td-actions">
                               <button
                                 type="button"
@@ -3579,6 +3745,23 @@ export default function App() {
                 </button>
               </div>
               <div className="dg-print-picker-row">
+                <div className="dg-print-picker-name">Qiymət təklifi</div>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-primary"
+                  onClick={() => printProjectId && runExport(printProjectId, "priceQuote", "print")}
+                >
+                  Çap et
+                </button>
+                <button
+                  type="button"
+                  className="dg-btn dg-btn-secondary"
+                  onClick={() => printProjectId && runExport(printProjectId, "priceQuote", "pdf")}
+                >
+                  Endir
+                </button>
+              </div>
+              <div className="dg-print-picker-row">
                 <div className="dg-print-picker-name">Protokol</div>
                 <button
                   type="button"
@@ -3640,6 +3823,18 @@ export default function App() {
                 <div className="dg-info-row">
                   <dt>Sətir sayı</dt>
                   <dd>{infoProject.rows.length}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Növ</dt>
+                  <dd>
+                    {infoProject.billingMode === "cash"
+                      ? "Nağd (qeyri-rəsmi)"
+                      : infoProject.billingMode === "official"
+                        ? "Rəsmi köçürmə"
+                        : infoProject.vatPercent > 0
+                          ? `ƏDV ${infoProject.vatPercent}%`
+                          : "—"}
+                  </dd>
                 </div>
                 <div className="dg-info-row">
                   <dt>H/F №</dt>
@@ -3735,8 +3930,11 @@ export default function App() {
                       <th style={{ width: 140 }}>Təchizatçı</th>
                       <th>Məhsul</th>
                       <th>Əvəz məhsul</th>
-                      <th style={{ width: 110 }} className="dg-num">
-                        Alış
+                      <th style={{ width: 100 }} className="dg-num">
+                        Alış (ƏDV-siz)
+                      </th>
+                      <th style={{ width: 100 }} className="dg-num">
+                        Alış (ƏDV daxil)
                       </th>
                       <th style={{ width: 80 }} className="dg-num">
                         Miqdar
@@ -3762,26 +3960,31 @@ export default function App() {
                         <td>{r.supplierName || "—"}</td>
                         <td>{r.name || "—"}</td>
                         <td>{r.replacementName?.trim() || "—"}</td>
-                        <td className="dg-num">{formatMoney(r.purchasePrice)}</td>
+                        <td className="dg-num">{r.purchasePrice > 0 ? formatMoney(r.purchasePrice) : "—"}</td>
+                        <td className="dg-num">
+                          {(r.purchasePriceWithVat ?? 0) > 0 ? formatMoney(r.purchasePriceWithVat!) : "—"}
+                        </td>
                         <td className="dg-num">{r.qty}</td>
                         <td className="dg-num">
                           {typeof r.marginPercent === "number" ? r.marginPercent.toLocaleString("az-AZ") : "—"}
                         </td>
-                        <td className="dg-num">{formatMoney(r.salePrice)}</td>
-                        <td className="dg-num">{formatMoney(r.purchasePrice * r.qty)}</td>
-                        <td className="dg-num">{formatMoney(r.salePrice * r.qty)}</td>
+                        <td className="dg-num">{formatMoney(resolveOfferSaleUnitPrice(r, "official"))}</td>
+                        <td className="dg-num">{formatMoney(resolvePurchaseExVat(r) * r.qty)}</td>
+                        <td className="dg-num">{formatMoney(resolveOfferSaleUnitPrice(r, "official") * r.qty)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               <div className="dg-info-totals" aria-label="Yekunlar">
-                <div className="k">Alış cəmi</div>
-                <div className="v">{formatMoney(infoOfferTotals.purchase)}</div>
-                <div className="k">Satış cəmi</div>
+                <div className="k">Alış (ƏDV-siz)</div>
+                <div className="v">{formatMoney(infoOfferTotals.purchaseEx)}</div>
+                <div className="k">Alış (ƏDV daxil)</div>
+                <div className="v">{formatMoney(infoOfferTotals.purchaseInc)}</div>
+                <div className="k">Satış (rəsmi)</div>
                 <div className="v">{formatMoney(infoOfferTotals.sale)}</div>
-                <div className="k">Marja</div>
-                <div className="v">{formatMoney(infoOfferTotals.sale - infoOfferTotals.purchase)}</div>
+                <div className="k">Satış (nağd)</div>
+                <div className="v">{formatMoney(infoOfferTotals.saleCash)}</div>
               </div>
             </>
           ) : null}

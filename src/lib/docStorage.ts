@@ -71,6 +71,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       rows: normalizeProductRows(p.rows ?? []),
       meta: { ...emptyMeta(), ...p.meta },
       vatPercent: Number(p.vatPercent) || 0,
+      ...(p.billingMode === "official" || p.billingMode === "cash" ? { billingMode: p.billingMode } : {}),
       createdAt: typeof p.createdAt === "number" ? p.createdAt : Date.now(),
       updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : Date.now(),
     }));
@@ -209,11 +210,14 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         .filter((r) => r && typeof (r as { id?: unknown }).id === "string")
         .map((r) => {
           const purchasePrice = Number((r as { purchasePrice?: unknown }).purchasePrice) || 0;
+          const purchasePriceWithVatRaw = Number((r as { purchasePriceWithVat?: unknown }).purchasePriceWithVat);
+          const purchasePriceWithVat =
+            Number.isFinite(purchasePriceWithVatRaw) && purchasePriceWithVatRaw > 0 ? purchasePriceWithVatRaw : undefined;
           const qty = Number((r as { qty?: unknown }).qty) || 0;
           const marginRaw = (r as { marginPercent?: unknown }).marginPercent;
           const marginPercent = typeof marginRaw === "number" && Number.isFinite(marginRaw) ? marginRaw : undefined;
           const saleRaw = Number((r as { salePrice?: unknown }).salePrice);
-          const salePrice = Number.isFinite(saleRaw) && saleRaw > 0 ? saleRaw : purchasePrice;
+          const salePrice = Number.isFinite(saleRaw) && saleRaw > 0 ? saleRaw : purchasePrice || purchasePriceWithVat || 0;
           const rowSupplierRaw =
             typeof (r as { supplierName?: unknown }).supplierName === "string"
               ? String((r as { supplierName: string }).supplierName).trim()
@@ -231,11 +235,17 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
             purchasePrice,
             qty,
             salePrice,
+            ...(purchasePriceWithVat != null ? { purchasePriceWithVat } : {}),
             ...(replacementRaw ? { replacementName: replacementRaw } : {}),
             ...(typeof marginPercent === "number" ? { marginPercent } : {}),
           };
         })
-        .filter((r) => (r.name.length > 0 || (r.replacementName?.length ?? 0) > 0) && r.supplierName.length > 0);
+        .filter(
+          (r) =>
+            (r.name.length > 0 || (r.replacementName?.length ?? 0) > 0) &&
+            r.supplierName.length > 0 &&
+            (r.purchasePrice > 0 || (r.purchasePriceWithVat ?? 0) > 0),
+        );
       return {
         id: String((o as { id: string }).id),
         companyId: companyIds.has(companyId) ? companyId : "",
@@ -294,6 +304,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         invoice: Number(w.settings?.docSeq?.invoice) > 0 ? Number(w.settings?.docSeq?.invoice) : 1,
         delivery: Number(w.settings?.docSeq?.delivery) > 0 ? Number(w.settings?.docSeq?.delivery) : 1,
         protocol: Number(w.settings?.docSeq?.protocol) > 0 ? Number(w.settings?.docSeq?.protocol) : 1,
+        quote: Number(w.settings?.docSeq?.quote) > 0 ? Number(w.settings?.docSeq?.quote) : 1,
       },
     },
     companies,

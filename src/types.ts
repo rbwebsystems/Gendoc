@@ -43,6 +43,8 @@ export interface DocumentMeta {
   contractDate: string;
   deliveryPlace: string;
   deliveryBasis: string;
+  /** Qiymət təklifi sənədi nömrəsi */
+  quoteNumber?: string;
 }
 
 /** Sənəd paketi (satıcı + alıcı + sətirlər) — çap funksiyalarına ötürülür */
@@ -72,6 +74,8 @@ export interface ProjectRecord {
   rows: ProductRow[];
   meta: DocumentMeta;
   vatPercent: number;
+  /** Rəsmi köçürmə və ya nağd qeyri-rəsmi */
+  billingMode?: "official" | "cash";
   createdAt: number;
   updatedAt: number;
 }
@@ -139,6 +143,8 @@ export interface SupplierOfferRow {
   replacementName?: string;
   /** Alış qiyməti (ƏDV-siz) */
   purchasePrice: number;
+  /** Alış qiyməti (ƏDV daxil) — doldurulubsa nağd təklifdə birbaşa istifadə olunur */
+  purchasePriceWithVat?: number;
   qty: number;
   /** Satış faizi — alışa əlavə */
   marginPercent?: number;
@@ -181,6 +187,7 @@ export interface DocWorkspace {
       invoice: number;
       delivery: number;
       protocol: number;
+      quote?: number;
     };
   };
   companies: SavedCompanyRecord[];
@@ -208,4 +215,4 @@ export interface SavedProjectV2 {
   state: GeneratorState;
 }
 
-export type DocKind = "invoice" | "delivery" | "deliveryNoPrice" | "protocol";
+export type DocKind = "invoice" | "delivery" | "deliveryNoPrice" | "protocol" | "priceQuote";

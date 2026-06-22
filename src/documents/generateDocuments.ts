@@ -1055,6 +1055,166 @@ ${printCssDocument({ compact: true })}
 </html>`;
 }
 
+export function buildPriceQuoteHtml(state: GeneratorState): string {
+  const m = state.meta;
+  const sellerName = state.seller.name?.trim() || "—";
+  const sellerVoen = state.seller.voen?.trim() || "";
+  const sellerDirector = state.seller.director?.trim() || "";
+
+  const buyerName = state.buyer.name?.trim() || "—";
+  const buyerVoen = state.buyer.voen?.trim() || "";
+
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+      Number.isFinite(n) ? n : 0,
+    );
+  const { subtotal, vatRate, vatAmount, grandTotal } = computeTotals(state);
+  const isCash = vatRate <= 0;
+  const finalTotal = isCash ? subtotal : grandTotal;
+  const quoteNo = m.quoteNumber?.trim() || "—";
+  const subtitle = isCash ? "Nağd hesablaşma" : "Rəsmi təklif — ƏDV ayrıca göstərilir";
+
+  const bodyRows =
+    state.rows.length === 0
+      ? ""
+      : state.rows
+          .map((r, i) => {
+            const qty = Number(r.qty) || 0;
+            const unitPrice = Number(r.unitPrice) || 0;
+            const lineTotal = qty * unitPrice;
+            const unit = (r.unit || "").trim() || "—";
+            return `
+                    <tr>
+                        <td class="text-center">${i + 1}</td>
+                        <td>${escapeHtml(r.name)}</td>
+                        <td class="text-center text-gray-500">${escapeHtml(unit)}</td>
+                        <td class="text-center">${qty}</td>
+                        <td class="text-right font-medium">${fmt(unitPrice)}</td>
+                        <td class="text-right font-medium">${fmt(lineTotal)}</td>
+                    </tr>`;
+          })
+          .join("");
+
+  const lineTotalHeader = isCash ? "Cəmi" : "Cəmi (ƏDV-siz)";
+  const footRows = isCash
+    ? `
+                    <tr>
+                        <td colspan="4" class="border-none-left"></td>
+                        <td class="font-bold bg-gray-200 text-[14px] uppercase tracking-wider">Yekun</td>
+                        <td class="text-right font-bold bg-gray-200 text-[14px]">${fmt(finalTotal)}</td>
+                    </tr>`
+    : `
+                    <tr>
+                        <td colspan="4" class="border-none-left"></td>
+                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">Cəmi</td>
+                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(subtotal)}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="4" class="border-none-left"></td>
+                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
+                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(vatAmount)}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="4" class="border-none-left"></td>
+                        <td class="font-bold bg-gray-200 text-[14px] uppercase tracking-wider">Yekun</td>
+                        <td class="text-right font-bold bg-gray-200 text-[14px]">${fmt(finalTotal)}</td>
+                    </tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qiymət Təklifi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+${printCssDocument()}
+    </style>
+</head>
+<body>
+
+    ${printButton("Təklifi Çap Et")}
+
+    <div class="page-container">
+
+        ${renderLetterhead(state)}
+
+        <div class="doc-body">
+
+        ${renderDocTitle(`Qiymət Təklifi № ${quoteNo}`, `Tarix: ${formatDateAzLong(m.invoiceDate)} — ${subtitle}`)}
+
+        <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4 doc-company-panel">
+          <div class="grid grid-cols-2 gap-8 text-[12.5px]">
+            <div class="min-w-0">
+                <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Satıcı</h3>
+                <div class="grid grid-cols-[90px_minmax(0,1fr)] gap-y-1 gap-x-3">
+                    <div class="font-semibold text-gray-700">Müəssisə</div>
+                    <div class="text-gray-900 break-words">${escapeHtml(sellerName)}</div>
+                    ${sellerVoen ? `<div class="font-semibold text-gray-700">VÖEN</div><div class="text-gray-900 break-words">${escapeHtml(sellerVoen)}</div>` : ""}
+                </div>
+            </div>
+            <div class="min-w-0">
+                <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Alıcı</h3>
+                <div class="grid grid-cols-[90px_minmax(0,1fr)] gap-y-1 gap-x-3">
+                    <div class="font-semibold text-gray-700">Müəssisə</div>
+                    <div class="text-gray-900 break-words">${escapeHtml(buyerName)}</div>
+                    ${buyerVoen ? `<div class="font-semibold text-gray-700">VÖEN</div><div class="text-gray-900 break-words">${escapeHtml(buyerVoen)}</div>` : ""}
+                </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-6">
+            <table>
+                <thead class="print-exact">
+                    <tr>
+                        <th class="text-center w-12">Sıra</th>
+                        <th class="text-left">Məhsul / Xidmətin adı</th>
+                        <th class="text-center w-16">Ölçü</th>
+                        <th class="text-center w-16">Miqdar</th>
+                        <th class="text-right w-28">Qiymət (AZN)</th>
+                        <th class="text-right w-36">${lineTotalHeader}</th>
+                    </tr>
+                </thead>
+                <tbody class="text-gray-800">${bodyRows}
+                </tbody>
+                <tfoot class="print-exact text-gray-900">${footRows}
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="mb-12">
+            <p class="text-sm text-gray-800">
+                <span class="font-bold text-gray-900">Məbləğ sözlə:</span> ${escapeHtml(moneyToWordsAz(finalTotal))}.
+            </p>
+        </div>
+
+        <div class="mt-12 text-sm w-1/2">
+            <div class="space-y-3 mb-8">
+                <p><span class="font-bold text-gray-900">Satıcı:</span> ${escapeHtml(sellerName)}</p>
+                ${sellerDirector ? `<p><span class="font-bold text-gray-900">Rəhbər:</span> ${escapeHtml(sellerDirector)}</p>` : ""}
+            </div>
+            <div class="flex items-end gap-6">
+                <div class="flex-1">
+                    <p class="font-bold text-gray-900 mb-1">İmza</p>
+                    <div class="border-b border-gray-900 w-full"></div>
+                </div>
+                <div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center text-gray-400 text-xs font-bold shrink-0">
+                    M.Y.
+                </div>
+            </div>
+        </div>
+
+        </div>
+
+        ${renderLetterfoot(state)}
+
+    </div>
+
+</body>
+</html>`;
+}
+
 export function openPrintableDocument(html: string): boolean {
   const w = window.open("", "_blank");
   if (!w) {

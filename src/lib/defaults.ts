@@ -29,6 +29,7 @@ export function emptyMeta(): DocumentMeta {
     contractDate: "",
     deliveryPlace: "",
     deliveryBasis: "",
+    quoteNumber: "",
   };
 }
 
