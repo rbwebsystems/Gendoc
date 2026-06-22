@@ -346,14 +346,14 @@ textarea.dg-input::placeholder {
 }
 
 .dg-table th {
-  background: rgba(249, 250, 251, 0.85);
+  background: var(--table-header-bg);
   font-weight: 700;
   font-size: 0.6875rem;
   line-height: 1.35;
-  color: #6b7280;
+  color: var(--table-header-fg);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border-bottom: 1px solid var(--win-border-strong);
+  border-bottom: 1px solid color-mix(in srgb, var(--table-header-bg-dark) 45%, transparent);
   box-shadow: none;
 }
 
@@ -1295,9 +1295,9 @@ select.dg-input:focus {
 }
 
 .dg-info-table thead th {
-  background: #f1f5f9;
+  background: var(--table-header-bg);
   font-weight: 800;
-  color: var(--win-text-secondary);
+  color: var(--table-header-fg);
 }
 
 .dg-info-table tbody tr:last-child td {
@@ -1839,8 +1839,8 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-table.dg-table--sales thead th {
-  background: var(--win-accent);
-  color: #ffffff;
+  background: var(--table-header-bg);
+  color: var(--table-header-fg);
   font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -1965,8 +1965,8 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-table.dg-table--supplier-offers-list thead th {
-  background: var(--win-accent);
-  color: #ffffff;
+  background: var(--table-header-bg);
+  color: var(--table-header-fg);
   font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;

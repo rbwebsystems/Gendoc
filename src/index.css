@@ -23,6 +23,10 @@
   --win-danger: #dc2626;
   --win-danger-bg: rgba(220, 38, 38, 0.08);
 
+  --table-header-bg: #dc2626;
+  --table-header-bg-dark: #b91c1c;
+  --table-header-fg: #ffffff;
+
   --xp-input-border: #e2e8f0;
   --xp-btn-outline: #e2e8f0;
   --xp-field-face: #f1f5f9;
