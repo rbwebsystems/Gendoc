@@ -1947,11 +1947,57 @@ textarea.dg-input.dg-input-textarea-compact {
   padding: 0.4rem 0.35rem;
 }
 
-.dg-table.dg-table--supplier-offers-list .dg-supplier-offer-ellipsis {
-  max-width: 14rem;
+.dg-table.dg-table--supplier-offers-list {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.dg-table.dg-table--supplier-offers-list th,
+.dg-table.dg-table--supplier-offers-list td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 0.6rem 0.7rem;
+  box-sizing: border-box;
+}
+
+.dg-table.dg-table--supplier-offers-list .dg-supplier-offer-ellipsis {
+  max-width: 0;
+  min-width: 0;
+}
+
+.dg-table.dg-table--supplier-offers-list .dg-th-num,
+.dg-table.dg-table--supplier-offers-list .dg-td-num {
+  width: 2.75rem;
+}
+
+.dg-table.dg-table--supplier-offers-list th:nth-child(2),
+.dg-table.dg-table--supplier-offers-list td:nth-child(2) {
+  width: 12%;
+}
+
+.dg-table.dg-table--supplier-offers-list th:nth-child(3),
+.dg-table.dg-table--supplier-offers-list td:nth-child(3) {
+  width: 24%;
+}
+
+.dg-table.dg-table--supplier-offers-list .dg-th-amount,
+.dg-table.dg-table--supplier-offers-list .dg-td-amount {
+  width: 11%;
+  padding-left: 0.55rem;
+  padding-right: 0.7rem;
+}
+
+.dg-table.dg-table--supplier-offers-list .dg-th-actions,
+.dg-table.dg-table--supplier-offers-list .dg-td-actions {
+  width: 9.5rem;
+  min-width: 9.5rem;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.dg-table.dg-table--supplier-offers-list .dg-td-actions .dg-icon-row {
+  flex-wrap: nowrap;
 }
 
 .dg-table.dg-table--supplier-offers-list .dg-offer-create-project-btn {

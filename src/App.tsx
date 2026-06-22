@@ -3595,7 +3595,6 @@ export default function App() {
                   <tr>
                     <th className="dg-th-num">№</th>
                     <th>Tarix</th>
-                    <th>Təchizatçı</th>
                     <th>Şirkət</th>
                     <th className="dg-th-amount">Sətir</th>
                     <th className="dg-th-amount">Alış (ƏDV-siz)</th>
@@ -3611,7 +3610,6 @@ export default function App() {
                       <tr key={o.id}>
                         <td className="dg-td-num">{i + 1}</td>
                         <td>{formatDateAzLong(o.offerDate)}</td>
-                        <td className="dg-supplier-offer-ellipsis">{offerSuppliersLabel(o.rows)}</td>
                         <td className="dg-supplier-offer-ellipsis">{companyLabel(o.companyId)}</td>
                         <td className="dg-td-amount">{o.rows.length}</td>
                         <td className="dg-td-amount">{formatMoney(totals.purchaseEx)}</td>
