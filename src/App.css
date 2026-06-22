@@ -1242,26 +1242,34 @@ select.dg-input:focus {
 }
 
 .dg-modal.dg-modal-info {
-  max-width: min(1100px, 98vw);
-  width: min(1100px, 98vw);
-  max-height: min(86vh, 900px);
+  max-width: min(1240px, 98vw);
+  width: min(1240px, 98vw);
+  max-height: min(92vh, 960px);
   overflow: hidden;
 }
 
 .dg-modal.dg-modal-info .dg-modal-body {
-  padding: 1.35rem 1.5rem 1.5rem;
-  max-height: min(86vh, 900px);
+  padding: 1.5rem 1.75rem 1.65rem;
+  max-height: min(92vh, 960px);
   overflow: auto;
 }
 
+.dg-modal.dg-modal-info .dg-modal-title {
+  margin: -1.5rem -1.75rem 1.15rem -1.75rem;
+  padding: 0.75rem 1.75rem;
+  font-size: 1.0625rem;
+}
+
 .dg-modal.dg-modal-info .dg-info-row {
-  grid-template-columns: 160px 1fr;
-  font-size: 1rem;
+  grid-template-columns: 180px 1fr;
+  font-size: 1.03125rem;
+  gap: 0.65rem 1rem;
+  padding: 0.45rem 0;
 }
 
 .dg-info-section-title {
-  margin: 1rem 0 0.5rem;
-  font-size: 0.95rem;
+  margin: 1.15rem 0 0.65rem;
+  font-size: 1rem;
   font-weight: 800;
   color: var(--win-text);
 }
@@ -1269,19 +1277,19 @@ select.dg-input:focus {
 .dg-info-table-wrap {
   border: 1px solid var(--win-border);
   border-radius: var(--win-radius-lg);
-  overflow: hidden;
+  overflow: auto;
   background: #fff;
 }
 
 .dg-info-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .dg-info-table th,
 .dg-info-table td {
-  padding: 0.55rem 0.65rem;
+  padding: 0.65rem 0.8rem;
   border-bottom: 1px solid var(--win-border);
   vertical-align: top;
 }
@@ -1302,14 +1310,14 @@ select.dg-input:focus {
 }
 
 .dg-info-totals {
-  margin-top: 0.85rem;
+  margin-top: 1rem;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 0.35rem 1rem;
+  gap: 0.45rem 1.25rem;
   justify-content: end;
-  max-width: 420px;
+  max-width: 520px;
   margin-left: auto;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .dg-info-totals .k {
