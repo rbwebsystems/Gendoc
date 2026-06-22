@@ -577,6 +577,31 @@ function offerSuppliersLabel(rows: SupplierOfferRow[]): string {
   return `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
 }
 
+function resolveOfferSaleUnitPrice(row: SupplierOfferRow): number {
+  const purchase = Number(row.purchasePrice) || 0;
+  const sale = Number(row.salePrice) || 0;
+  const margin = row.marginPercent;
+  const fromMargin =
+    typeof margin === "number" && Number.isFinite(margin) && purchase > 0
+      ? calcSaleFromMargin(purchase, margin)
+      : null;
+  if (fromMargin != null && sale > 0) return sale;
+  if (sale > 0) return sale;
+  if (fromMargin != null) return fromMargin;
+  return purchase > 0 ? purchase : 0;
+}
+
+function resolveOfferSaleFromDraft(row: OfferRowDraft): number {
+  const purchase = Number(String(row.purchasePrice).replace(",", ".")) || 0;
+  const sale = Number(String(row.salePrice).replace(",", ".")) || 0;
+  const margin = Number(String(row.marginPercent).replace(",", "."));
+  const fromMargin = Number.isFinite(margin) && purchase > 0 ? calcSaleFromMargin(purchase, margin) : null;
+  if (fromMargin != null && sale > 0) return sale;
+  if (sale > 0) return sale;
+  if (fromMargin != null) return fromMargin;
+  return purchase > 0 ? purchase : 0;
+}
+
 export default function App() {
   // Firebase yoxdursa lokal localStorage rejimində qalırıq.
   const initialAuth: AuthState = firebaseEnabled ? { status: "loading" } : { status: "disabled" };
@@ -2850,6 +2875,101 @@ export default function App() {
     return c?.profile.name?.trim() || c?.profile.voen?.trim() || "—";
   };
 
+  const appendProjectFromOfferData = (
+    companyId: string,
+    offerDate: string,
+    productRows: ProductRow[],
+    titleHint?: string,
+  ) => {
+    const rows = normalizeProductRows(productRows);
+    if (rows.length === 0) {
+      flash(setToast, "Ən azı bir məhsul sətri lazımdır.", "error");
+      return false;
+    }
+    const invoiceDate = (offerDate || "").trim() || new Date().toISOString().slice(0, 10);
+    const companyName = companyLabel(companyId);
+    const now = Date.now();
+
+    setWorkspace((w) => {
+      const seq = w.settings.docSeq ?? { invoice: 1, delivery: 1, protocol: 1 };
+      const meta: DocumentMeta = {
+        ...emptyMeta(),
+        invoiceDate,
+        invoiceNumber: `${yy(invoiceDate)}${mm(invoiceDate)}-${pad3(seq.invoice)}`,
+        deliveryActNumber: `${pad3(seq.delivery)}/${yy(invoiceDate)}`,
+        protocolNumber: `${pad3(seq.protocol)}/${yy(invoiceDate)}`,
+      };
+      const title = titleHint?.trim() || `${companyName} — ${formatDateAzLong(invoiceDate)}`;
+      return {
+        ...w,
+        settings: {
+          ...w.settings,
+          docSeq: {
+            invoice: seq.invoice + 1,
+            delivery: seq.delivery + 1,
+            protocol: seq.protocol + 1,
+          },
+        },
+        projects: [
+          ...w.projects,
+          {
+            id: crypto.randomUUID(),
+            title,
+            companyId,
+            rows,
+            meta,
+            vatPercent: 0,
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      };
+    });
+
+    flash(setToast, "Təklif yaradıldı — «Təkliflər» bölməsində çap edə bilərsiniz");
+    setModule("projects");
+    return true;
+  };
+
+  const createProjectFromSupplierOffer = (offer: SupplierOfferRecord) => {
+    const productRows: ProductRow[] = offer.rows.map((r) => ({
+      id: crypto.randomUUID(),
+      name: r.name,
+      unit: "ədəd",
+      qty: r.qty,
+      unitPrice: resolveOfferSaleUnitPrice(r),
+    }));
+    appendProjectFromOfferData(offer.companyId, offer.offerDate, productRows);
+  };
+
+  const createProjectFromOfferDraft = () => {
+    const companyId = offerDraft.companyId.trim();
+    if (!companyId) {
+      flash(setToast, "Əvvəlcə şirkət seçin.", "error");
+      return;
+    }
+    const productRows: ProductRow[] = [];
+    for (const row of offerDraft.rows) {
+      const supplierName = row.supplierName.trim();
+      const name = row.name.trim();
+      const qty = Number(String(row.qty).replace(",", "."));
+      if (!supplierName || !name || !Number.isFinite(qty) || qty <= 0) continue;
+      productRows.push({
+        id: crypto.randomUUID(),
+        name,
+        unit: "ədəd",
+        qty,
+        unitPrice: resolveOfferSaleFromDraft(row),
+      });
+    }
+    const offerDate =
+      offerEditId != null
+        ? (workspace.supplierOffers ?? []).find((o) => o.id === offerEditId)?.offerDate ||
+          new Date().toISOString().slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+    appendProjectFromOfferData(companyId, offerDate, productRows);
+  };
+
   const renderSuppliersModule = () => {
     const offers = sortedSupplierOffers;
 
@@ -2913,20 +3033,33 @@ export default function App() {
               ) : null}
             </section>
 
-            <section className="dg-form-inner-panel" aria-labelledby="dg-offer-products-heading">
-              <h2 id="dg-offer-products-heading" className="dg-form-inner-panel-title">
-                Məhsullar
-              </h2>
-              <div className="dg-product-toolbar">
-                <button
-                  type="button"
-                  className="dg-btn dg-btn-primary"
-                  onClick={() => setOfferDraft((d) => ({ ...d, rows: [...d.rows, emptyOfferRow()] }))}
-                >
-                  Sətir əlavə et
-                </button>
+            <section className="dg-form-inner-panel dg-offer-products-panel" aria-labelledby="dg-offer-products-heading">
+              <div className="dg-offer-products-head">
+                <h2 id="dg-offer-products-heading" className="dg-form-inner-panel-title">
+                  Məhsullar
+                </h2>
+                <div className="dg-offer-products-head-right">
+                  <div className="dg-offer-summary-inline" aria-label="Yekunlar">
+                    <span>
+                      Alış: <strong>{formatMoney(draftTotals.purchase)}</strong>
+                    </span>
+                    <span>
+                      Satış: <strong>{formatMoney(draftTotals.sale)}</strong>
+                    </span>
+                    <span>
+                      Marja: <strong>{formatMoney(draftTotals.sale - draftTotals.purchase)}</strong>
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="dg-btn dg-btn-primary"
+                    onClick={() => setOfferDraft((d) => ({ ...d, rows: [...d.rows, emptyOfferRow()] }))}
+                  >
+                    Sətir əlavə et
+                  </button>
+                </div>
               </div>
-              <div className="dg-table-wrap pg-grid-host dg-project-lines-wrap">
+              <div className="dg-table-wrap pg-grid-host dg-project-lines-wrap dg-offer-table-wrap">
                 <table className="dg-table dg-table--sales dg-table--offer">
                   <thead>
                     <tr>
@@ -3047,27 +3180,17 @@ export default function App() {
               </datalist>
             </section>
 
-            <aside className="dg-form-inner-panel dg-project-summary-aside dg-offer-summary-aside" aria-label="Yekunlar">
-              <h2 className="dg-form-inner-panel-title dg-form-inner-panel-title--sm">Yekun</h2>
-              <div className="dg-sales-summary">
-                <div className="dg-sales-summary-row">
-                  <span>Alış cəmi (ƏDV-siz)</span>
-                  <span>{formatMoney(draftTotals.purchase)}</span>
-                </div>
-                <div className="dg-sales-summary-row dg-sales-summary-row--grand">
-                  <span>Satış cəmi</span>
-                  <span>{formatMoney(draftTotals.sale)}</span>
-                </div>
-                <div className="dg-sales-summary-row">
-                  <span>Marja</span>
-                  <span>{formatMoney(draftTotals.sale - draftTotals.purchase)}</span>
-                </div>
-              </div>
-            </aside>
-
-            <footer className="dg-form-footer-actions">
+            <footer className="dg-form-footer-actions dg-offer-form-footer">
               <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelOfferForm}>
                 Bağla
+              </button>
+              <button
+                type="button"
+                className="dg-btn dg-btn-secondary"
+                onClick={createProjectFromOfferDraft}
+                disabled={sortedCompanies.length === 0}
+              >
+                Təklif yarat
               </button>
               <button
                 type="button"
@@ -3097,7 +3220,7 @@ export default function App() {
               <div className="dg-empty-state-desc">«Yeni təklif» düyməsi ilə təchizatçı təklifi əlavə edin.</div>
             </div>
           ) : (
-            <div className="dg-table-wrap pg-grid-host">
+            <div className="dg-table-wrap pg-grid-host dg-offer-table-wrap">
               <table className="dg-table dg-table--sales dg-table--offer-list">
                 <thead>
                   <tr>
@@ -3124,33 +3247,42 @@ export default function App() {
                         <td className="dg-td-amount dg-offer-list-col-purchase">{formatMoney(totals.purchase)}</td>
                         <td className="dg-td-amount dg-offer-list-col-sale">{formatMoney(totals.sale)}</td>
                         <td className="dg-td-actions">
-                          <div className="dg-icon-row">
+                          <div className="dg-offer-row-actions">
+                            <div className="dg-icon-row">
+                              <button
+                                type="button"
+                                className="dg-icon-btn"
+                                title="Məlumat"
+                                aria-label="Məlumat"
+                                onClick={() => setInfoDialog({ kind: "offer", id: o.id })}
+                              >
+                                <IconInfo />
+                              </button>
+                              <button
+                                type="button"
+                                className="dg-icon-btn"
+                                title="Redaktə"
+                                aria-label="Redaktə"
+                                onClick={() => startEditOffer(o)}
+                              >
+                                <IconEdit />
+                              </button>
+                              <button
+                                type="button"
+                                className="dg-icon-btn dg-icon-btn-danger"
+                                title="Sil"
+                                aria-label="Sil"
+                                onClick={() => deleteOffer(o.id)}
+                              >
+                                <IconTrash />
+                              </button>
+                            </div>
                             <button
                               type="button"
-                              className="dg-icon-btn"
-                              title="Məlumat"
-                              aria-label="Məlumat"
-                              onClick={() => setInfoDialog({ kind: "offer", id: o.id })}
+                              className="dg-btn dg-btn-secondary dg-offer-create-project-btn"
+                              onClick={() => createProjectFromSupplierOffer(o)}
                             >
-                              <IconInfo />
-                            </button>
-                            <button
-                              type="button"
-                              className="dg-icon-btn"
-                              title="Redaktə"
-                              aria-label="Redaktə"
-                              onClick={() => startEditOffer(o)}
-                            >
-                              <IconEdit />
-                            </button>
-                            <button
-                              type="button"
-                              className="dg-icon-btn dg-icon-btn-danger"
-                              title="Sil"
-                              aria-label="Sil"
-                              onClick={() => deleteOffer(o.id)}
-                            >
-                              <IconTrash />
+                              Təklif yarat
                             </button>
                           </div>
                         </td>

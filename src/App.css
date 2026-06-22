@@ -1599,6 +1599,8 @@ dialog.dg-modal[open] {
 /* Yeni təklif formu — sahələr dartılmır, kompakt enlər */
 .dg-project-form-body {
   gap: 1.35rem;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* Üst sıra: 2 kart yan-yana (bərabər) */
@@ -1860,93 +1862,102 @@ textarea.dg-input.dg-input-textarea-compact {
   background-color: color-mix(in srgb, var(--win-accent) 9%, transparent);
 }
 
-/* Təchizatçı təklifi — sütun enlikləri */
+/* Təchizatçı təklifi — sütun enlikləri (səhifəyə sığır, scroll yox) */
+.dg-offer-table-wrap {
+  overflow-x: hidden;
+}
+
 .dg-table.dg-table--offer {
   table-layout: fixed;
-  min-width: 1020px;
+  width: 100%;
+  min-width: 0;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-idx {
-  width: 2.75rem;
+  width: 3%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-supplier {
-  width: 9.5rem;
-  max-width: 9.5rem;
+  width: 11%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-product {
-  width: 9.5rem;
-  max-width: 9.5rem;
+  width: 12%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-price {
-  width: 7.5rem;
-  min-width: 7.5rem;
+  width: 9%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-qty {
-  width: 5.25rem;
-  min-width: 5.25rem;
+  width: 7%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-margin {
-  width: 4.75rem;
-  min-width: 4.75rem;
+  width: 7%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-total {
-  width: 7rem;
-  min-width: 7rem;
+  width: 9%;
   white-space: nowrap;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-actions {
-  width: 3rem;
+  width: 3.5rem;
 }
 
 .dg-table.dg-table--offer .dg-input-offer-product,
 .dg-table.dg-table--offer .dg-input-offer-supplier {
   max-width: 100%;
+  min-width: 0;
 }
 
 .dg-table.dg-table--offer .dg-input-offer-num {
   width: 100%;
   min-width: 0;
-  padding-left: 0.45rem;
-  padding-right: 0.45rem;
-  font-size: 0.9375rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
 }
 
+.dg-table.dg-table--offer thead th,
 .dg-table.dg-table--offer tbody td {
   overflow: hidden;
+  padding: 0.4rem 0.35rem;
 }
 
 .dg-table.dg-table--offer-list {
   table-layout: fixed;
   width: 100%;
+  min-width: 0;
 }
 
 .dg-table.dg-table--offer-list .dg-offer-list-col-date {
-  width: 8.5rem;
+  width: 9rem;
 }
 
-.dg-table.dg-table--offer-list .dg-offer-list-col-supplier {
-  width: 16%;
-}
-
+.dg-table.dg-table--offer-list .dg-offer-list-col-supplier,
 .dg-table.dg-table--offer-list .dg-offer-list-col-company {
-  width: 16%;
+  width: 18%;
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dg-table.dg-table--offer-list .dg-offer-list-col-rows {
-  width: 4.5rem;
+  width: 3.5rem;
 }
 
 .dg-table.dg-table--offer-list .dg-offer-list-col-purchase,
 .dg-table.dg-table--offer-list .dg-offer-list-col-sale {
-  width: 7.5rem;
+  width: 6.5rem;
+}
+
+.dg-table.dg-table--offer-list .dg-th-actions,
+.dg-table.dg-table--offer-list .dg-td-actions {
+  width: 9.5rem;
 }
 
 .dg-table.dg-table--offer-list thead th {
@@ -1954,7 +1965,7 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-offer-company-panel {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .dg-offer-company-field {
@@ -1967,8 +1978,65 @@ textarea.dg-input.dg-input-textarea-compact {
   font-size: 0.9rem;
 }
 
-.dg-offer-summary-aside {
-  margin-top: 1rem;
+.dg-offer-products-panel {
+  min-width: 0;
+}
+
+.dg-offer-products-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.85rem;
+}
+
+.dg-offer-products-head .dg-form-inner-panel-title {
+  margin-bottom: 0;
+}
+
+.dg-offer-products-head-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem 1rem;
+  margin-left: auto;
+}
+
+.dg-offer-summary-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--win-text-secondary);
+}
+
+.dg-offer-summary-inline strong {
+  color: var(--win-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dg-offer-form-footer {
+  flex-wrap: wrap;
+}
+
+.dg-offer-form-footer .dg-btn {
+  min-width: 120px;
+}
+
+.dg-offer-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.dg-offer-create-project-btn {
+  height: 30px;
+  padding: 0 0.55rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .dg-qty-wrap {
