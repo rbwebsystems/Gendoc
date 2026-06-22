@@ -826,6 +826,8 @@ export default function App() {
   const remoteWriteInFlightRef = useRef(false);
   // İlk snapshot gəlmədən yazmaq olmaz (yoxsa migration ilə yaza bilərik)
   const remoteReadyRef = useRef<boolean>(false);
+  /** remoteReadyRef dəyişəndə debounced yazını yenidən işə salmaq üçün */
+  const [remoteSyncEpoch, setRemoteSyncEpoch] = useState(0);
   const [module, setModule] = useState<SidebarModule>("companies");
   const [toast, setToast] = useState<{ kind: ToastKind; msg: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -920,10 +922,8 @@ export default function App() {
       const payload = workspaceRef.current;
       const json = workspaceFingerprint(payload);
 
-      if (json === lastSyncedJsonRef.current) {
-        pendingLocalWriteRef.current = false;
-        return;
-      }
+      // workspaceRef köhnə ola bilər — pending-i burada sıfırlama (snapshot geri qaytarmasın)
+      if (json === lastSyncedJsonRef.current) return;
 
       pendingLocalWriteRef.current = true;
       remoteWriteInFlightRef.current = true;
@@ -989,10 +989,12 @@ export default function App() {
         clearLocalWorkspace();
 
         if (!cancelled) {
-          lastSyncedJsonRef.current = workspaceFingerprint(merged);
-          pendingLocalWriteRef.current = false;
-          setWorkspace(merged);
           remoteReadyRef.current = true;
+          if (!pendingLocalWriteRef.current) {
+            lastSyncedJsonRef.current = workspaceFingerprint(merged);
+            setWorkspace(merged);
+          }
+          setRemoteSyncEpoch((e) => e + 1);
         }
       } catch {
         /* ignore — onSnapshot da işə düşəcək */
@@ -1009,15 +1011,18 @@ export default function App() {
       // Echo qoruması: snapshot bizim öz yazımızdırsa, state-ə dəymə
       if (json === lastSyncedJsonRef.current) {
         remoteReadyRef.current = true;
+        setRemoteSyncEpoch((e) => e + 1);
         return;
       }
       // Yerli silmə/yeniləmə hələ yazılmayıbsa köhnə remote state-i geri qaytarmayın
       if (pendingLocalWriteRef.current) {
         remoteReadyRef.current = true;
+        setRemoteSyncEpoch((e) => e + 1);
         return;
       }
       lastSyncedJsonRef.current = json;
       remoteReadyRef.current = true;
+      setRemoteSyncEpoch((e) => e + 1);
       setWorkspace(normalized);
     });
 
@@ -1063,7 +1068,7 @@ export default function App() {
     }
     // signedOut / loading — yazma (istifadəçilər arası qarışıqlıq olmasın)
     return;
-  }, [workspace, authState, flushRemoteWrite]);
+  }, [workspace, authState, flushRemoteWrite, remoteSyncEpoch]);
 
   // Reminder: vaxt çatanda bir dəfə səsli xəbərdarlıq et
   useEffect(() => {
@@ -2405,6 +2410,8 @@ export default function App() {
 
     const files = Array.from(filesList);
     const useRemote = firebaseEnabled && authState.status === "signedIn";
+    /** Firestore-a dataUrl ilə yazıla bilən maksimum ölçü (workspaceSync ilə eyni) */
+    const firestoreInlineMaxBytes = 240_000;
 
     // Remote snapshot köhnə state ilə yükləməni əvəz etməsin deyə əvvəlcədən qoru
     pendingLocalWriteRef.current = true;
@@ -2414,18 +2421,28 @@ export default function App() {
       if (useRemote && authState.status === "signedIn") {
         const uid = authState.user.uid;
         const results: FolderFileRecord[] = [];
+        let storageFallbackUsed = false;
         for (const f of files) {
           try {
             results.push(await uploadFolderFile(uid, folderId, f));
           } catch {
+            if (f.size > firestoreInlineMaxBytes) {
+              flash(
+                setToast,
+                `${f.name} çox böyükdür (${(f.size / (1024 * 1024)).toFixed(1)} MB) — Firebase Storage lazımdır.`,
+                "error",
+              );
+              continue;
+            }
+            storageFallbackUsed = true;
             results.push(await readFileAsDataUrlRecord(f));
           }
         }
         added = results;
-        if (results.some((x) => Boolean(x.dataUrl) && !x.url)) {
+        if (storageFallbackUsed) {
           flash(
             setToast,
-            "Storage işləmir — fayl bu cihazda görünür, sinxron üçün Storage yoxlayın.",
+            "Storage işləmir — kiçik fayllar bu cihazda saxlanır, böyük fayllar üçün Storage yoxlayın.",
             "error",
           );
         }
@@ -2439,6 +2456,7 @@ export default function App() {
         return;
       }
 
+      let applied = false;
       setWorkspace((w) => {
         let touched = false;
         const nextFolders = (w.folders ?? []).map((fold) => {
@@ -2452,7 +2470,9 @@ export default function App() {
           };
         });
         if (!touched) return w;
+        applied = true;
         const next = { ...w, folders: nextFolders };
+        workspaceRef.current = next;
         if (!useRemote && (!firebaseEnabled || authState.status === "disabled")) {
           saveWorkspaceLocal(next);
           pendingLocalWriteRef.current = false;
@@ -2460,11 +2480,14 @@ export default function App() {
         return next;
       });
 
-      flash(setToast, added.length === 1 ? "Fayl əlavə olundu" : `${added.length} fayl əlavə olundu`);
-
-      if (useRemote) {
-        void flushRemoteWrite();
+      if (!applied) {
+        pendingLocalWriteRef.current = false;
+        flash(setToast, "Qovluq tapılmadı — qovluğu bağlayıb yenidən açın.", "error");
+        return;
       }
+
+      flash(setToast, added.length === 1 ? "Fayl əlavə olundu" : `${added.length} fayl əlavə olundu`);
+      // Remote yazını debounced useEffect edir (workspaceRef artıq yenilənib)
     } catch {
       pendingLocalWriteRef.current = false;
       flash(setToast, "Fayl yüklənmədi", "error");
