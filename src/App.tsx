@@ -3589,18 +3589,44 @@ export default function App() {
           {offers.length === 0 ? (
             <p className="dg-muted dg-form-page-empty">Hələ təklif yoxdur — «Yeni təklif» ilə əlavə edin.</p>
           ) : (
-            <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table dg-table--sales dg-table--supplier-offers-list">
+            <div className="dg-table-wrap pg-grid-host dg-table-wrap--supplier-offers">
+              <table className="dg-table dg-table--supplier-offers-list">
+                <colgroup>
+                  <col className="dg-so-col-num" />
+                  <col className="dg-so-col-date" />
+                  <col className="dg-so-col-company" />
+                  <col className="dg-so-col-amount" />
+                  <col className="dg-so-col-amount" />
+                  <col className="dg-so-col-amount" />
+                  <col className="dg-so-col-amount" />
+                  <col className="dg-so-col-actions" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th className="dg-th-num">№</th>
-                    <th>Tarix</th>
-                    <th>Şirkət</th>
-                    <th className="dg-th-amount">Sətir</th>
-                    <th className="dg-th-amount">Alış (ƏDV-siz)</th>
-                    <th className="dg-th-amount">Satış (rəsmi)</th>
-                    <th className="dg-th-amount">Satış (nağd)</th>
-                    <th className="dg-th-actions">Əməliyyatlar</th>
+                    <th className="dg-th-num" scope="col">
+                      №
+                    </th>
+                    <th className="dg-so-col-text" scope="col">
+                      Tarix
+                    </th>
+                    <th className="dg-so-col-text" scope="col">
+                      Şirkət
+                    </th>
+                    <th className="dg-th-amount" scope="col">
+                      Sətir
+                    </th>
+                    <th className="dg-th-amount" scope="col">
+                      Alış (ƏDV-siz)
+                    </th>
+                    <th className="dg-th-amount" scope="col">
+                      Satış (rəsmi)
+                    </th>
+                    <th className="dg-th-amount" scope="col">
+                      Satış (nağd)
+                    </th>
+                    <th className="dg-th-actions" scope="col">
+                      Əməliyyatlar
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3609,8 +3635,8 @@ export default function App() {
                     return (
                       <tr key={o.id}>
                         <td className="dg-td-num">{i + 1}</td>
-                        <td>{formatDateAzLong(o.offerDate)}</td>
-                        <td className="dg-supplier-offer-ellipsis">{companyLabel(o.companyId)}</td>
+                        <td className="dg-so-col-text">{formatDateAzLong(o.offerDate)}</td>
+                        <td className="dg-so-col-text">{companyLabel(o.companyId)}</td>
                         <td className="dg-td-amount">{o.rows.length}</td>
                         <td className="dg-td-amount">{formatMoney(totals.purchaseEx)}</td>
                         <td className="dg-td-amount">{formatMoney(totals.sale)}</td>
