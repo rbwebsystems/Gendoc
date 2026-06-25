@@ -329,6 +329,16 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
             border-collapse: collapse;
         }
 
+        /* Çoxsəhifəli çapda cəmi/ƏDV/yekun yalnız son səhifədə (tfoot təkrarlanmasın) */
+        tfoot {
+            display: table-row-group;
+        }
+
+        tfoot tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
         th, td {
             border: 1px solid ${DOC_THEME.border};
             padding: ${thPadding};
