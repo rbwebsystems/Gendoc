@@ -22,8 +22,8 @@ type PrintCssOptions = {
 };
 
 function printCssDocument(opts: PrintCssOptions = {}): string {
-  const thFontSize = opts.thFontSize ?? "10.5px";
-  const tdFontSize = opts.tdFontSize ?? "11.5px";
+  const thFontSize = opts.thFontSize ?? "8.5px";
+  const tdFontSize = opts.tdFontSize ?? "9.5px";
   const thPadding = opts.thPadding ?? "4px 8px";
   const compactBlock = opts.compact
     ? `
@@ -130,7 +130,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
 
         .doc-letterhead-brand .doc-brand {
             font-family: 'Merriweather', serif;
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
             margin: 0;
             line-height: 1.15;
@@ -139,7 +139,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
 
         .doc-letterhead-meta {
             margin: 5px 0 0;
-            font-size: 10.5px;
+            font-size: 8.5px;
             color: ${DOC_THEME.textMuted};
             letter-spacing: 0.06em;
             text-transform: uppercase;
@@ -148,7 +148,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
 
         .doc-letterhead-contact {
             text-align: right;
-            font-size: 11px;
+            font-size: 9px;
             line-height: 1.55;
             max-width: 46%;
         }
@@ -173,7 +173,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
 
         .doc-doc-title h2 {
             font-family: 'Merriweather', serif;
-            font-size: 1.25rem;
+            font-size: 1.125rem;
             font-weight: 700;
             color: ${DOC_THEME.text};
             margin: 0;
@@ -183,7 +183,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
 
         .doc-doc-title-sub {
             margin: 8px 0 0;
-            font-size: 12px;
+            font-size: 10px;
             color: ${DOC_THEME.textMuted};
             font-weight: 500;
         }
@@ -223,7 +223,7 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
         }
 
         .doc-letterfoot-inner {
-            font-size: 9.5px;
+            font-size: 7.5px;
             color: ${DOC_THEME.textMuted};
             text-align: center;
             letter-spacing: 0.04em;
@@ -310,15 +310,15 @@ function printCssDocument(opts: PrintCssOptions = {}): string {
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            .grid.grid-cols-2.gap-20.text-sm.mt-12,
-            .grid.grid-cols-2.gap-16.text-sm.mt-12,
-            .mt-12.text-sm.w-1\\/2 {
+            .grid.grid-cols-2.gap-20.text-\\[12px\\].mt-12,
+            .grid.grid-cols-2.gap-16.text-\\[12px\\].mt-12,
+            .mt-12.text-\\[12px\\].w-1\\/2 {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
-            .grid.grid-cols-2.gap-20.text-sm.mt-12 > div,
-            .grid.grid-cols-2.gap-16.text-sm.mt-12 > div,
-            .mt-12.text-sm.w-1\\/2 {
+            .grid.grid-cols-2.gap-20.text-\\[12px\\].mt-12 > div,
+            .grid.grid-cols-2.gap-16.text-\\[12px\\].mt-12 > div,
+            .mt-12.text-\\[12px\\].w-1\\/2 {
                 break-inside: avoid;
                 page-break-inside: avoid;
             }
@@ -508,8 +508,8 @@ ${printCssDocument()}
 
         <!-- Rekvizitlər (yalnız Satıcı) -->
         <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4 doc-company-panel doc-requisites">
-          <div class="min-w-0 text-[12.5px]">
-                <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Satıcı rekvizitləri</h3>
+          <div class="min-w-0 text-[10.5px]">
+                <h3 class="font-bold text-gray-900 text-[12px] uppercase mb-2 border-b border-gray-200 pb-1">Satıcı rekvizitləri</h3>
                 <div class="grid grid-cols-[110px_minmax(0,1fr)] gap-y-1 gap-x-3">
                     <div class="font-semibold text-gray-700">Müəssisə</div>
                     <div class="text-gray-900 break-words">${escapeHtml(sellerName)}</div>
@@ -544,19 +544,19 @@ ${printCssDocument()}
                 <tfoot class="print-exact text-gray-900">
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">Cəmi</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(subtotal)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">Cəmi</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(subtotal)}</td>
                     </tr>
                     ${vatRate > 0 ? `
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(vatAmount)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(vatAmount)}</td>
                     </tr>` : ""}
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-200 text-[14px] uppercase tracking-wider">Yekun</td>
-                        <td class="text-right font-bold bg-gray-200 text-[14px]">${fmt(finalTotal)}</td>
+                        <td class="font-bold bg-gray-200 text-[12px] uppercase tracking-wider">Yekun</td>
+                        <td class="text-right font-bold bg-gray-200 text-[12px]">${fmt(finalTotal)}</td>
                     </tr>
                 </tfoot>
             </table>
@@ -564,13 +564,13 @@ ${printCssDocument()}
 
         <!-- Məbləğ Sözlə -->
         <div class="mb-12">
-            <p class="text-sm text-gray-800">
+            <p class="text-[12px] text-gray-800">
                 <span class="font-bold text-gray-900">Məbləğ sözlə:</span> ${escapeHtml(moneyToWordsAz(finalTotal))}.
             </p>
         </div>
 
         <!-- İmzalar -->
-        <div class="mt-12 text-sm w-1/2">
+        <div class="mt-12 text-[12px] w-1/2">
             <div class="space-y-3 mb-8">
                 <p><span class="font-bold text-gray-900">Satıcı:</span> ${escapeHtml(sellerName)}</p>
                 ${director ? `<p><span class="font-bold text-gray-900">Rəhbər:</span> ${escapeHtml(director)}</p>` : ""}
@@ -580,7 +580,7 @@ ${printCssDocument()}
                     <p class="font-bold text-gray-900 mb-1">İmza</p>
                     <div class="border-b border-gray-900 w-full"></div>
                 </div>
-                <div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center text-gray-400 text-xs font-bold shrink-0">
+                <div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
                     M.Y.
                 </div>
             </div>
@@ -644,7 +644,7 @@ export function buildDeliveryActHtml(state: GeneratorState): string {
     <title>Təhvil-Təslim Aktı</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10px" })}
+${printCssDocument({ thFontSize: "10px", tdFontSize: "11px", thPadding: "6px 10px" })}
     </style>
 </head>
 <body>
@@ -659,7 +659,7 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
         <div class="doc-body">
 
         <!-- Məlumat Hissəsi -->
-        <div class="mb-10 text-sm">
+        <div class="mb-10 text-[12px]">
             <div class="mb-5 flex justify-between">
                 <p><span class="font-bold text-gray-900 w-16 inline-block">Tarix:</span> ${escapeHtml(formatDateAzLong(m.invoiceDate))}</p>
                 <p><span class="font-bold text-gray-900 mr-2">Akt №:</span> ${escapeHtml(m.deliveryActNumber || "")}</p>
@@ -679,7 +679,7 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
         ${renderDocTitle("Təhvil-Təslim Aktı")}
 
         <!-- Giriş Mətni -->
-        <p class="text-sm text-gray-800 leading-relaxed mb-6 text-justify">
+        <p class="text-[12px] text-gray-800 leading-relaxed mb-6 text-justify">
             Biz, aşağıda imza edən tərəflər, bu aktı ona görə tərtib etdik ki, "Təhvil verən" aşağıda göstərilən məhsulları (işləri, xidmətləri) tam olaraq təhvil vermiş, "Təhvil alan" isə onları qəbul etmişdir:
         </p>
 
@@ -702,31 +702,31 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
                 <tfoot class="print-exact text-gray-900">
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">Cəmi</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(subtotal)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">Cəmi</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(subtotal)}</td>
                     </tr>
                     ${vatRate > 0 ? `
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(vatAmount)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(vatAmount)}</td>
                     </tr>` : ""}
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-200 text-[14px] uppercase tracking-wider">Yekun</td>
-                        <td class="text-right font-bold bg-gray-200 text-[14px]">${fmt(finalTotal)}</td>
+                        <td class="font-bold bg-gray-200 text-[12px] uppercase tracking-wider">Yekun</td>
+                        <td class="text-right font-bold bg-gray-200 text-[12px]">${fmt(finalTotal)}</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
 
         <!-- Təsdiq Mətni -->
-        <p class="text-sm text-gray-800 leading-relaxed mb-12 text-justify">
+        <p class="text-[12px] text-gray-800 leading-relaxed mb-12 text-justify">
             Yuxarıda qeyd olunan məhsullar (işlər, xidmətlər) tam, işlək vəziyyətdə və qüsursuz olaraq təhvil verilmişdir. Təhvil alanın məhsulların kəmiyyəti, keyfiyyəti və komplektasiyası barədə heç bir iddiası yoxdur. Bu akt 2 (iki) nüsxədə tərtib edilmişdir və hər iki tərəf üçün bərabər hüquqi qüvvəyə malikdir.
         </p>
 
         <!-- İmzalar -->
-        <div class="grid grid-cols-2 gap-16 text-sm mt-12">
+        <div class="grid grid-cols-2 gap-16 text-[12px] mt-12">
             <!-- Təhvil Verən Blok -->
             <div class="flex flex-col h-full">
                 <div class="space-y-3 mb-10">
@@ -735,10 +735,10 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
                 </div>
                 <div class="flex items-end gap-4 mt-auto">
                     <div class="flex-1">
-                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza</p>
+                        <p class="font-bold text-gray-900 mb-1 text-[10px] uppercase tracking-wider">İmza</p>
                         <div class="border-b border-gray-900 w-full"></div>
                     </div>
-                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
+                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[8px] font-bold shrink-0">
                         M.Y.
                     </div>
                 </div>
@@ -752,10 +752,10 @@ ${printCssDocument({ thFontSize: "12px", tdFontSize: "13px", thPadding: "6px 10p
                 </div>
                 <div class="flex items-end gap-4 mt-auto">
                     <div class="flex-1">
-                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza</p>
+                        <p class="font-bold text-gray-900 mb-1 text-[10px] uppercase tracking-wider">İmza</p>
                         <div class="border-b border-gray-900 w-full"></div>
                     </div>
-                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
+                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[8px] font-bold shrink-0">
                         M.Y.
                     </div>
                 </div>
@@ -809,7 +809,7 @@ export function buildDeliveryActNoPriceHtml(state: GeneratorState): string {
     <title>Qiymətsiz Təhvil-Təslim Aktı</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12px" })}
+${printCssDocument({ thFontSize: "11px", tdFontSize: "12px", thPadding: "8px 12px" })}
     </style>
 </head>
 <body>
@@ -824,7 +824,7 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
         <div class="doc-body">
 
         <!-- Məlumat Hissəsi -->
-        <div class="mb-10 text-sm">
+        <div class="mb-10 text-[12px]">
             <div class="mb-5 flex justify-between">
                 <p><span class="font-bold text-gray-900 w-16 inline-block">Tarix:</span> ${escapeHtml(formatDateAzLong(m.invoiceDate))}</p>
                 <p><span class="font-bold text-gray-900 mr-2">Akt №:</span> ${escapeHtml(m.deliveryActNumber || "")}</p>
@@ -844,7 +844,7 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
         ${renderDocTitle("Təhvil-Təslim Aktı")}
 
         <!-- Giriş Mətni -->
-        <p class="text-sm text-gray-800 leading-relaxed mb-6 text-justify">
+        <p class="text-[12px] text-gray-800 leading-relaxed mb-6 text-justify">
             Biz, aşağıda imza edən tərəflər, bu aktı ona görə tərtib etdik ki, "Təhvil verən" tərəfindən aşağıda adları və miqdarı göstərilən məhsullar (işlər, xidmətlər) "Təhvil alan"a təhvil verilmişdir:
         </p>
 
@@ -865,12 +865,12 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
         </div>
 
         <!-- Təsdiq Mətni -->
-        <p class="text-sm text-gray-800 leading-relaxed mb-16 text-justify mt-8">
+        <p class="text-[12px] text-gray-800 leading-relaxed mb-16 text-justify mt-8">
             Yuxarıda qeyd olunan məhsullar tam, işlək vəziyyətdə, siyahıya və sayına uyğun olaraq qüsursuz təhvil verilmişdir. Təhvil alanın məhsulların kəmiyyəti, keyfiyyəti və komplektasiyası barədə heç bir iddiası yoxdur. Bu akt 2 (iki) nüsxədə tərtib edilmişdir və hər iki tərəf üçün bərabər hüquqi qüvvəyə malikdir.
         </p>
 
         <!-- İmzalar -->
-        <div class="grid grid-cols-2 gap-16 text-sm mt-12">
+        <div class="grid grid-cols-2 gap-16 text-[12px] mt-12">
             <!-- Təhvil Verən Blok -->
             <div class="flex flex-col h-full">
                 <div class="space-y-3 mb-10">
@@ -879,10 +879,10 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
                 </div>
                 <div class="flex items-end gap-4 mt-auto">
                     <div class="flex-1">
-                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza</p>
+                        <p class="font-bold text-gray-900 mb-1 text-[10px] uppercase tracking-wider">İmza</p>
                         <div class="border-b border-gray-900 w-full"></div>
                     </div>
-                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
+                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[8px] font-bold shrink-0">
                         M.Y.
                     </div>
                 </div>
@@ -896,10 +896,10 @@ ${printCssDocument({ thFontSize: "13px", tdFontSize: "14px", thPadding: "8px 12p
                 </div>
                 <div class="flex items-end gap-4 mt-auto">
                     <div class="flex-1">
-                        <p class="font-bold text-gray-900 mb-1 text-xs uppercase tracking-wider">İmza</p>
+                        <p class="font-bold text-gray-900 mb-1 text-[10px] uppercase tracking-wider">İmza</p>
                         <div class="border-b border-gray-900 w-full"></div>
                     </div>
-                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
+                    <div class="w-16 h-16 border-2 border-dashed border-gray-400 rounded-full flex items-center justify-center text-gray-400 text-[8px] font-bold shrink-0">
                         M.Y.
                     </div>
                 </div>
@@ -970,7 +970,7 @@ ${printCssDocument({ compact: true })}
         <div class="doc-body">
 
         <!-- Məlumat Hissəsi -->
-        <div class="mb-10 text-sm">
+        <div class="mb-10 text-[12px]">
             <div class="mb-5">
                 <p><span class="font-bold text-gray-900 w-16 inline-block">Tarix:</span> ${escapeHtml(formatDateAzLong(m.invoiceDate))}</p>
             </div>
@@ -989,7 +989,7 @@ ${printCssDocument({ compact: true })}
         ${renderDocTitle("Qiymət razılaşdırma protokolu")}
 
         <!-- Giriş Mətni -->
-        <p class="text-sm text-gray-800 leading-relaxed mb-6 text-justify">
+        <p class="text-[12px] text-gray-800 leading-relaxed mb-6 text-justify">
             Bu protokol üzrə tərəflər aşağıda göstərilən məhsulların miqdarı və vahid qiyməti ilə razılaşır. Razılaşdırılmış yekun məbləğ ödəniş və təhvil-təslim üçün əsas hesab olunur.
         </p>
 
@@ -1011,26 +1011,26 @@ ${printCssDocument({ compact: true })}
                 <tfoot class="print-exact text-gray-900">
                     <tr>
                         <td colspan="3" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">Cəmi</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(subtotal)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">Cəmi</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(subtotal)}</td>
                     </tr>
                     ${vatRate > 0 ? `
                     <tr>
                         <td colspan="3" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(vatAmount)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(vatAmount)}</td>
                     </tr>` : ""}
                     <tr>
                         <td colspan="3" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-200 text-[14px] uppercase tracking-wider">Yekun</td>
-                        <td class="text-right font-bold bg-gray-200 text-[14px]">${fmt(vatRate > 0 ? grandTotal : subtotal)}</td>
+                        <td class="font-bold bg-gray-200 text-[12px] uppercase tracking-wider">Yekun</td>
+                        <td class="text-right font-bold bg-gray-200 text-[12px]">${fmt(vatRate > 0 ? grandTotal : subtotal)}</td>
                     </tr>
                 </tfoot>
             </table>
         </div>
 
         <!-- İmzalar -->
-        <div class="grid grid-cols-2 gap-20 text-sm mt-12">
+        <div class="grid grid-cols-2 gap-20 text-[12px] mt-12">
             <!-- Satıcı Blok -->
             <div class="flex flex-col h-full">
                 <div class="space-y-3 mb-16">
@@ -1110,24 +1110,24 @@ export function buildPriceQuoteHtml(state: GeneratorState): string {
     ? `
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-200 text-[14px] uppercase tracking-wider">Yekun</td>
-                        <td class="text-right font-bold bg-gray-200 text-[14px]">${fmt(finalTotal)}</td>
+                        <td class="font-bold bg-gray-200 text-[12px] uppercase tracking-wider">Yekun</td>
+                        <td class="text-right font-bold bg-gray-200 text-[12px]">${fmt(finalTotal)}</td>
                     </tr>`
     : `
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">Cəmi</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(subtotal)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">Cəmi</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(subtotal)}</td>
                     </tr>
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-50 text-[13px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
-                        <td class="text-right font-bold bg-gray-50 text-[13px]">${fmt(vatAmount)}</td>
+                        <td class="font-bold bg-gray-50 text-[11px] uppercase tracking-wider">ƏDV ${vatRate.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}%</td>
+                        <td class="text-right font-bold bg-gray-50 text-[11px]">${fmt(vatAmount)}</td>
                     </tr>
                     <tr>
                         <td colspan="4" class="border-none-left"></td>
-                        <td class="font-bold bg-gray-200 text-[14px] uppercase tracking-wider">Yekun</td>
-                        <td class="text-right font-bold bg-gray-200 text-[14px]">${fmt(finalTotal)}</td>
+                        <td class="font-bold bg-gray-200 text-[12px] uppercase tracking-wider">Yekun</td>
+                        <td class="text-right font-bold bg-gray-200 text-[12px]">${fmt(finalTotal)}</td>
                     </tr>`;
 
   return `<!DOCTYPE html>
@@ -1154,9 +1154,9 @@ ${printCssDocument()}
         ${renderDocTitle(`Qiymət Təklifi № ${quoteNo}`, `Tarix: ${formatDateAzLong(m.invoiceDate)} — ${subtitle}`)}
 
         <div class="mb-8 border border-gray-200 rounded-xl bg-gray-50/60 px-5 py-4 doc-company-panel">
-          <div class="grid grid-cols-2 gap-8 text-[12.5px]">
+          <div class="grid grid-cols-2 gap-8 text-[10.5px]">
             <div class="min-w-0">
-                <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Satıcı</h3>
+                <h3 class="font-bold text-gray-900 text-[12px] uppercase mb-2 border-b border-gray-200 pb-1">Satıcı</h3>
                 <div class="grid grid-cols-[90px_minmax(0,1fr)] gap-y-1 gap-x-3">
                     <div class="font-semibold text-gray-700">Müəssisə</div>
                     <div class="text-gray-900 break-words">${escapeHtml(sellerName)}</div>
@@ -1164,7 +1164,7 @@ ${printCssDocument()}
                 </div>
             </div>
             <div class="min-w-0">
-                <h3 class="font-bold text-gray-900 text-sm uppercase mb-2 border-b border-gray-200 pb-1">Alıcı</h3>
+                <h3 class="font-bold text-gray-900 text-[12px] uppercase mb-2 border-b border-gray-200 pb-1">Alıcı</h3>
                 <div class="grid grid-cols-[90px_minmax(0,1fr)] gap-y-1 gap-x-3">
                     <div class="font-semibold text-gray-700">Müəssisə</div>
                     <div class="text-gray-900 break-words">${escapeHtml(buyerName)}</div>
@@ -1194,12 +1194,12 @@ ${printCssDocument()}
         </div>
 
         <div class="mb-12">
-            <p class="text-sm text-gray-800">
+            <p class="text-[12px] text-gray-800">
                 <span class="font-bold text-gray-900">Məbləğ sözlə:</span> ${escapeHtml(moneyToWordsAz(finalTotal))}.
             </p>
         </div>
 
-        <div class="mt-12 text-sm w-1/2">
+        <div class="mt-12 text-[12px] w-1/2">
             <div class="space-y-3 mb-8">
                 <p><span class="font-bold text-gray-900">Satıcı:</span> ${escapeHtml(sellerName)}</p>
                 ${sellerDirector ? `<p><span class="font-bold text-gray-900">Rəhbər:</span> ${escapeHtml(sellerDirector)}</p>` : ""}
@@ -1209,7 +1209,7 @@ ${printCssDocument()}
                     <p class="font-bold text-gray-900 mb-1">İmza</p>
                     <div class="border-b border-gray-900 w-full"></div>
                 </div>
-                <div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center text-gray-400 text-xs font-bold shrink-0">
+                <div class="w-20 h-20 border-2 border-dashed border-gray-300 rounded-full flex items-center justify-center text-gray-400 text-[10px] font-bold shrink-0">
                     M.Y.
                 </div>
             </div>
