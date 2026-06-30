@@ -1,5 +1,8 @@
 import type { CompanyProfile, DocumentMeta, ProductRow } from "../types";
 
+/** Rəsmi sənədlər və təchizatçı təkliflərində standart ƏDV */
+export const OFFICIAL_VAT_PERCENT = 18;
+
 export function emptyCompany(): CompanyProfile {
   return {
     currency: "AZN",

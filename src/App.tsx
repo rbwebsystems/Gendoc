@@ -28,8 +28,9 @@ import {
   sortProjectsByDate,
   workspaceHasUserData,
   workspaceToGeneratorState,
+  resolveProjectVatPercent,
 } from "./lib/docStorage";
-import { emptyCompany, emptyMeta, newProductRow } from "./lib/defaults";
+import { emptyCompany, emptyMeta, newProductRow, OFFICIAL_VAT_PERCENT } from "./lib/defaults";
 import { formatDateAzLong, formatMoney } from "./lib/text";
 import type {
   CompanyProfile,
@@ -524,7 +525,16 @@ function calcSaleFromMargin(purchase: number, marginPercent: number): number {
   return Math.round(purchase * (1 + marginPercent / 100) * 100) / 100;
 }
 
-const SUPPLIER_OFFER_PROJECT_VAT_PERCENT = 18;
+const SUPPLIER_OFFER_PROJECT_VAT_PERCENT = OFFICIAL_VAT_PERCENT;
+
+function attachOfficialSaleVat<T extends { saleOfficial: number }>(totals: T) {
+  const saleOfficialVat = roundMoney(totals.saleOfficial * (OFFICIAL_VAT_PERCENT / 100));
+  return {
+    ...totals,
+    saleOfficialVat,
+    saleOfficialGrand: roundMoney(totals.saleOfficial + saleOfficialVat),
+  };
+}
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
@@ -695,7 +705,7 @@ function resolveOfferSaleFromDraft(row: OfferRowDraft, billingMode: "official" |
 }
 
 function offerDraftTotals(rows: OfferRowDraft[]) {
-  return rows.reduce(
+  const base = rows.reduce(
     (acc, r) => {
       const qty = Number(String(r.qty).replace(",", ".")) || 0;
       acc.purchaseEx += resolveOfferPurchaseFromDraft(r) * qty;
@@ -706,6 +716,7 @@ function offerDraftTotals(rows: OfferRowDraft[]) {
     },
     { purchaseEx: 0, purchaseInc: 0, saleOfficial: 0, saleCash: 0 },
   );
+  return attachOfficialSaleVat(base);
 }
 
 function offerRowTotals(rows: SupplierOfferRow[]) {
@@ -720,7 +731,14 @@ function offerRowTotals(rows: SupplierOfferRow[]) {
     saleOfficial += resolveOfferSaleUnitPrice(r, "official") * q;
     saleCash += resolveOfferSaleUnitPrice(r, "cash") * q;
   }
-  return { purchaseEx, purchaseInc, purchase: purchaseEx, sale: saleOfficial, saleCash };
+  return attachOfficialSaleVat({
+    purchaseEx,
+    purchaseInc,
+    purchase: purchaseEx,
+    sale: saleOfficial,
+    saleCash,
+    saleOfficial,
+  });
 }
 
 function offerSuppliersLabel(rows: SupplierOfferRow[]): string {
@@ -1677,9 +1695,9 @@ export default function App() {
         buyer: emptyCompany(),
         rows: projectDraft.rows,
         meta: projectDraft.meta,
-        vatPercent: projectDraft.vatPercent,
+        vatPercent: resolveProjectVatPercent(projectDraft),
       }),
-    [projectDraft.rows, projectDraft.meta, projectDraft.vatPercent],
+    [projectDraft.rows, projectDraft.meta, projectDraft.vatPercent, projectDraft.billingMode],
   );
 
   const infoCompany = infoDialog?.kind === "company" ? workspace.companies.find((c) => c.id === infoDialog.id) : undefined;
@@ -3380,7 +3398,13 @@ export default function App() {
                       Alış (ƏDV daxil): <strong>{formatMoney(draftTotals.purchaseInc)}</strong>
                     </span>
                     <span>
-                      Satış (rəsmi): <strong>{formatMoney(draftTotals.saleOfficial)}</strong>
+                      Satış (rəsmi, ƏDV-siz): <strong>{formatMoney(draftTotals.saleOfficial)}</strong>
+                    </span>
+                    <span>
+                      ƏDV ({OFFICIAL_VAT_PERCENT}%): <strong>{formatMoney(draftTotals.saleOfficialVat)}</strong>
+                    </span>
+                    <span>
+                      Yekun (rəsmi): <strong>{formatMoney(draftTotals.saleOfficialGrand)}</strong>
                     </span>
                     <span>
                       Satış (nağd): <strong>{formatMoney(draftTotals.saleCash)}</strong>
@@ -3619,7 +3643,7 @@ export default function App() {
                       Alış (ƏDV-siz)
                     </th>
                     <th className="dg-th-amount" scope="col">
-                      Satış (rəsmi)
+                      Yekun (rəsmi)
                     </th>
                     <th className="dg-th-amount" scope="col">
                       Satış (nağd)
@@ -3639,7 +3663,7 @@ export default function App() {
                         <td className="dg-so-col-text">{companyLabel(o.companyId)}</td>
                         <td className="dg-td-amount">{o.rows.length}</td>
                         <td className="dg-td-amount">{formatMoney(totals.purchaseEx)}</td>
-                        <td className="dg-td-amount">{formatMoney(totals.sale)}</td>
+                        <td className="dg-td-amount">{formatMoney(totals.saleOfficialGrand)}</td>
                         <td className="dg-td-amount">{formatMoney(totals.saleCash)}</td>
                         <td className="dg-td-actions">
                           <div className="dg-icon-row">
@@ -4176,8 +4200,12 @@ export default function App() {
                 <div className="v">{formatMoney(infoOfferTotals.purchaseEx)}</div>
                 <div className="k">Alış (ƏDV daxil)</div>
                 <div className="v">{formatMoney(infoOfferTotals.purchaseInc)}</div>
-                <div className="k">Satış (rəsmi)</div>
-                <div className="v">{formatMoney(infoOfferTotals.sale)}</div>
+                <div className="k">Satış (rəsmi, ƏDV-siz)</div>
+                <div className="v">{formatMoney(infoOfferTotals.saleOfficial)}</div>
+                <div className="k">ƏDV ({OFFICIAL_VAT_PERCENT}%)</div>
+                <div className="v">{formatMoney(infoOfferTotals.saleOfficialVat)}</div>
+                <div className="k">Yekun (rəsmi)</div>
+                <div className="v">{formatMoney(infoOfferTotals.saleOfficialGrand)}</div>
                 <div className="k">Satış (nağd)</div>
                 <div className="v">{formatMoney(infoOfferTotals.saleCash)}</div>
               </div>

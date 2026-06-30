@@ -13,7 +13,7 @@ import type {
   SavedCompanyRecord,
   SavedProjectV2,
 } from "../types";
-import { emptyCompany, emptyMeta } from "./defaults";
+import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT } from "./defaults";
 
 const WS_KEY_V3 = "docgen_workspace_v3";
 const WS_KEY_V3_BACKUP = "docgen_workspace_v3_backup";
@@ -70,7 +70,10 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       companyId: typeof p.companyId === "string" && companyIds.has(p.companyId) ? p.companyId : "",
       rows: normalizeProductRows(p.rows ?? []),
       meta: { ...emptyMeta(), ...p.meta },
-      vatPercent: Number(p.vatPercent) || 0,
+      vatPercent: resolveProjectVatPercent({
+        vatPercent: Number(p.vatPercent) || 0,
+        billingMode: p.billingMode,
+      }),
       ...(p.billingMode === "official" || p.billingMode === "cash" ? { billingMode: p.billingMode } : {}),
       createdAt: typeof p.createdAt === "number" ? p.createdAt : Date.now(),
       updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : Date.now(),
@@ -597,6 +600,14 @@ export function hasLocalWorkspace(): boolean {
   }
 }
 
+export function resolveProjectVatPercent(proj: Pick<ProjectRecord, "vatPercent" | "billingMode">): number {
+  if (proj.billingMode === "cash") return 0;
+  if (proj.billingMode === "official") {
+    return proj.vatPercent > 0 ? proj.vatPercent : OFFICIAL_VAT_PERCENT;
+  }
+  return Math.max(0, Number(proj.vatPercent) || 0);
+}
+
 export function workspaceToGeneratorState(ws: DocWorkspace, proj: ProjectRecord): GeneratorState {
   const buyer =
     ws.companies.find((c) => c.id === proj.companyId)?.profile ?? emptyCompany();
@@ -605,7 +616,7 @@ export function workspaceToGeneratorState(ws: DocWorkspace, proj: ProjectRecord)
     buyer,
     rows: proj.rows,
     meta: proj.meta,
-    vatPercent: proj.vatPercent,
+    vatPercent: resolveProjectVatPercent(proj),
   });
 }
 
