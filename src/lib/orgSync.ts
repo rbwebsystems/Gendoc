@@ -136,6 +136,25 @@ export async function fetchOrgMemberOnce(uid: string): Promise<SystemUserRecord 
   return normalizeOrgMember(snap.data(), uid);
 }
 
+/** Real-time abunəlik — tək istifadəçi profili (işçilər üçün icazə yenilənməsi). */
+export function subscribeOrgMember(uid: string, cb: (member: SystemUserRecord | null) => void): Unsubscribe {
+  if (!db) {
+    cb(null);
+    return () => {};
+  }
+  return onSnapshot(
+    orgMemberRef(uid),
+    (snap) => {
+      if (!snap.exists()) {
+        cb(null);
+        return;
+      }
+      cb(normalizeOrgMember(snap.data(), uid));
+    },
+    () => cb(null),
+  );
+}
+
 export async function fetchAllOrgMembersOnce(): Promise<SystemUserRecord[]> {
   const snap = await getDocs(orgMembersCol());
   const out: SystemUserRecord[] = [];

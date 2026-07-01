@@ -90,6 +90,7 @@ import {
   isUsernameTaken,
   seedOrgWorkspaceFromUser,
   subscribeOrgMembers,
+  subscribeOrgMember,
   subscribeOrgWorkspace,
   syncUsernameIndex,
   deleteUsernameIndex,
@@ -1308,29 +1309,56 @@ export default function App() {
 
   useEffect(() => {
     if (!firebaseEnabled || authState.status !== "signedIn") return;
-    return subscribeOrgMembers((members) => setOrgMembers(members.filter((m) => !m.disabled)));
-  }, [authState.status]);
-
-  // İcazə dəyişəndə işçinin currentMember və modul siyahısı dərhal yenilənsin
-  useEffect(() => {
-    if (authState.status !== "signedIn" || sessionKind !== "member") {
-      prevMemberModulesRef.current = [];
-      return;
-    }
     const uid = authState.user.uid;
-    const updated = orgMembers.find((m) => m.id === uid);
-    if (!updated) return;
+    const unsubs: Array<() => void> = [];
 
-    const prevModules = prevMemberModulesRef.current;
-    const added = updated.modules.filter((m) => !prevModules.includes(m));
+    if (sessionKind === "member") {
+      unsubs.push(
+        subscribeOrgMember(uid, (member) => {
+          if (!member || member.disabled) {
+            setCurrentMember(null);
+            return;
+          }
 
-    setCurrentMember(updated);
-    prevMemberModulesRef.current = [...updated.modules];
+          const prevModules = prevMemberModulesRef.current;
+          const added = member.modules.filter((m) => !prevModules.includes(m));
 
-    if (updated.role === "employee" && sessionModuleAppliedRef.current && prevModules.length > 0 && added.length > 0) {
-      setModule(added[added.length - 1] as SidebarModule);
+          setCurrentMember(member);
+          prevMemberModulesRef.current = [...member.modules];
+
+          if (member.role === "employee") {
+            setOrgMembers([member]);
+          }
+
+          if (
+            member.role === "employee" &&
+            sessionModuleAppliedRef.current &&
+            prevModules.length > 0 &&
+            added.length > 0
+          ) {
+            setModule(added[added.length - 1] as SidebarModule);
+          }
+        }),
+      );
     }
-  }, [authState.status, sessionKind, orgMembers, authState]);
+
+    if (sessionKind === "developer") {
+      unsubs.push(subscribeOrgMembers((members) => setOrgMembers(members.filter((m) => !m.disabled))));
+    }
+
+    return () => {
+      for (const unsub of unsubs) unsub();
+    };
+  }, [authState.status, sessionKind, authState]);
+
+  // Direktor/admin: bütün istifadəçilər siyahısı (kolleksiya sorğusu yalnız onlara icazəlidir)
+  useEffect(() => {
+    if (!firebaseEnabled || authState.status !== "signedIn") return;
+    if (sessionKind !== "member") return;
+    if (currentMember?.role !== "admin" && currentMember?.role !== "director") return;
+
+    return subscribeOrgMembers((members) => setOrgMembers(members.filter((m) => !m.disabled)));
+  }, [authState.status, sessionKind, currentMember?.role]);
 
   useEffect(() => {
     const el = forcePasswordDialogRef.current;
