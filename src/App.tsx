@@ -1153,6 +1153,7 @@ export default function App() {
   /** remoteReadyRef dəyişəndə debounced yazını yenidən işə salmaq üçün */
   const [remoteSyncEpoch, setRemoteSyncEpoch] = useState(0);
   const sessionModuleAppliedRef = useRef(false);
+  const prevMemberModulesRef = useRef<PermissionModuleId[]>([]);
   const [module, setModule] = useState<SidebarModule>("companies");
   const [toast, setToast] = useState<{ kind: ToastKind; msg: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1269,6 +1270,7 @@ export default function App() {
             }
             setSessionKind("member");
             setCurrentMember(member);
+            prevMemberModulesRef.current = [...member.modules];
             setForcePasswordChange(Boolean(member.mustChangePassword));
           } catch {
             setSessionKind("member");
@@ -1305,6 +1307,27 @@ export default function App() {
     if (!firebaseEnabled || authState.status !== "signedIn") return;
     return subscribeOrgMembers((members) => setOrgMembers(members.filter((m) => !m.disabled)));
   }, [authState.status]);
+
+  // İcazə dəyişəndə işçinin currentMember və modul siyahısı dərhal yenilənsin
+  useEffect(() => {
+    if (authState.status !== "signedIn" || sessionKind !== "member") {
+      prevMemberModulesRef.current = [];
+      return;
+    }
+    const uid = authState.user.uid;
+    const updated = orgMembers.find((m) => m.id === uid);
+    if (!updated) return;
+
+    const prevModules = prevMemberModulesRef.current;
+    const added = updated.modules.filter((m) => !prevModules.includes(m));
+
+    setCurrentMember(updated);
+    prevMemberModulesRef.current = [...updated.modules];
+
+    if (updated.role === "employee" && sessionModuleAppliedRef.current && prevModules.length > 0 && added.length > 0) {
+      setModule(added[added.length - 1] as SidebarModule);
+    }
+  }, [authState.status, sessionKind, orgMembers, authState]);
 
   useEffect(() => {
     const el = forcePasswordDialogRef.current;
@@ -1807,7 +1830,16 @@ export default function App() {
     }
 
     if (moduleAccessSet && !isModuleAccessible(module, moduleAccessSet, navOpts)) {
-      setModule(preferredModuleForSession(currentMember, moduleAccessSet));
+      const next = preferredModuleForSession(currentMember, moduleAccessSet);
+      if (module === "companies") cancelCompanyForm();
+      else if (module === "projects") cancelProjectForm();
+      else if (module === "suppliers") cancelOfferForm();
+      else if (module === "storeOrders") cancelStoreOrderForm();
+      else if (module === "customerOrders") cancelCustomerOrderForm();
+      else if (module === "systemPermissions") cancelPermissionForm();
+      else if (module === "appUsers") cancelAppUserForm();
+      else if (module === "workLeave") cancelLeaveForm();
+      setModule(next);
     }
   }, [
     authState.status,
