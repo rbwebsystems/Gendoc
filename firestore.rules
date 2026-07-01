@@ -35,7 +35,12 @@ service cloud.firestore {
 
     match /orgs/default/members/{uid} {
       allow read: if isDeveloper() || isOrgAdmin() || (isOrgMember() && request.auth.uid == uid);
-      allow create, update, delete: if isDeveloper() || isOrgAdmin();
+      allow create, delete: if isDeveloper() || isOrgAdmin();
+      allow update: if isDeveloper() || isOrgAdmin() || (
+        isOrgMember()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['mustChangePassword', 'updatedAt'])
+      );
     }
 
     match /{document=**} {

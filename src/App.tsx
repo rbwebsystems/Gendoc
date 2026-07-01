@@ -91,6 +91,7 @@ import {
   subscribeOrgMembers,
   subscribeOrgWorkspace,
   writeOrgMember,
+  setMemberMustChangePassword,
   writeOrgWorkspace,
 } from "./lib/orgSync";
 import {
@@ -5772,14 +5773,19 @@ export default function App() {
     }
     try {
       await updatePassword(authState.user, newPasswordDraft);
+      await setMemberMustChangePassword(currentMember.id, false);
       const rec: SystemUserRecord = { ...currentMember, mustChangePassword: false, updatedAt: Date.now() };
-      await writeOrgMember(rec);
       setCurrentMember(rec);
       setForcePasswordChange(false);
       setNewPasswordDraft("");
       setNewPasswordConfirm("");
       flash(setToast, "Şifrə yeniləndi");
     } catch (e: unknown) {
+      const code = (e as { code?: string })?.code ?? "";
+      if (code === "permission-denied") {
+        flash(setToast, "Şifrə dəyişildi, amma profil yenilənmədi — administratorla əlaqə saxlayın.", "error");
+        return;
+      }
       flash(setToast, mapAuthError(e), "error");
     }
   }, [authState, currentMember, newPasswordDraft, newPasswordConfirm]);
