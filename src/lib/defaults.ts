@@ -61,7 +61,8 @@ export function newOrderLineRow(): OrderLineRow {
   return {
     id: crypto.randomUUID(),
     name: "",
-    unit: "ədəd",
     qty: 1,
+    purchasePrice: 0,
+    supplierName: "",
   };
 }

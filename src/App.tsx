@@ -184,7 +184,7 @@ type OfferFormMode = "list" | "form";
 type OrderFormMode = "list" | "form";
 
 type StoreOrderDraft = {
-  title: string;
+  customerName: string;
   orderDate: string;
   status: OrderStatus;
   note: string;
@@ -202,7 +202,7 @@ type CustomerOrderDraft = {
 
 function emptyStoreOrderDraft(): StoreOrderDraft {
   return {
-    title: "",
+    customerName: "",
     orderDate: new Date().toISOString().slice(0, 10),
     status: "draft",
     note: "",
@@ -226,10 +226,11 @@ function normalizeOrderDraftRows(rows: OrderLineRow[]): OrderLineRow[] {
     .map((r) => ({
       ...r,
       name: r.name.trim(),
-      unit: r.unit.trim() || "ədəd",
+      supplierName: r.supplierName.trim(),
       qty: Number(r.qty) || 0,
+      purchasePrice: Number(r.purchasePrice) || 0,
     }))
-    .filter((r) => r.name.length > 0 && r.qty > 0);
+    .filter((r) => r.name.length > 0 && r.supplierName.length > 0 && r.qty > 0 && r.purchasePrice > 0);
 }
 
 type ProjectDraft = {
@@ -3342,7 +3343,7 @@ export default function App() {
   const startEditStoreOrder = (o: StoreOrderRecord) => {
     setStoreOrderEditId(o.id);
     setStoreOrderDraft({
-      title: o.title,
+      customerName: o.customerName,
       orderDate: o.orderDate,
       status: o.status,
       note: o.note || "",
@@ -3352,14 +3353,14 @@ export default function App() {
   };
 
   const saveStoreOrder = () => {
-    const title = storeOrderDraft.title.trim();
+    const customerName = storeOrderDraft.customerName.trim();
     const rows = normalizeOrderDraftRows(storeOrderDraft.rows);
-    if (!title) {
-      flash(setToast, "Sifariş başlığını daxil edin.", "error");
+    if (!customerName) {
+      flash(setToast, "Müştəri adını daxil edin.", "error");
       return;
     }
     if (rows.length === 0) {
-      flash(setToast, "Ən azı bir məhsul sətri əlavə edin.", "error");
+      flash(setToast, "Hər sətirdə məhsul, miqdar, alış qiyməti və təchizatçı daxil edin.", "error");
       return;
     }
     const orderDate = storeOrderDraft.orderDate.trim() || new Date().toISOString().slice(0, 10);
@@ -3372,7 +3373,7 @@ export default function App() {
           if (o.id !== storeOrderEditId) return o;
           const rec: StoreOrderRecord = {
             id: o.id,
-            title,
+            customerName,
             orderDate,
             status: storeOrderDraft.status,
             rows,
@@ -3387,7 +3388,7 @@ export default function App() {
     } else {
       const rec: StoreOrderRecord = {
         id: crypto.randomUUID(),
-        title,
+        customerName,
         orderDate,
         status: storeOrderDraft.status,
         rows,
@@ -3451,7 +3452,7 @@ export default function App() {
       return;
     }
     if (rows.length === 0) {
-      flash(setToast, "Ən azı bir məhsul sətri əlavə edin.", "error");
+      flash(setToast, "Hər sətirdə məhsul, miqdar, alış qiyməti və təchizatçı daxil edin.", "error");
       return;
     }
     const orderDate = customerOrderDraft.orderDate.trim() || new Date().toISOString().slice(0, 10);
@@ -3536,15 +3537,16 @@ export default function App() {
           <tr>
             <th className="dg-th-num">№</th>
             <th>Məhsul</th>
-            <th>Vahid</th>
             <th>Miqdar</th>
+            <th>Alış qiyməti</th>
+            <th>Təchizatçı</th>
             <th className="dg-th-actions">Sil</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={5} className="dg-empty-cell">
+              <td colSpan={6} className="dg-empty-cell">
                 Məhsul sətri əlavə edin.
               </td>
             </tr>
@@ -3561,9 +3563,12 @@ export default function App() {
                 </td>
                 <td>
                   <input
-                    className="dg-input dg-input-table dg-input-narrow"
-                    value={r.unit}
-                    onChange={(e) => onPatch(r.id, { unit: e.target.value })}
+                    className="dg-input dg-input-table dg-input-num"
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={r.qty}
+                    onChange={(e) => onPatch(r.id, { qty: Number(e.target.value) || 0 })}
                   />
                 </td>
                 <td>
@@ -3571,9 +3576,16 @@ export default function App() {
                     className="dg-input dg-input-table dg-input-num"
                     type="number"
                     min={0}
-                    step="any"
-                    value={r.qty}
-                    onChange={(e) => onPatch(r.id, { qty: Number(e.target.value) || 0 })}
+                    step="0.01"
+                    value={r.purchasePrice}
+                    onChange={(e) => onPatch(r.id, { purchasePrice: Number(e.target.value) || 0 })}
+                  />
+                </td>
+                <td>
+                  <input
+                    className="dg-input dg-input-table"
+                    value={r.supplierName}
+                    onChange={(e) => onPatch(r.id, { supplierName: e.target.value })}
                   />
                 </td>
                 <td className="dg-td-actions">
@@ -3599,6 +3611,78 @@ export default function App() {
       </div>
     </div>
   );
+
+  const renderOrderListTable = <T extends { id: string; customerName: string; status: OrderStatus; rows: OrderLineRow[] }>(
+    orders: T[],
+    onEdit: (order: T) => void,
+    onDelete: (id: string) => void,
+  ) => {
+    let rowNum = 0;
+    return (
+      <div className="dg-table-wrap pg-grid-host">
+        <table className="dg-table">
+          <thead>
+            <tr>
+              <th className="dg-th-num">№</th>
+              <th>Müştəri</th>
+              <th>Status</th>
+              <th>Məhsul</th>
+              <th>Miqdar</th>
+              <th>Alış qiyməti</th>
+              <th>Təchizatçı</th>
+              <th className="dg-th-actions">Əməliyyatlar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.flatMap((o) =>
+              o.rows.map((row, lineIdx) => {
+                rowNum += 1;
+                return (
+                  <tr key={`${o.id}-${row.id}`}>
+                    <td className="dg-td-num">{rowNum}</td>
+                    {lineIdx === 0 ? (
+                      <>
+                        <td rowSpan={o.rows.length}>{o.customerName}</td>
+                        <td rowSpan={o.rows.length}>{orderStatusLabel(o.status)}</td>
+                      </>
+                    ) : null}
+                    <td>{row.name}</td>
+                    <td className="dg-td-amount">{row.qty}</td>
+                    <td className="dg-td-amount">{formatMoney(row.purchasePrice)}</td>
+                    <td>{row.supplierName}</td>
+                    {lineIdx === 0 ? (
+                      <td className="dg-td-actions" rowSpan={o.rows.length}>
+                        <div className="dg-icon-row">
+                          <button
+                            type="button"
+                            className="dg-icon-btn"
+                            title="Redaktə et"
+                            aria-label="Redaktə et"
+                            onClick={() => onEdit(o)}
+                          >
+                            <IconEdit />
+                          </button>
+                          <button
+                            type="button"
+                            className="dg-icon-btn dg-icon-btn-danger"
+                            title="Sil"
+                            aria-label="Sil"
+                            onClick={() => onDelete(o.id)}
+                          >
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              }),
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   const companyLabel = (companyId?: string) => {
     const c = companyId ? companyById.get(companyId) : undefined;
@@ -4191,12 +4275,12 @@ export default function App() {
           <div className="dg-form-page-body">
             <div className="dg-form-meta-grid">
               <label className="dg-field">
-                <span className="dg-label">Başlıq</span>
+                <span className="dg-label">Müştəri adı</span>
                 <input
                   className="dg-input"
-                  value={storeOrderDraft.title}
-                  onChange={(e) => setStoreOrderDraft((d) => ({ ...d, title: e.target.value }))}
-                  placeholder="Məs: Anbar doldurma"
+                  value={storeOrderDraft.customerName}
+                  onChange={(e) => setStoreOrderDraft((d) => ({ ...d, customerName: e.target.value }))}
+                  placeholder="Ad və ya şirkət"
                 />
               </label>
               <label className="dg-field">
@@ -4269,53 +4353,7 @@ export default function App() {
               <div className="dg-empty-state-desc">«Yeni sifariş» ilə mağaza daxili sifariş əlavə edin.</div>
             </div>
           ) : (
-            <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table">
-                <thead>
-                  <tr>
-                    <th className="dg-th-num">№</th>
-                    <th>Tarix</th>
-                    <th>Başlıq</th>
-                    <th>Status</th>
-                    <th>Məhsul</th>
-                    <th className="dg-th-actions">Əməliyyatlar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((o, i) => (
-                    <tr key={o.id}>
-                      <td className="dg-td-num">{i + 1}</td>
-                      <td>{formatDateAzLong(o.orderDate)}</td>
-                      <td>{o.title}</td>
-                      <td>{orderStatusLabel(o.status)}</td>
-                      <td className="dg-td-amount">{o.rows.length}</td>
-                      <td className="dg-td-actions">
-                        <div className="dg-icon-row">
-                          <button
-                            type="button"
-                            className="dg-icon-btn"
-                            title="Redaktə et"
-                            aria-label="Redaktə et"
-                            onClick={() => startEditStoreOrder(o)}
-                          >
-                            <IconEdit />
-                          </button>
-                          <button
-                            type="button"
-                            className="dg-icon-btn dg-icon-btn-danger"
-                            title="Sil"
-                            aria-label="Sil"
-                            onClick={() => deleteStoreOrder(o.id)}
-                          >
-                            <IconTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            renderOrderListTable(orders, startEditStoreOrder, deleteStoreOrder)
           )}
         </div>
       </div>
@@ -4434,55 +4472,7 @@ export default function App() {
               <div className="dg-empty-state-desc">«Yeni sifariş» ilə müştəri sifarişi əlavə edin.</div>
             </div>
           ) : (
-            <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table">
-                <thead>
-                  <tr>
-                    <th className="dg-th-num">№</th>
-                    <th>Tarix</th>
-                    <th>Müştəri</th>
-                    <th>Telefon</th>
-                    <th>Status</th>
-                    <th>Məhsul</th>
-                    <th className="dg-th-actions">Əməliyyatlar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map((o, i) => (
-                    <tr key={o.id}>
-                      <td className="dg-td-num">{i + 1}</td>
-                      <td>{formatDateAzLong(o.orderDate)}</td>
-                      <td>{o.customerName}</td>
-                      <td>{o.customerPhone || "—"}</td>
-                      <td>{orderStatusLabel(o.status)}</td>
-                      <td className="dg-td-amount">{o.rows.length}</td>
-                      <td className="dg-td-actions">
-                        <div className="dg-icon-row">
-                          <button
-                            type="button"
-                            className="dg-icon-btn"
-                            title="Redaktə et"
-                            aria-label="Redaktə et"
-                            onClick={() => startEditCustomerOrder(o)}
-                          >
-                            <IconEdit />
-                          </button>
-                          <button
-                            type="button"
-                            className="dg-icon-btn dg-icon-btn-danger"
-                            title="Sil"
-                            aria-label="Sil"
-                            onClick={() => deleteCustomerOrder(o.id)}
-                          >
-                            <IconTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            renderOrderListTable(orders, startEditCustomerOrder, deleteCustomerOrder)
           )}
         </div>
       </div>

@@ -186,14 +186,15 @@ export type OrderStatus = "draft" | "pending" | "done" | "cancelled";
 export interface OrderLineRow {
   id: string;
   name: string;
-  unit: string;
   qty: number;
+  purchasePrice: number;
+  supplierName: string;
 }
 
-/** Mağaza daxili sifariş — şirkət/təklif/təchizatçı ilə əlaqəli deyil */
+/** Mağaza daxili sifariş — şirkət/təklif/təchizatçı modulları ilə əlaqəli deyil */
 export interface StoreOrderRecord {
   id: string;
-  title: string;
+  customerName: string;
   orderDate: string;
   status: OrderStatus;
   rows: OrderLineRow[];
