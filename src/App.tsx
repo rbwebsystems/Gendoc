@@ -30,7 +30,7 @@ import {
   workspaceToGeneratorState,
   resolveProjectVatPercent,
 } from "./lib/docStorage";
-import { emptyCompany, emptyMeta, newOrderLineRow, newProductRow, OFFICIAL_VAT_PERCENT, ORDER_STATUS_OPTIONS, orderStatusLabel } from "./lib/defaults";
+import { emptyCompany, emptyMeta, newOrderLineRow, newProductRow, OFFICIAL_VAT_PERCENT, ORDER_STATUS_OPTIONS, orderStatusLabel, orderStatusModifier } from "./lib/defaults";
 import { formatDateAzLong, formatMoney } from "./lib/text";
 import type {
   CompanyProfile,
@@ -409,6 +409,30 @@ function IconTrash() {
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
       <path d="M10 11v6M14 11v6" />
     </SvgIcon>
+  );
+}
+
+function OrderStatusBadge(props: { status: OrderStatus }) {
+  return (
+    <span className={`dg-order-status ${orderStatusModifier(props.status)}`}>{orderStatusLabel(props.status)}</span>
+  );
+}
+
+function OrderStatusPicker(props: { status: OrderStatus; onChange: (status: OrderStatus) => void }) {
+  return (
+    <select
+      className={`dg-order-status dg-order-status-select ${orderStatusModifier(props.status)}`}
+      value={props.status}
+      onChange={(e) => props.onChange(e.target.value as OrderStatus)}
+      aria-label="Status dəyiş"
+      title="Statusu dəyişmək üçün seçin"
+    >
+      {ORDER_STATUS_OPTIONS.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -3419,6 +3443,13 @@ export default function App() {
     flash(setToast, "Mağaza sifarişi silindi");
   };
 
+  const patchStoreOrderStatus = (id: string, status: OrderStatus) => {
+    setWorkspace((w) => ({
+      ...w,
+      storeOrders: (w.storeOrders ?? []).map((o) => (o.id === id ? { ...o, status, updatedAt: Date.now() } : o)),
+    }));
+  };
+
   const resetCustomerOrderDraft = () => {
     setCustomerOrderEditId(null);
     setCustomerOrderDraft(emptyCustomerOrderDraft());
@@ -3512,6 +3543,13 @@ export default function App() {
     setWorkspace((w) => ({ ...w, customerOrders: (w.customerOrders ?? []).filter((o) => o.id !== id) }));
     if (customerOrderEditId === id) resetCustomerOrderDraft();
     flash(setToast, "Müştəri sifarişi silindi");
+  };
+
+  const patchCustomerOrderStatus = (id: string, status: OrderStatus) => {
+    setWorkspace((w) => ({
+      ...w,
+      customerOrders: (w.customerOrders ?? []).map((o) => (o.id === id ? { ...o, status, updatedAt: Date.now() } : o)),
+    }));
   };
 
   const patchStoreOrderLine = (id: string, patch: Partial<OrderLineRow>) => {
@@ -3631,6 +3669,7 @@ export default function App() {
       onInfo: (order: T) => void;
       onEdit: (order: T) => void;
       onDelete: (id: string) => void;
+      onStatusChange: (id: string, status: OrderStatus) => void;
     },
   ) => {
     let rowNum = 0;
@@ -3663,7 +3702,12 @@ export default function App() {
                           <td rowSpan={o.rows.length}>{o.orderDate ? formatDateAzLong(o.orderDate) : "—"}</td>
                         ) : null}
                         {opts.showCustomer ? <td rowSpan={o.rows.length}>{o.customerName || "—"}</td> : null}
-                        <td rowSpan={o.rows.length}>{orderStatusLabel(o.status)}</td>
+                        <td rowSpan={o.rows.length} className="dg-order-status-cell">
+                          <OrderStatusPicker
+                            status={o.status}
+                            onChange={(status) => opts.onStatusChange(o.id, status)}
+                          />
+                        </td>
                       </>
                     ) : null}
                     <td>{row.name}</td>
@@ -4423,6 +4467,7 @@ export default function App() {
               onInfo: (o) => setInfoDialog({ kind: "storeOrder", id: o.id }),
               onEdit: startEditStoreOrder,
               onDelete: deleteStoreOrder,
+              onStatusChange: patchStoreOrderStatus,
             })
           )}
         </div>
@@ -4548,6 +4593,7 @@ export default function App() {
               onInfo: (o) => setInfoDialog({ kind: "customerOrder", id: o.id }),
               onEdit: startEditCustomerOrder,
               onDelete: deleteCustomerOrder,
+              onStatusChange: patchCustomerOrderStatus,
             })
           )}
         </div>
@@ -5019,7 +5065,9 @@ export default function App() {
                 </div>
                 <div className="dg-info-row">
                   <dt>Status</dt>
-                  <dd>{orderStatusLabel(infoStoreOrder.status)}</dd>
+                  <dd>
+                    <OrderStatusBadge status={infoStoreOrder.status} />
+                  </dd>
                 </div>
                 {infoStoreOrder.note?.trim() ? (
                   <div className="dg-info-row">
@@ -5051,7 +5099,9 @@ export default function App() {
                 </div>
                 <div className="dg-info-row">
                   <dt>Status</dt>
-                  <dd>{orderStatusLabel(infoCustomerOrder.status)}</dd>
+                  <dd>
+                    <OrderStatusBadge status={infoCustomerOrder.status} />
+                  </dd>
                 </div>
                 {infoCustomerOrder.note?.trim() ? (
                   <div className="dg-info-row">

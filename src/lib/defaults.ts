@@ -57,6 +57,10 @@ export function orderStatusLabel(status: OrderStatus): string {
   return ORDER_STATUS_OPTIONS.find((o) => o.value === status)?.label ?? status;
 }
 
+export function orderStatusModifier(status: OrderStatus): string {
+  return `dg-order-status--${status}`;
+}
+
 export function newOrderLineRow(): OrderLineRow {
   return {
     id: crypto.randomUUID(),
