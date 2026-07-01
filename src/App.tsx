@@ -87,9 +87,12 @@ import {
   deleteOrgMember,
   fetchOrgMemberOnce,
   fetchOrgWorkspaceOnce,
+  isUsernameTaken,
   seedOrgWorkspaceFromUser,
   subscribeOrgMembers,
   subscribeOrgWorkspace,
+  syncUsernameIndex,
+  deleteUsernameIndex,
   writeOrgMember,
   setMemberMustChangePassword,
   writeOrgWorkspace,
@@ -5132,7 +5135,7 @@ export default function App() {
         flash(setToast, "Müvəqqəti şifrə ən azı 6 simvol olmalıdır.", "error");
         return;
       }
-      const authEmail = usernameToAuthEmail(username, firebaseProjectId);
+      const authEmailForCreate = usernameToAuthEmail(username, firebaseProjectId);
       const duplicate = activeUsers.some(
         (u) => u.username.toLowerCase() === username && u.id !== appUserEditId,
       );
@@ -5140,11 +5143,15 @@ export default function App() {
         flash(setToast, "Bu istifadəçi adı artıq mövcuddur.", "error");
         return;
       }
+      if (await isUsernameTaken(username, appUserEditId ?? undefined)) {
+        flash(setToast, "Bu istifadəçi adı artıq mövcuddur.", "error");
+        return;
+      }
       try {
         if (appUserEditId) {
           const existing = activeUsers.find((u) => u.id === appUserEditId);
           if (!existing) return;
-          const authEmail = existing.authEmail ?? usernameToAuthEmail(username, firebaseProjectId);
+          const authEmail = existing.authEmail ?? usernameToAuthEmail(existing.username, firebaseProjectId);
           let mustChangePassword = existing.mustChangePassword;
           if (appUserDraft.password.length >= 6) {
             if (!appUserDraft.currentPassword.trim()) {
@@ -5154,6 +5161,9 @@ export default function App() {
             await resetAppUserPassword(authEmail, appUserDraft.password, appUserDraft.currentPassword);
             mustChangePassword = true;
           }
+          if (username !== existing.username.toLowerCase()) {
+            await syncUsernameIndex(existing.username, username, existing.id, authEmail);
+          }
           const rec: SystemUserRecord = {
             ...existing,
             username,
@@ -5161,12 +5171,13 @@ export default function App() {
             role,
             modules: defaultModulesForRole(role),
             mustChangePassword,
+            authEmail,
             updatedAt: now,
           };
           await writeOrgMember(rec);
           flash(setToast, appUserDraft.password.length >= 6 ? "İstifadəçi və şifrə yeniləndi" : "İstifadəçi yeniləndi");
         } else {
-          const { uid } = await createAppUserAuthAccount(authEmail, appUserDraft.password);
+          const { uid } = await createAppUserAuthAccount(authEmailForCreate, appUserDraft.password);
           const rec: SystemUserRecord = {
             id: uid,
             username,
@@ -5174,10 +5185,11 @@ export default function App() {
             role,
             modules: defaultModulesForRole(role),
             mustChangePassword: true,
-            authEmail,
+            authEmail: authEmailForCreate,
             createdAt: now,
             updatedAt: now,
           };
+          await syncUsernameIndex(undefined, username, uid, authEmailForCreate);
           await writeOrgMember(rec);
           flash(setToast, "İstifadəçi yaradıldı");
         }
@@ -5220,7 +5232,9 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
+    const target = activeUsers.find((u) => u.id === id);
     if (firebaseEnabled) {
+      if (target) await deleteUsernameIndex(target.username);
       await deleteOrgMember(id);
     } else {
       setWorkspace((w) => ({
@@ -5311,9 +5325,13 @@ export default function App() {
                   className="dg-input"
                   value={appUserDraft.username}
                   onChange={(e) => setAppUserDraft((d) => ({ ...d, username: e.target.value }))}
-                  disabled={Boolean(appUserEditId)}
                   placeholder="məs: ali.mammadov"
                 />
+                {appUserEditId ? (
+                  <span className="dg-muted" style={{ fontSize: "0.8rem" }}>
+                    Dəyişəndə işçi yeni ad ilə daxil olacaq
+                  </span>
+                ) : null}
               </label>
               <label className="dg-field">
                 <span className="dg-label">Ad, soyad</span>
@@ -5893,7 +5911,7 @@ export default function App() {
       setAuthError("İstifadəçi adı (və ya email) və şifrə daxil edin.");
       return;
     }
-    const email = resolveLoginEmail(identifier, firebaseProjectId);
+    const email = await resolveLoginEmail(identifier, firebaseProjectId);
     if (!email) {
       setAuthError("İstifadəçi adı və ya email düzgün deyil.");
       return;
@@ -5917,7 +5935,7 @@ export default function App() {
       setAuthError("Şifrə yeniləmə yalnız developer email hesabları üçündür.");
       return;
     }
-    const email = resolveLoginEmail(identifier, firebaseProjectId);
+    const email = await resolveLoginEmail(identifier, firebaseProjectId);
     if (!email) {
       setAuthError("Email daxil edin.");
       return;

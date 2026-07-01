@@ -39,6 +39,71 @@ function orgMembersCol() {
   return collection(db, "orgs", ORG_ID, "members");
 }
 
+export function normalizeUsernameKey(username: string): string {
+  return username
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function orgUsernameRef(normalizedUsername: string) {
+  if (!db) throw new Error("Firestore is not configured");
+  return doc(db, "orgs", ORG_ID, "usernames", normalizedUsername);
+}
+
+export async function fetchAuthEmailByUsername(username: string): Promise<string | null> {
+  if (!db) return null;
+  const key = normalizeUsernameKey(username);
+  if (!key) return null;
+  const snap = await getDoc(orgUsernameRef(key));
+  if (!snap.exists()) return null;
+  const authEmail = (snap.data() as { authEmail?: string }).authEmail;
+  return typeof authEmail === "string" && authEmail.trim() ? authEmail.trim() : null;
+}
+
+export async function isUsernameTaken(username: string, exceptUid?: string): Promise<boolean> {
+  if (!db) return false;
+  const key = normalizeUsernameKey(username);
+  if (!key) return true;
+  const snap = await getDoc(orgUsernameRef(key));
+  if (!snap.exists()) return false;
+  const uid = (snap.data() as { uid?: string }).uid;
+  return uid !== exceptUid;
+}
+
+export async function writeUsernameIndex(username: string, uid: string, authEmail: string): Promise<void> {
+  const key = normalizeUsernameKey(username);
+  if (!key) throw new Error("İstifadəçi adı düzgün deyil.");
+  await setDoc(orgUsernameRef(key), { uid, authEmail, updatedAt: Date.now() });
+}
+
+export async function deleteUsernameIndex(username: string): Promise<void> {
+  if (!db) return;
+  const key = normalizeUsernameKey(username);
+  if (!key) return;
+  try {
+    await deleteDoc(orgUsernameRef(key));
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function syncUsernameIndex(
+  oldUsername: string | undefined,
+  newUsername: string,
+  uid: string,
+  authEmail: string,
+): Promise<void> {
+  const oldKey = oldUsername ? normalizeUsernameKey(oldUsername) : "";
+  const newKey = normalizeUsernameKey(newUsername);
+  if (!newKey) throw new Error("İstifadəçi adı düzgün deyil.");
+  if (oldKey && oldKey !== newKey) {
+    await deleteUsernameIndex(oldUsername!);
+  }
+  await writeUsernameIndex(newUsername, uid, authEmail);
+}
+
 export function normalizeOrgMember(raw: unknown, uid: string): SystemUserRecord | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;

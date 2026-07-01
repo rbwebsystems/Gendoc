@@ -8,6 +8,7 @@ import {
   type Auth,
 } from "firebase/auth";
 import { firebaseApp, firebaseEnabled } from "./firebase";
+import { fetchAuthEmailByUsername } from "./orgSync";
 
 const APP_USER_EMAIL_SUFFIX = ".app.gendoc";
 
@@ -35,10 +36,14 @@ export function isDeveloperAuthEmail(email: string, projectId: string): boolean 
   return Boolean(email.trim()) && !isAppUserAuthEmail(email, projectId);
 }
 
-export function resolveLoginEmail(identifier: string, projectId: string): string {
+export async function resolveLoginEmail(identifier: string, projectId: string): Promise<string> {
   const raw = identifier.trim();
   if (!raw) return "";
   if (raw.includes("@")) return raw.toLowerCase();
+  if (firebaseEnabled) {
+    const mapped = await fetchAuthEmailByUsername(raw);
+    if (mapped) return mapped.toLowerCase();
+  }
   return usernameToAuthEmail(raw, projectId);
 }
 

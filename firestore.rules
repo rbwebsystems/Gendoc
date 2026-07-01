@@ -43,6 +43,11 @@ service cloud.firestore {
       );
     }
 
+    match /orgs/default/usernames/{username} {
+      allow read: if true;
+      allow create, update, delete: if isDeveloper() || isOrgAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }
