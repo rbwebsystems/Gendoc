@@ -78,6 +78,7 @@ import {
   createAppUserAuthAccount,
   isAppUserAuthEmail,
   isDeveloperAuthEmail,
+  resetAppUserPassword,
   resolveLoginEmail,
   validateUsername,
   usernameToAuthEmail,
@@ -496,6 +497,16 @@ function IconTrash() {
       <path d="M8 6V4h8v2" />
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
       <path d="M10 11v6M14 11v6" />
+    </SvgIcon>
+  );
+}
+
+function IconKey() {
+  return (
+    <SvgIcon>
+      <circle cx="8" cy="15" r="4" />
+      <path d="m11 12 9-9" />
+      <path d="M16 5h3v3" />
     </SvgIcon>
   );
 }
@@ -4957,6 +4968,28 @@ export default function App() {
     setAppUserMode("form");
   };
 
+  const resetAppUserPasswordAction = async (u: SystemUserRecord) => {
+    const password = await askPrompt({
+      title: "Şifrəni sıfırla",
+      label: `@${u.username} üçün yeni müvəqqəti şifrə`,
+      confirmLabel: "Sıfırla",
+      cancelLabel: "Ləğv et",
+    });
+    if (password == null) return;
+    const newPassword = password.trim();
+    if (newPassword.length < 6) {
+      flash(setToast, "Şifrə ən azı 6 simvol olmalıdır.", "error");
+      return;
+    }
+    try {
+      await resetAppUserPassword(u.id, newPassword);
+      flash(setToast, "Şifrə sıfırlandı — istifadəçi növbəti girişdə dəyişdirməlidir");
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message || "Şifrə sıfırlanmadı";
+      flash(setToast, msg, "error");
+    }
+  };
+
   const saveAppUser = async () => {
     const usernameErr = validateUsername(appUserDraft.username);
     if (usernameErr) {
@@ -4989,20 +5022,22 @@ export default function App() {
         if (appUserEditId) {
           const existing = activeUsers.find((u) => u.id === appUserEditId);
           if (!existing) return;
+          let mustChangePassword = existing.mustChangePassword;
+          if (appUserDraft.password.length >= 6) {
+            await resetAppUserPassword(appUserEditId, appUserDraft.password);
+            mustChangePassword = true;
+          }
           const rec: SystemUserRecord = {
             ...existing,
             username,
             name,
             role,
             modules: defaultModulesForRole(role),
+            mustChangePassword,
             updatedAt: now,
           };
           await writeOrgMember(rec);
-          if (appUserDraft.password.length >= 6) {
-            flash(setToast, "Şifrəni Firebase konsolundan yeniləmək lazım ola bilər. İstifadəçini silib yenidən yaradın.", "error");
-          } else {
-            flash(setToast, "İstifadəçi yeniləndi");
-          }
+          flash(setToast, appUserDraft.password.length >= 6 ? "İstifadəçi və şifrə yeniləndi" : "İstifadəçi yeniləndi");
         } else {
           const { uid } = await createAppUserAuthAccount(authEmail, appUserDraft.password);
           const rec: SystemUserRecord = {
@@ -5175,18 +5210,16 @@ export default function App() {
                   ))}
                 </select>
               </label>
-              {!appUserEditId ? (
-                <label className="dg-field">
-                  <span className="dg-label">Müvəqqəti şifrə</span>
-                  <input
-                    className="dg-input"
-                    type="password"
-                    value={appUserDraft.password}
-                    onChange={(e) => setAppUserDraft((d) => ({ ...d, password: e.target.value }))}
-                    placeholder="İlk girişdə dəyişdiriləcək"
-                  />
-                </label>
-              ) : null}
+              <label className="dg-field">
+                <span className="dg-label">{appUserEditId ? "Yeni müvəqqəti şifrə (istəyə görə)" : "Müvəqqəti şifrə"}</span>
+                <input
+                  className="dg-input"
+                  type="password"
+                  value={appUserDraft.password}
+                  onChange={(e) => setAppUserDraft((d) => ({ ...d, password: e.target.value }))}
+                  placeholder={appUserEditId ? "Boş buraxsanız, şifrə dəyişməz" : "İlk girişdə dəyişdiriləcək"}
+                />
+              </label>
             </div>
             <footer className="dg-form-footer-actions">
               <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelAppUserForm}>
@@ -5232,6 +5265,17 @@ export default function App() {
                       <td>{u.mustChangePassword ? "Şifrə dəyişməli" : "—"}</td>
                       <td className="dg-td-actions">
                         <div className="dg-icon-row">
+                          {firebaseEnabled ? (
+                            <button
+                              type="button"
+                              className="dg-icon-btn"
+                              title="Şifrəni sıfırla"
+                              aria-label="Şifrəni sıfırla"
+                              onClick={() => void resetAppUserPasswordAction(u)}
+                            >
+                              <IconKey />
+                            </button>
+                          ) : null}
                           <button type="button" className="dg-icon-btn" title="Redaktə" aria-label="Redaktə" onClick={() => startEditAppUser(u)}>
                             <IconEdit />
                           </button>

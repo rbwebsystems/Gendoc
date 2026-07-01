@@ -5,6 +5,7 @@ import {
   signOut,
   type Auth,
 } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp, firebaseEnabled } from "./firebase";
 
 const APP_USER_EMAIL_SUFFIX = ".app.gendoc";
@@ -77,4 +78,17 @@ export async function createAppUserAuthAccount(
   const cred = await createUserWithEmailAndPassword(a, authEmail, password);
   await signOut(a);
   return { uid: cred.user.uid, authEmail };
+}
+
+/** Admin tərəfindən istifadəçi şifrəsinin sıfırlanması (Cloud Function). */
+export async function resetAppUserPassword(memberUid: string, newPassword: string): Promise<void> {
+  if (!firebaseEnabled || !firebaseApp) {
+    throw new Error("Firebase konfiqurasiya edilməyib.");
+  }
+  const functions = getFunctions(firebaseApp);
+  const resetFn = httpsCallable<{ memberUid: string; newPassword: string }, { ok: boolean }>(
+    functions,
+    "resetAppUserPassword",
+  );
+  await resetFn({ memberUid, newPassword });
 }
