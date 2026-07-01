@@ -6,15 +6,9 @@ import {
   setDoc,
   type Unsubscribe,
 } from "firebase/firestore";
-import {
-  deleteObject,
-  getDownloadURL,
-  ref,
-  uploadBytes,
-} from "firebase/storage";
-import { db, storage } from "./firebase";
+import { db } from "./firebase";
 import { normalizeWorkspace } from "./docStorage";
-import type { DocWorkspace, FolderFileRecord } from "../types";
+import type { DocWorkspace } from "../types";
 
 /** Firestore undefined dəyərləri qəbul etmir; NaN/Infinity də səhvdir */
 export function prepareWorkspaceForFirestore(workspace: DocWorkspace): DocWorkspace {
@@ -71,7 +65,7 @@ export function assertFirestorePayloadSize(payload: DocWorkspace): void {
   const bytes = new TextEncoder().encode(JSON.stringify(payload)).length;
   if (bytes + FIRESTORE_SAFE_MARGIN_BYTES > FIRESTORE_DOC_LIMIT_BYTES) {
     throw new Error(
-      `Workspace çox böyükdür (${Math.round(bytes / 1024)} KB). Qovluq fayllarını azaldın və ya Storage istifadə edin.`,
+      `Workspace çox böyükdür (${Math.round(bytes / 1024)} KB). Qovluq fayllarını azaldın və ya kiçik fayllar yükləyin.`,
     );
   }
 }
@@ -136,64 +130,6 @@ export async function writeWorkspace(uid: string, workspace: DocWorkspace): Prom
     },
     { merge: false },
   );
-}
-
-/** Storage helpers */
-
-function storageFolderPath(root: string, folderId: string, fileId: string, name: string): string {
-  const safe = (name || "fayl").replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 80);
-  if (root.startsWith("orgs/")) {
-    return `${root}/folders/${folderId}/${fileId}-${safe}`;
-  }
-  return `users/${root}/folders/${folderId}/${fileId}-${safe}`;
-}
-
-export interface UploadFolderFileResult extends FolderFileRecord {
-  storagePath: string;
-  url: string;
-}
-
-function guessFolderFileMime(file: File): string {
-  const t = (file.type || "").trim();
-  if (t) return t;
-  const lower = file.name.toLowerCase();
-  if (lower.endsWith(".pdf")) return "application/pdf";
-  if (/\.(jpe?g|png|gif|webp|bmp|svg)$/.test(lower)) return "image/jpeg";
-  return "application/octet-stream";
-}
-
-export async function uploadFolderFile(
-  storageRoot: string,
-  folderId: string,
-  file: File,
-): Promise<UploadFolderFileResult> {
-  if (!storage) throw new Error("Firebase Storage is not configured");
-  const id = crypto.randomUUID();
-  const path = storageFolderPath(storageRoot, folderId, id, file.name);
-  const r = ref(storage, path);
-  await uploadBytes(r, file, { contentType: guessFolderFileMime(file) });
-  const url = await getDownloadURL(r);
-  return {
-    id,
-    name: file.name,
-    mime: guessFolderFileMime(file),
-    size: file.size,
-    createdAt: Date.now(),
-    storagePath: path,
-    url,
-  };
-}
-
-export async function deleteStorageFile(storagePath: string): Promise<void> {
-  if (!storage) throw new Error("Firebase Storage is not configured");
-  const r = ref(storage, storagePath);
-  try {
-    await deleteObject(r);
-  } catch (e: unknown) {
-    // Faylın artıq olmaması fatal deyil
-    const code = (e as { code?: string })?.code;
-    if (code !== "storage/object-not-found") throw e;
-  }
 }
 
 export { workspaceDocPath };

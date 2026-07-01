@@ -102,10 +102,8 @@ import {
   type User,
 } from "firebase/auth";
 import {
-  deleteStorageFile,
   fetchWorkspaceOnce,
   subscribeWorkspace,
-  uploadFolderFile,
   writeWorkspace,
   workspaceFingerprint,
 } from "./lib/workspaceSync";
@@ -234,6 +232,7 @@ type AppUserDraft = {
   username: string;
   name: string;
   password: string;
+  currentPassword: string;
   role: AppUserRole;
 };
 
@@ -251,7 +250,7 @@ type LeaveRequestDraft = {
 };
 
 function emptyAppUserDraft(): AppUserDraft {
-  return { username: "", name: "", password: "", role: "employee" };
+  return { username: "", name: "", password: "", currentPassword: "", role: "employee" };
 }
 
 function emptyLeaveRequestDraft(employeeId = ""): LeaveRequestDraft {
@@ -1675,12 +1674,6 @@ export default function App() {
     return m;
   }, [activeUsers]);
 
-  const storageRoot = useMemo(() => {
-    if (firebaseEnabled && authState.status === "signedIn") return "orgs/default";
-    if (authState.status === "signedIn") return authState.user.uid;
-    return "local";
-  }, [authState]);
-
   const filteredMainNavIds = useMemo(() => {
     const q = navSearch.trim().toLowerCase();
     return SIDEBAR_MAIN_IDS.filter((id) => {
@@ -2927,32 +2920,17 @@ export default function App() {
 
     try {
       let added: FolderFileRecord[] = [];
-      if (useRemote && authState.status === "signedIn") {
-        const results: FolderFileRecord[] = [];
-        let storageFallbackUsed = false;
+      if (useRemote) {
         for (const f of files) {
-          try {
-            results.push(await uploadFolderFile(storageRoot, folderId, f));
-          } catch {
-            if (f.size > firestoreInlineMaxBytes) {
-              flash(
-                setToast,
-                `${f.name} çox böyükdür (${(f.size / (1024 * 1024)).toFixed(1)} MB) — Firebase Storage lazımdır.`,
-                "error",
-              );
-              continue;
-            }
-            storageFallbackUsed = true;
-            results.push(await readFileAsDataUrlRecord(f));
+          if (f.size > firestoreInlineMaxBytes) {
+            flash(
+              setToast,
+              `${f.name} çox böyükdür (${(f.size / (1024 * 1024)).toFixed(1)} MB). Hər fayl ən çoxu ~230 KB ola bilər.`,
+              "error",
+            );
+            continue;
           }
-        }
-        added = results;
-        if (storageFallbackUsed) {
-          flash(
-            setToast,
-            "Storage işləmir — kiçik fayllar bu cihazda saxlanır, böyük fayllar üçün Storage yoxlayın.",
-            "error",
-          );
+          added.push(await readFileAsDataUrlRecord(f));
         }
       } else {
         added = await Promise.all(files.map(readFileAsDataUrlRecord));
@@ -3011,16 +2989,6 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
-    // Əvvəlcə Storage-dən sil (varsa)
-    const folder = (workspace.folders ?? []).find((x) => x.id === folderId);
-    const file = folder?.files?.find((x) => x.id === fileId);
-    if (file?.storagePath && firebaseEnabled && authState.status === "signedIn") {
-      try {
-        await deleteStorageFile(file.storagePath);
-      } catch {
-        /* metadatanı yenə də siləcəyik */
-      }
-    }
     setWorkspace((w) => ({
       ...w,
       folders: (w.folders ?? []).map((fold) =>
@@ -3030,20 +2998,9 @@ export default function App() {
     flash(setToast, "Fayl silindi");
   };
 
-  // Qovluq silərkən bütün remote faylları da Storage-dən təmizləyir
-  const purgeFoldersStorage = async (folders: WorkspaceFolderRecord[]) => {
-    if (!(firebaseEnabled && authState.status === "signedIn")) return;
-    for (const fold of folders) {
-      for (const f of fold.files ?? []) {
-        if (f.storagePath) {
-          try {
-            await deleteStorageFile(f.storagePath);
-          } catch {
-            /* davam et */
-          }
-        }
-      }
-    }
+  // Qovluq silərkən fayllar workspace-dən silinir (Firestore sinxronu)
+  const purgeFoldersStorage = async (_folders: WorkspaceFolderRecord[]) => {
+    /* Storage istifadə olunmur */
   };
 
   const deleteCompanyFolder = async (cid: string) => {
@@ -4963,26 +4920,37 @@ export default function App() {
       username: u.username,
       name: u.name,
       password: "",
+      currentPassword: "",
       role: u.role,
     });
     setAppUserMode("form");
   };
 
   const resetAppUserPasswordAction = async (u: SystemUserRecord) => {
-    const password = await askPrompt({
+    const newPassword = await askPrompt({
       title: "Şifrəni sıfırla",
       label: `@${u.username} üçün yeni müvəqqəti şifrə`,
-      confirmLabel: "Sıfırla",
+      confirmLabel: "Davam et",
       cancelLabel: "Ləğv et",
     });
-    if (password == null) return;
-    const newPassword = password.trim();
-    if (newPassword.length < 6) {
+    if (newPassword == null) return;
+    const nextPassword = newPassword.trim();
+    if (nextPassword.length < 6) {
       flash(setToast, "Şifrə ən azı 6 simvol olmalıdır.", "error");
       return;
     }
+    const currentPassword = await askPrompt({
+      title: "Cari şifrə",
+      label: "İstifadəçinin hazırkı şifrəsi (admin təyin etdiyi müvəqqəti)",
+      confirmLabel: "Sıfırla",
+      cancelLabel: "Ləğv et",
+    });
+    if (currentPassword == null) return;
+    const authEmail = u.authEmail ?? usernameToAuthEmail(u.username, firebaseProjectId);
     try {
-      await resetAppUserPassword(u.id, newPassword);
+      await resetAppUserPassword(authEmail, nextPassword, currentPassword.trim());
+      const rec: SystemUserRecord = { ...u, mustChangePassword: true, updatedAt: Date.now() };
+      await writeOrgMember(rec);
       flash(setToast, "Şifrə sıfırlandı — istifadəçi növbəti girişdə dəyişdirməlidir");
     } catch (e: unknown) {
       const msg = (e as { message?: string })?.message || "Şifrə sıfırlanmadı";
@@ -5022,9 +4990,14 @@ export default function App() {
         if (appUserEditId) {
           const existing = activeUsers.find((u) => u.id === appUserEditId);
           if (!existing) return;
+          const authEmail = existing.authEmail ?? usernameToAuthEmail(username, firebaseProjectId);
           let mustChangePassword = existing.mustChangePassword;
           if (appUserDraft.password.length >= 6) {
-            await resetAppUserPassword(appUserEditId, appUserDraft.password);
+            if (!appUserDraft.currentPassword.trim()) {
+              flash(setToast, "Yeni şifrə üçün cari şifrə daxil edin.", "error");
+              return;
+            }
+            await resetAppUserPassword(authEmail, appUserDraft.password, appUserDraft.currentPassword);
             mustChangePassword = true;
           }
           const rec: SystemUserRecord = {
@@ -5220,6 +5193,18 @@ export default function App() {
                   placeholder={appUserEditId ? "Boş buraxsanız, şifrə dəyişməz" : "İlk girişdə dəyişdiriləcək"}
                 />
               </label>
+              {appUserEditId ? (
+                <label className="dg-field">
+                  <span className="dg-label">Cari şifrə (yeni şifrə üçün)</span>
+                  <input
+                    className="dg-input"
+                    type="password"
+                    value={appUserDraft.currentPassword}
+                    onChange={(e) => setAppUserDraft((d) => ({ ...d, currentPassword: e.target.value }))}
+                    placeholder="İstifadəçinin hazırkı şifrəsi"
+                  />
+                </label>
+              ) : null}
             </div>
             <footer className="dg-form-footer-actions">
               <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelAppUserForm}>
@@ -5265,17 +5250,15 @@ export default function App() {
                       <td>{u.mustChangePassword ? "Şifrə dəyişməli" : "—"}</td>
                       <td className="dg-td-actions">
                         <div className="dg-icon-row">
-                          {firebaseEnabled ? (
-                            <button
-                              type="button"
-                              className="dg-icon-btn"
-                              title="Şifrəni sıfırla"
-                              aria-label="Şifrəni sıfırla"
-                              onClick={() => void resetAppUserPasswordAction(u)}
-                            >
-                              <IconKey />
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            className="dg-icon-btn"
+                            title="Şifrəni sıfırla"
+                            aria-label="Şifrəni sıfırla"
+                            onClick={() => void resetAppUserPasswordAction(u)}
+                          >
+                            <IconKey />
+                          </button>
                           <button type="button" className="dg-icon-btn" title="Redaktə" aria-label="Redaktə" onClick={() => startEditAppUser(u)}>
                             <IconEdit />
                           </button>

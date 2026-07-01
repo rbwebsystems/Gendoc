@@ -2,10 +2,11 @@ import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
   getAuth,
+  signInWithEmailAndPassword,
   signOut,
+  updatePassword,
   type Auth,
 } from "firebase/auth";
-import { getFunctions, httpsCallable } from "firebase/functions";
 import { firebaseApp, firebaseEnabled } from "./firebase";
 
 const APP_USER_EMAIL_SUFFIX = ".app.gendoc";
@@ -80,15 +81,32 @@ export async function createAppUserAuthAccount(
   return { uid: cred.user.uid, authEmail };
 }
 
-/** Admin tərəfindən istifadəçi şifrəsinin sıfırlanması (Cloud Function). */
-export async function resetAppUserPassword(memberUid: string, newPassword: string): Promise<void> {
-  if (!firebaseEnabled || !firebaseApp) {
-    throw new Error("Firebase konfiqurasiya edilməyib.");
+/**
+ * Admin tərəfindən şifrə dəyişmə (Spark / ödənişsiz).
+ * Cari şifrə lazımdır — admin təyin etdiyi müvəqqəti və ya istifadəçinin bildirdiyi şifrə.
+ */
+export async function resetAppUserPassword(
+  authEmail: string,
+  newPassword: string,
+  currentPassword: string,
+): Promise<void> {
+  if (newPassword.length < 6) {
+    throw new Error("Yeni şifrə ən azı 6 simvol olmalıdır.");
   }
-  const functions = getFunctions(firebaseApp);
-  const resetFn = httpsCallable<{ memberUid: string; newPassword: string }, { ok: boolean }>(
-    functions,
-    "resetAppUserPassword",
-  );
-  await resetFn({ memberUid, newPassword });
+  const current = currentPassword.trim();
+  if (!current) {
+    throw new Error("Cari şifrə daxil edin.");
+  }
+
+  const a = getSecondaryAuth();
+  try {
+    const cred = await signInWithEmailAndPassword(a, authEmail, current);
+    await updatePassword(cred.user, newPassword);
+  } finally {
+    try {
+      await signOut(a);
+    } catch {
+      /* ignore */
+    }
+  }
 }
