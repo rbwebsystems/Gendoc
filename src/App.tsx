@@ -5387,6 +5387,9 @@ export default function App() {
 
   const openNewLeaveForm = () => {
     resetLeaveDraft();
+    if (currentMember?.role === "employee") {
+      setLeaveDraft((d) => ({ ...d, employeeId: currentMember.id }));
+    }
     setLeaveMode("form");
   };
 
@@ -5412,8 +5415,13 @@ export default function App() {
   };
 
   const saveLeaveRequest = () => {
-    const employeeId = leaveDraft.employeeId.trim();
-    const employee = systemUsersById.get(employeeId);
+    const employeeId =
+      currentMember?.role === "employee" && !leaveEditId
+        ? currentMember.id
+        : leaveDraft.employeeId.trim();
+    const employee =
+      systemUsersById.get(employeeId) ??
+      (currentMember?.id === employeeId ? currentMember : undefined);
     const employeeName = employee?.name.trim() || "";
     const reason = leaveDraft.reason.trim();
     if (!employeeId || !employeeName) {
@@ -5534,6 +5542,14 @@ export default function App() {
 
     if (leaveMode === "form") {
       const employeeOptions = employees.length > 0 ? employees : activeUsers;
+      const isEmployeeSelf = currentMember?.role === "employee";
+      const leaveEmployeeName = isEmployeeSelf
+        ? currentMember.name
+        : systemUsersById.get(leaveDraft.employeeId)?.name ??
+          (leaveEditId
+            ? (workspace.leaveRequests ?? []).find((r) => r.id === leaveEditId)?.employeeName
+            : undefined) ??
+          "";
       return (
         <div className="dg-form-page pg-panel" aria-label={leaveEditId ? "Sorğu redaktəsi" : "Yeni sorğu"}>
           <header className="dg-form-page-head">
@@ -5548,19 +5564,23 @@ export default function App() {
             <div className="dg-form-meta-grid">
               <label className="dg-field">
                 <span className="dg-label">İşçi</span>
-                <select
-                  className="dg-input"
-                  value={leaveDraft.employeeId}
-                  onChange={(e) => setLeaveDraft((d) => ({ ...d, employeeId: e.target.value }))}
-                  disabled={Boolean(leaveEditId) || (currentMember?.role === "employee" && !leaveEditId)}
-                >
-                  <option value="">— seçin —</option>
-                  {employeeOptions.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
+                {isEmployeeSelf ? (
+                  <input className="dg-input" value={leaveEmployeeName} readOnly disabled />
+                ) : (
+                  <select
+                    className="dg-input"
+                    value={leaveDraft.employeeId}
+                    onChange={(e) => setLeaveDraft((d) => ({ ...d, employeeId: e.target.value }))}
+                    disabled={Boolean(leaveEditId)}
+                  >
+                    <option value="">— seçin —</option>
+                    {employeeOptions.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </label>
               <label className="dg-field">
                 <span className="dg-label">İcazə növü</span>
