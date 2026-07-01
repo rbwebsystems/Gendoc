@@ -415,6 +415,35 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   settings: "",
 };
 
+function preferredModuleForSession(
+  member: SystemUserRecord | null,
+  access: Set<PermissionModuleId> | null,
+): SidebarModule {
+  if (member?.role === "employee") {
+    if (!access || access.has("workLeave")) return "workLeave";
+  }
+  if (!access) return "companies";
+  for (const id of SIDEBAR_MAIN_IDS) {
+    if (access.has(id as PermissionModuleId)) return id;
+  }
+  if (access.has("workLeave")) return "workLeave";
+  return "companies";
+}
+
+function isModuleAccessible(
+  mod: SidebarModule,
+  access: Set<PermissionModuleId> | null,
+  opts: { canManageUsers: boolean; canManageSystemUsers: boolean; canReviewLeave: boolean },
+): boolean {
+  if (!access) return true;
+  if (mod === "settings") return false;
+  if (mod === "appUsers") return opts.canManageUsers;
+  if (mod === "systemPermissions") return opts.canManageSystemUsers;
+  if (mod === "workLeave") return opts.canReviewLeave || access.has("workLeave");
+  if (SIDEBAR_MAIN_IDS.includes(mod)) return access.has(mod as PermissionModuleId);
+  return false;
+}
+
 type ToastKind = "success" | "error";
 
 function flash(
@@ -1114,6 +1143,7 @@ export default function App() {
   const remoteReadyRef = useRef<boolean>(false);
   /** remoteReadyRef dəyişəndə debounced yazını yenidən işə salmaq üçün */
   const [remoteSyncEpoch, setRemoteSyncEpoch] = useState(0);
+  const sessionModuleAppliedRef = useRef(false);
   const [module, setModule] = useState<SidebarModule>("companies");
   const [toast, setToast] = useState<{ kind: ToastKind; msg: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1698,6 +1728,40 @@ export default function App() {
       return !q || label.toLowerCase().includes(q);
     });
   }, [navSearch, canManageSystemUsers, canManageUsers, canReviewLeave, moduleAccessSet]);
+
+  useEffect(() => {
+    if (authState.status !== "signedIn") {
+      sessionModuleAppliedRef.current = false;
+      return;
+    }
+    if (sessionKind === "developer" || sessionKind === "local") return;
+    if (!currentMember) return;
+
+    const navOpts = {
+      canManageUsers,
+      canManageSystemUsers,
+      canReviewLeave,
+    };
+
+    if (!sessionModuleAppliedRef.current) {
+      sessionModuleAppliedRef.current = true;
+      setModule(preferredModuleForSession(currentMember, moduleAccessSet));
+      return;
+    }
+
+    if (moduleAccessSet && !isModuleAccessible(module, moduleAccessSet, navOpts)) {
+      setModule(preferredModuleForSession(currentMember, moduleAccessSet));
+    }
+  }, [
+    authState.status,
+    sessionKind,
+    currentMember,
+    moduleAccessSet,
+    module,
+    canManageUsers,
+    canManageSystemUsers,
+    canReviewLeave,
+  ]);
 
   const workspaceHeader = useMemo(() => {
     if (module === "settings") return { title: "Ayarlar", sub: MODULE_TAGLINE.settings };
