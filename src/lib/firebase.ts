@@ -61,6 +61,8 @@ if (firebaseEnabled) {
   _storage = getStorage(_app);
 }
 
+export const firebaseProjectId: string = firebaseConfig.projectId ?? "gendoc";
+
 export const firebaseApp = _app;
 export const auth = _auth;
 export const db = _db;

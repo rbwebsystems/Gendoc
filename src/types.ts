@@ -231,12 +231,21 @@ export type PermissionModuleId =
   | "workLeave";
 
 /** Sistem istifadəçisi və modul icazələri */
+export type SessionKind = "developer" | "member" | "local";
+
 export interface SystemUserRecord {
   id: string;
+  /** Giriş istifadəçi adı */
+  username: string;
   name: string;
+  /** @deprecated köhnə — app user üçün authEmail istifadə olunur */
   email?: string;
+  /** Firebase Auth email (saxta domen) */
+  authEmail?: string;
   role: AppUserRole;
   modules: PermissionModuleId[];
+  mustChangePassword?: boolean;
+  disabled?: boolean;
   createdAt: number;
   updatedAt: number;
 }

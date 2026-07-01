@@ -140,17 +140,27 @@ function normalizeSystemUsers(raw: unknown): SystemUserRecord[] {
       const role = normalizeAppUserRole((u as { role?: unknown }).role);
       const email =
         typeof (u as { email?: unknown }).email === "string" ? String((u as { email: string }).email).trim() : "";
+      const usernameRaw =
+        typeof (u as { username?: unknown }).username === "string" ? String((u as { username: string }).username).trim() : "";
+      const name = typeof (u as { name?: unknown }).name === "string" ? String((u as { name: string }).name).trim() : "";
+      const username = usernameRaw || email.split("@")[0] || name.toLowerCase().replace(/\s+/g, "");
+      const authEmail =
+        typeof (u as { authEmail?: unknown }).authEmail === "string" ? String((u as { authEmail: string }).authEmail).trim() : "";
       return {
         id: String((u as { id: string }).id),
-        name: typeof (u as { name?: unknown }).name === "string" ? String((u as { name: string }).name).trim() : "",
+        username,
+        name: name || username,
         role,
         modules: normalizePermissionModules((u as { modules?: unknown }).modules, role),
+        mustChangePassword: Boolean((u as { mustChangePassword?: unknown }).mustChangePassword),
+        disabled: Boolean((u as { disabled?: unknown }).disabled),
         createdAt: typeof (u as { createdAt?: unknown }).createdAt === "number" ? Number((u as { createdAt: number }).createdAt) : Date.now(),
         updatedAt: typeof (u as { updatedAt?: unknown }).updatedAt === "number" ? Number((u as { updatedAt: number }).updatedAt) : Date.now(),
         ...(email ? { email } : {}),
+        ...(authEmail ? { authEmail } : {}),
       };
     })
-    .filter((u) => u.name.length > 0);
+    .filter((u) => u.username.length > 0 && u.name.length > 0);
 }
 
 function normalizeLeaveStatus(raw: unknown): LeaveRequestStatus {

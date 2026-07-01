@@ -73,13 +73,31 @@ import type {
   WorkspaceFolderRecord,
 } from "./types";
 import html2pdf from "html2pdf.js";
-import { auth, firebaseConfigError, firebaseEnabled } from "./lib/firebase";
+import { auth, firebaseConfigError, firebaseEnabled, firebaseProjectId } from "./lib/firebase";
 import {
-  createUserWithEmailAndPassword,
+  createAppUserAuthAccount,
+  isAppUserAuthEmail,
+  isDeveloperAuthEmail,
+  resolveLoginEmail,
+  validateUsername,
+  usernameToAuthEmail,
+} from "./lib/orgAuth";
+import {
+  deleteOrgMember,
+  fetchOrgMemberOnce,
+  fetchOrgWorkspaceOnce,
+  seedOrgWorkspaceFromUser,
+  subscribeOrgMembers,
+  subscribeOrgWorkspace,
+  writeOrgMember,
+  writeOrgWorkspace,
+} from "./lib/orgSync";
+import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
+  updatePassword,
   type User,
 } from "firebase/auth";
 import {
@@ -198,6 +216,7 @@ type SidebarModule =
   | "suppliers"
   | "storeOrders"
   | "customerOrders"
+  | "appUsers"
   | "systemPermissions"
   | "workLeave"
   | "settings";
@@ -208,11 +227,17 @@ type OfferFormMode = "list" | "form";
 type OrderFormMode = "list" | "form";
 type SystemUserFormMode = "list" | "form";
 type LeaveFormMode = "list" | "form";
+type AppUserFormMode = "list" | "form";
 
-type SystemUserDraft = {
+type AppUserDraft = {
+  username: string;
   name: string;
-  email: string;
+  password: string;
   role: AppUserRole;
+};
+
+type PermissionEditDraft = {
+  memberId: string;
   modules: PermissionModuleId[];
 };
 
@@ -224,13 +249,8 @@ type LeaveRequestDraft = {
   reason: string;
 };
 
-function emptySystemUserDraft(): SystemUserDraft {
-  return {
-    name: "",
-    email: "",
-    role: "employee",
-    modules: defaultModulesForRole("employee"),
-  };
+function emptyAppUserDraft(): AppUserDraft {
+  return { username: "", name: "", password: "", role: "employee" };
 }
 
 function emptyLeaveRequestDraft(employeeId = ""): LeaveRequestDraft {
@@ -362,12 +382,13 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "suppliers", label: "Təchizatçı təklifləri" },
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
+  { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
   { id: "settings", label: "Ayarlar" },
 ];
 
-const SIDEBAR_SYSTEM_IDS: SidebarModule[] = ["systemPermissions", "workLeave", "settings"];
+const SIDEBAR_SYSTEM_IDS: SidebarModule[] = ["appUsers", "systemPermissions", "workLeave", "settings"];
 
 const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "companies",
@@ -387,7 +408,8 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   suppliers: "Təchizatçı qiymət təklifləri",
   storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
-  systemPermissions: "İstifadəçilər üçün modul və rol icazələri",
+  appUsers: "Giriş hesablarının idarə edilməsi",
+  systemPermissions: "Modul giriş icazələri",
   workLeave: "İşçi sorğuları və direktor təsdiqi",
   settings: "",
 };
@@ -615,6 +637,17 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
           <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
         </svg>
       );
+    case "appUsers":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM19 8v6M22 11h-6"
+          />
+        </svg>
+      );
     case "workLeave":
       return (
         <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
@@ -735,8 +768,6 @@ type AuthState =
   | { status: "signedOut" }
   | { status: "signedIn"; user: User }
   | { status: "disabled" };
-
-type LoginFormMode = "signin" | "signup";
 
 function calcSaleFromMargin(purchase: number, marginPercent: number): number {
   if (!Number.isFinite(purchase) || purchase <= 0) return 0;
@@ -1047,9 +1078,16 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>(initialAuth);
   const [authError, setAuthError] = useState<string>("");
   const [authBusy, setAuthBusy] = useState<boolean>(false);
-  const [loginMode, setLoginMode] = useState<LoginFormMode>("signin");
-  const [loginEmail, setLoginEmail] = useState<string>("");
+  const [loginIdentifier, setLoginIdentifier] = useState<string>("");
   const [loginPassword, setLoginPassword] = useState<string>("");
+
+  const [sessionKind, setSessionKind] = useState<"developer" | "member" | "local">("local");
+  const [currentMember, setCurrentMember] = useState<SystemUserRecord | null>(null);
+  const [orgMembers, setOrgMembers] = useState<SystemUserRecord[]>([]);
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
+  const [newPasswordDraft, setNewPasswordDraft] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const forcePasswordDialogRef = useRef<HTMLDialogElement>(null);
 
   const [workspace, setWorkspace] = useState<DocWorkspace>(() => normalizeWorkspace(loadWorkspaceLocal()));
   const workspaceRef = useRef(workspace);
@@ -1094,9 +1132,12 @@ export default function App() {
   const [customerOrderDraft, setCustomerOrderDraft] = useState<CustomerOrderDraft>(() => emptyCustomerOrderDraft());
   const [customerOrderMode, setCustomerOrderMode] = useState<OrderFormMode>("list");
 
-  const [systemUserEditId, setSystemUserEditId] = useState<string | null>(null);
-  const [systemUserDraft, setSystemUserDraft] = useState<SystemUserDraft>(() => emptySystemUserDraft());
-  const [systemUserMode, setSystemUserMode] = useState<SystemUserFormMode>("list");
+  const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
+  const [permissionMode, setPermissionMode] = useState<SystemUserFormMode>("list");
+
+  const [appUserEditId, setAppUserEditId] = useState<string | null>(null);
+  const [appUserDraft, setAppUserDraft] = useState<AppUserDraft>(() => emptyAppUserDraft());
+  const [appUserMode, setAppUserMode] = useState<AppUserFormMode>("list");
 
   const [leaveEditId, setLeaveEditId] = useState<string | null>(null);
   const [leaveDraft, setLeaveDraft] = useState<LeaveRequestDraft>(() => emptyLeaveRequestDraft());
@@ -1149,14 +1190,49 @@ export default function App() {
   useEffect(() => {
     if (!firebaseEnabled || !auth) {
       setAuthState({ status: "disabled" });
+      setSessionKind("local");
+      setCurrentMember(null);
       return;
     }
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
+        const email = user.email ?? "";
+        if (isDeveloperAuthEmail(email, firebaseProjectId)) {
+          setSessionKind("developer");
+          setCurrentMember(null);
+          setForcePasswordChange(false);
+          try {
+            await seedOrgWorkspaceFromUser(user.uid);
+          } catch {
+            /* ignore */
+          }
+        } else if (isAppUserAuthEmail(email, firebaseProjectId)) {
+          try {
+            const member = await fetchOrgMemberOnce(user.uid);
+            if (!member || member.disabled) {
+              if (auth) await signOut(auth);
+              setAuthState({ status: "signedOut" });
+              setAuthError("Hesab deaktiv edilib və ya tapılmadı.");
+              return;
+            }
+            setSessionKind("member");
+            setCurrentMember(member);
+            setForcePasswordChange(Boolean(member.mustChangePassword));
+          } catch {
+            setSessionKind("member");
+            setCurrentMember(null);
+          }
+        } else {
+          setSessionKind("developer");
+          setCurrentMember(null);
+        }
         setAuthState({ status: "signedIn", user });
       } else {
         setAuthState({ status: "signedOut" });
-        // İstifadəçi çıxış edibsə remote sinxron izlərini sıfırla
+        setSessionKind("local");
+        setCurrentMember(null);
+        setOrgMembers([]);
+        setForcePasswordChange(false);
         remoteReadyRef.current = false;
         lastSyncedJsonRef.current = "";
         pendingLocalWriteRef.current = false;
@@ -1172,6 +1248,18 @@ export default function App() {
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!firebaseEnabled || authState.status !== "signedIn") return;
+    return subscribeOrgMembers((members) => setOrgMembers(members.filter((m) => !m.disabled)));
+  }, [authState.status]);
+
+  useEffect(() => {
+    const el = forcePasswordDialogRef.current;
+    if (!el) return;
+    if (forcePasswordChange) el.showModal();
+    else if (el.open) el.close();
+  }, [forcePasswordChange]);
 
   const flushRemoteWrite = useCallback(
     async (opts?: { retryMs?: number }) => {
@@ -1189,7 +1277,11 @@ export default function App() {
       remoteWriteInFlightRef.current = true;
 
       try {
-        await writeWorkspace(uid, payload);
+        if (firebaseEnabled) {
+          await writeOrgWorkspace(payload);
+        } else {
+          await writeWorkspace(uid, payload);
+        }
         lastSyncedJsonRef.current = json;
         pendingLocalWriteRef.current = false;
         if (remoteWriteRetryTimerRef.current != null) {
@@ -1224,10 +1316,9 @@ export default function App() {
     const uid = authState.user.uid;
     let cancelled = false;
 
-    // İlk dəfə: lokal + remote-u müqayisə et, daha dolu olanı saxla
     (async () => {
       try {
-        const remote = await fetchWorkspaceOnce(uid);
+        const remote = firebaseEnabled ? await fetchOrgWorkspaceOnce() : await fetchWorkspaceOnce(uid);
         if (cancelled) return;
 
         const localMain = hasLocalWorkspace() ? loadWorkspaceLocal() : null;
@@ -1242,7 +1333,8 @@ export default function App() {
           workspaceFingerprint(merged) !== workspaceFingerprint(remoteNorm);
 
         if (needsUpload) {
-          await writeWorkspace(uid, merged);
+          if (firebaseEnabled) await writeOrgWorkspace(merged);
+          else await writeWorkspace(uid, merged);
         }
 
         backupLocalWorkspace();
@@ -1261,20 +1353,24 @@ export default function App() {
       }
     })();
 
-    const unsub = subscribeWorkspace(uid, ({ exists, workspace: remoteWs }) => {
+    const onRemoteWorkspace = ({
+      exists,
+      workspace: remoteWs,
+    }: {
+      exists: boolean;
+      workspace: DocWorkspace | null;
+      remoteUpdatedAt?: number | null;
+    }) => {
       if (!exists || !remoteWs) {
-        // Hələ doc yaranmayıb — fetchWorkspaceOnce yuxarıda işini görür
         return;
       }
       const normalized = normalizeWorkspace(remoteWs);
       const json = workspaceFingerprint(normalized);
-      // Echo qoruması: snapshot bizim öz yazımızdırsa, state-ə dəymə
       if (json === lastSyncedJsonRef.current) {
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
         return;
       }
-      // Yerli silmə/yeniləmə hələ yazılmayıbsa köhnə remote state-i geri qaytarmayın
       if (pendingLocalWriteRef.current) {
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
@@ -1284,7 +1380,11 @@ export default function App() {
       remoteReadyRef.current = true;
       setRemoteSyncEpoch((e) => e + 1);
       setWorkspace(normalized);
-    });
+    };
+
+    const unsub = firebaseEnabled
+      ? subscribeOrgWorkspace(onRemoteWorkspace)
+      : subscribeWorkspace(uid, onRemoteWorkspace);
 
     return () => {
       cancelled = true;
@@ -1530,41 +1630,45 @@ export default function App() {
     return m;
   }, [workspace.companies]);
 
-  const signedInEmail = authState.status === "signedIn" ? authState.user.email?.toLowerCase() ?? "" : "";
+  const isDeveloper = sessionKind === "developer";
 
-  const currentSystemUser = useMemo(() => {
-    if (!signedInEmail) return undefined;
-    return (workspace.systemUsers ?? []).find((u) => u.email?.toLowerCase() === signedInEmail);
-  }, [workspace.systemUsers, signedInEmail]);
+  const activeUsers = useMemo(() => {
+    if (firebaseEnabled && authState.status === "signedIn") {
+      return orgMembers;
+    }
+    return workspace.systemUsers ?? [];
+  }, [firebaseEnabled, authState.status, orgMembers, workspace.systemUsers]);
 
   const moduleAccessSet = useMemo(() => {
-    const users = workspace.systemUsers ?? [];
-    if (users.length === 0 || !currentSystemUser) return null;
-    if (currentSystemUser.role === "admin" || currentSystemUser.role === "director") return null;
-    return new Set(currentSystemUser.modules);
-  }, [workspace.systemUsers, currentSystemUser]);
+    if (isDeveloper || sessionKind === "local") return null;
+    if (!currentMember) return new Set<PermissionModuleId>();
+    if (currentMember.role === "admin" || currentMember.role === "director") return null;
+    return new Set(currentMember.modules);
+  }, [isDeveloper, sessionKind, currentMember]);
+
+  const canManageUsers = useMemo(() => {
+    if (isDeveloper || sessionKind === "local") return true;
+    return currentMember?.role === "admin" || currentMember?.role === "director";
+  }, [isDeveloper, sessionKind, currentMember]);
 
   const canReviewLeave = useMemo(() => {
-    const users = workspace.systemUsers ?? [];
-    if (users.length === 0) return true;
-    if (!currentSystemUser) {
-      return users.every((u) => u.role !== "director" && u.role !== "admin");
-    }
-    return currentSystemUser.role === "director" || currentSystemUser.role === "admin";
-  }, [workspace.systemUsers, currentSystemUser]);
+    if (isDeveloper || sessionKind === "local") return true;
+    return currentMember?.role === "director" || currentMember?.role === "admin";
+  }, [isDeveloper, sessionKind, currentMember]);
 
-  const canManageSystemUsers = useMemo(() => {
-    const users = workspace.systemUsers ?? [];
-    if (users.length === 0) return true;
-    if (!currentSystemUser) return false;
-    return currentSystemUser.role === "admin" || currentSystemUser.role === "director";
-  }, [workspace.systemUsers, currentSystemUser]);
+  const canManageSystemUsers = canManageUsers;
 
   const systemUsersById = useMemo(() => {
     const m = new Map<string, SystemUserRecord>();
-    for (const u of workspace.systemUsers ?? []) m.set(u.id, u);
+    for (const u of activeUsers) m.set(u.id, u);
     return m;
-  }, [workspace.systemUsers]);
+  }, [activeUsers]);
+
+  const storageRoot = useMemo(() => {
+    if (firebaseEnabled && authState.status === "signedIn") return "orgs/default";
+    if (authState.status === "signedIn") return authState.user.uid;
+    return "local";
+  }, [authState]);
 
   const filteredMainNavIds = useMemo(() => {
     const q = navSearch.trim().toLowerCase();
@@ -1578,7 +1682,9 @@ export default function App() {
   const filteredSystemNavIds = useMemo(() => {
     const q = navSearch.trim().toLowerCase();
     return SIDEBAR_SYSTEM_IDS.filter((id) => {
+      if (id === "settings" && moduleAccessSet) return false;
       if (id === "systemPermissions" && !canManageSystemUsers) return false;
+      if (id === "appUsers" && !canManageUsers) return false;
       if (id === "workLeave") {
         const allowed = canReviewLeave || !moduleAccessSet || moduleAccessSet.has("workLeave");
         if (!allowed) return false;
@@ -1586,7 +1692,7 @@ export default function App() {
       const label = SIDEBAR_MODULES.find((m) => m.id === id)?.label ?? "";
       return !q || label.toLowerCase().includes(q);
     });
-  }, [navSearch, canManageSystemUsers, canReviewLeave, moduleAccessSet]);
+  }, [navSearch, canManageSystemUsers, canManageUsers, canReviewLeave, moduleAccessSet]);
 
   const workspaceHeader = useMemo(() => {
     if (module === "settings") return { title: "Ayarlar", sub: MODULE_TAGLINE.settings };
@@ -1631,11 +1737,18 @@ export default function App() {
         sub: customerOrderEditId ? "Mövcud sifarişi yeniləyin" : "Yeni müştəri sifarişi əlavə edin",
       };
     }
-    if (module === "systemPermissions") {
-      if (systemUserMode === "list") return { title: "Sistem icazələri", sub: MODULE_TAGLINE.systemPermissions };
+    if (module === "appUsers") {
+      if (appUserMode === "list") return { title: "İstifadəçilər", sub: MODULE_TAGLINE.appUsers };
       return {
-        title: systemUserEditId ? "İstifadəçi redaktəsi" : "Yeni istifadəçi",
-        sub: systemUserEditId ? "İcazələri yeniləyin" : "İstifadəçi və modul icazələri əlavə edin",
+        title: appUserEditId ? "İstifadəçi redaktəsi" : "Yeni istifadəçi",
+        sub: appUserEditId ? "Hesab məlumatlarını yeniləyin" : "Giriş üçün istifadəçi adı və müvəqqəti şifrə təyin edin",
+      };
+    }
+    if (module === "systemPermissions") {
+      if (permissionMode === "list") return { title: "Sistem icazələri", sub: MODULE_TAGLINE.systemPermissions };
+      return {
+        title: "Modul icazələri",
+        sub: "İşçinin sistemdə görə biləcəyi bölmələri seçin",
       };
     }
     if (module === "workLeave") {
@@ -1658,8 +1771,9 @@ export default function App() {
     storeOrderEditId,
     customerOrderMode,
     customerOrderEditId,
-    systemUserMode,
-    systemUserEditId,
+    appUserMode,
+    appUserEditId,
+    permissionMode,
     leaveMode,
     leaveEditId,
   ]);
@@ -1763,6 +1877,16 @@ export default function App() {
     if (!ok) return;
     const merged = normalizeWorkspace(source);
     if (firebaseEnabled && authState.status === "signedIn") {
+      try {
+        await writeOrgWorkspace(merged);
+        lastSyncedJsonRef.current = workspaceFingerprint(merged);
+        pendingLocalWriteRef.current = false;
+        remoteReadyRef.current = true;
+      } catch {
+        flash(setToast, "Firestore-a yazılmadı", "error");
+        return;
+      }
+    } else if (authState.status === "signedIn") {
       try {
         await writeWorkspace(authState.user.uid, merged);
         lastSyncedJsonRef.current = workspaceFingerprint(merged);
@@ -2793,12 +2917,11 @@ export default function App() {
     try {
       let added: FolderFileRecord[] = [];
       if (useRemote && authState.status === "signedIn") {
-        const uid = authState.user.uid;
         const results: FolderFileRecord[] = [];
         let storageFallbackUsed = false;
         for (const f of files) {
           try {
-            results.push(await uploadFolderFile(uid, folderId, f));
+            results.push(await uploadFolderFile(storageRoot, folderId, f));
           } catch {
             if (f.size > firestoreInlineMaxBytes) {
               flash(
@@ -4803,95 +4926,130 @@ export default function App() {
   };
 
   const reviewerDisplayName = () => {
-    if (currentSystemUser?.name) return currentSystemUser.name;
+    if (currentMember?.name) return currentMember.name;
     if (authState.status === "signedIn") return authState.user.email || "Direktor";
     return "Direktor";
   };
 
-  const resetSystemUserDraft = () => {
-    setSystemUserEditId(null);
-    setSystemUserDraft(emptySystemUserDraft());
+  const resetAppUserDraft = () => {
+    setAppUserEditId(null);
+    setAppUserDraft(emptyAppUserDraft());
   };
 
-  const openNewSystemUserForm = () => {
-    resetSystemUserDraft();
-    setSystemUserMode("form");
+  const openNewAppUserForm = () => {
+    resetAppUserDraft();
+    setAppUserMode("form");
   };
 
-  const cancelSystemUserForm = () => {
-    resetSystemUserDraft();
-    setSystemUserMode("list");
+  const cancelAppUserForm = () => {
+    resetAppUserDraft();
+    setAppUserMode("list");
   };
 
-  const startEditSystemUser = (u: SystemUserRecord) => {
-    setSystemUserEditId(u.id);
-    setSystemUserDraft({
+  const startEditAppUser = (u: SystemUserRecord) => {
+    setAppUserEditId(u.id);
+    setAppUserDraft({
+      username: u.username,
       name: u.name,
-      email: u.email || "",
+      password: "",
       role: u.role,
-      modules: [...u.modules],
     });
-    setSystemUserMode("form");
+    setAppUserMode("form");
   };
 
-  const toggleSystemUserModule = (mod: PermissionModuleId) => {
-    setSystemUserDraft((d) => {
-      const has = d.modules.includes(mod);
-      const modules = has ? d.modules.filter((m) => m !== mod) : [...d.modules, mod];
-      return { ...d, modules };
-    });
-  };
-
-  const saveSystemUser = () => {
-    const name = systemUserDraft.name.trim();
+  const saveAppUser = async () => {
+    const usernameErr = validateUsername(appUserDraft.username);
+    if (usernameErr) {
+      flash(setToast, usernameErr, "error");
+      return;
+    }
+    const name = appUserDraft.name.trim();
     if (!name) {
-      flash(setToast, "İstifadəçi adını daxil edin.", "error");
+      flash(setToast, "Ad, soyad daxil edin.", "error");
       return;
     }
-    const email = systemUserDraft.email.trim();
-    const role = systemUserDraft.role;
-    const modules =
-      role === "admin" || role === "director" ? defaultModulesForRole(role) : systemUserDraft.modules;
-    if (role === "employee" && modules.length === 0) {
-      flash(setToast, "Ən azı bir modul icazəsi seçin.", "error");
-      return;
-    }
+    const username = appUserDraft.username.trim().toLowerCase();
+    const role = appUserDraft.role;
     const now = Date.now();
-    if (systemUserEditId) {
-      setWorkspace((w) => ({
-        ...w,
-        systemUsers: (w.systemUsers ?? []).map((u) => {
-          if (u.id !== systemUserEditId) return u;
+
+    if (firebaseEnabled) {
+      if (!appUserEditId && appUserDraft.password.length < 6) {
+        flash(setToast, "Müvəqqəti şifrə ən azı 6 simvol olmalıdır.", "error");
+        return;
+      }
+      const authEmail = usernameToAuthEmail(username, firebaseProjectId);
+      const duplicate = activeUsers.some(
+        (u) => u.username.toLowerCase() === username && u.id !== appUserEditId,
+      );
+      if (duplicate) {
+        flash(setToast, "Bu istifadəçi adı artıq mövcuddur.", "error");
+        return;
+      }
+      try {
+        if (appUserEditId) {
+          const existing = activeUsers.find((u) => u.id === appUserEditId);
+          if (!existing) return;
           const rec: SystemUserRecord = {
-            id: u.id,
+            ...existing,
+            username,
             name,
             role,
-            modules,
-            createdAt: u.createdAt,
+            modules: defaultModulesForRole(role),
             updatedAt: now,
           };
-          if (email) rec.email = email;
-          return rec;
-        }),
+          await writeOrgMember(rec);
+          if (appUserDraft.password.length >= 6) {
+            flash(setToast, "Şifrəni Firebase konsolundan yeniləmək lazım ola bilər. İstifadəçini silib yenidən yaradın.", "error");
+          } else {
+            flash(setToast, "İstifadəçi yeniləndi");
+          }
+        } else {
+          const { uid } = await createAppUserAuthAccount(authEmail, appUserDraft.password);
+          const rec: SystemUserRecord = {
+            id: uid,
+            username,
+            name,
+            role,
+            modules: defaultModulesForRole(role),
+            mustChangePassword: true,
+            authEmail,
+            createdAt: now,
+            updatedAt: now,
+          };
+          await writeOrgMember(rec);
+          flash(setToast, "İstifadəçi yaradıldı");
+        }
+        cancelAppUserForm();
+      } catch (e: unknown) {
+        flash(setToast, mapAuthError(e), "error");
+      }
+      return;
+    }
+
+    if (appUserEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        systemUsers: (w.systemUsers ?? []).map((u) =>
+          u.id === appUserEditId ? { ...u, username, name, role, modules: defaultModulesForRole(role), updatedAt: now } : u,
+        ),
       }));
-      flash(setToast, "İstifadəçi yeniləndi");
     } else {
       const rec: SystemUserRecord = {
         id: crypto.randomUUID(),
+        username,
         name,
         role,
-        modules,
+        modules: defaultModulesForRole(role),
         createdAt: now,
         updatedAt: now,
       };
-      if (email) rec.email = email;
       setWorkspace((w) => ({ ...w, systemUsers: [...(w.systemUsers ?? []), rec] }));
-      flash(setToast, "İstifadəçi əlavə olundu");
     }
-    cancelSystemUserForm();
+    flash(setToast, appUserEditId ? "İstifadəçi yeniləndi" : "İstifadəçi əlavə olundu");
+    cancelAppUserForm();
   };
 
-  const deleteSystemUser = async (id: string) => {
+  const deleteAppUser = async (id: string) => {
     const ok = await askConfirm({
       title: "Silmə təsdiqi",
       message: "Bu istifadəçi silinsin?",
@@ -4900,18 +5058,302 @@ export default function App() {
       danger: true,
     });
     if (!ok) return;
-    setWorkspace((w) => ({
-      ...w,
-      systemUsers: (w.systemUsers ?? []).filter((u) => u.id !== id),
-      leaveRequests: (w.leaveRequests ?? []).filter((r) => r.employeeId !== id),
-    }));
-    if (systemUserEditId === id) resetSystemUserDraft();
+    if (firebaseEnabled) {
+      await deleteOrgMember(id);
+    } else {
+      setWorkspace((w) => ({
+        ...w,
+        systemUsers: (w.systemUsers ?? []).filter((u) => u.id !== id),
+        leaveRequests: (w.leaveRequests ?? []).filter((r) => r.employeeId !== id),
+      }));
+    }
+    if (appUserEditId === id) resetAppUserDraft();
     flash(setToast, "İstifadəçi silindi");
+  };
+
+  const cancelPermissionForm = () => {
+    setPermissionDraft({ memberId: "", modules: [] });
+    setPermissionMode("list");
+  };
+
+  const startEditPermissions = (u: SystemUserRecord) => {
+    if (u.role === "admin" || u.role === "director") {
+      flash(setToast, "Direktor və admin bütün modullara giriş edir.", "error");
+      return;
+    }
+    setPermissionDraft({ memberId: u.id, modules: [...u.modules] });
+    setPermissionMode("form");
+  };
+
+  const togglePermissionModule = (mod: PermissionModuleId) => {
+    setPermissionDraft((d) => {
+      const has = d.modules.includes(mod);
+      const modules = has ? d.modules.filter((m) => m !== mod) : [...d.modules, mod];
+      return { ...d, modules };
+    });
+  };
+
+  const savePermissions = async () => {
+    if (!permissionDraft.memberId) return;
+    const user = activeUsers.find((u) => u.id === permissionDraft.memberId);
+    if (!user) return;
+    if (permissionDraft.modules.length === 0) {
+      flash(setToast, "Ən azı bir modul seçin.", "error");
+      return;
+    }
+    const rec: SystemUserRecord = { ...user, modules: permissionDraft.modules, updatedAt: Date.now() };
+    if (firebaseEnabled) {
+      await writeOrgMember(rec);
+    } else {
+      setWorkspace((w) => ({
+        ...w,
+        systemUsers: (w.systemUsers ?? []).map((u) => (u.id === rec.id ? rec : u)),
+      }));
+    }
+    flash(setToast, "İcazələr yeniləndi");
+    cancelPermissionForm();
+  };
+
+  const renderAppUsersModule = () => {
+    if (!canManageUsers) {
+      return (
+        <div className="dg-form-page pg-panel" aria-label="İstifadəçilər">
+          <div className="dg-form-page-body">
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Giriş icazəsi yoxdur</div>
+              <div className="dg-empty-state-desc">Bu bölmə yalnız developer, direktor və ya admin üçün əlçatandır.</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const users = [...activeUsers].sort((a, b) => a.name.localeCompare(b.name, "az", { sensitivity: "base" }));
+
+    if (appUserMode === "form") {
+      return (
+        <div className="dg-form-page pg-panel" aria-label={appUserEditId ? "İstifadəçi redaktəsi" : "Yeni istifadəçi"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">İstifadəçilər</h1>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelAppUserForm}>
+              Siyahı
+            </button>
+          </header>
+          <div className="dg-form-page-body">
+            <div className="dg-form-meta-grid">
+              <label className="dg-field">
+                <span className="dg-label">İstifadəçi adı</span>
+                <input
+                  className="dg-input"
+                  value={appUserDraft.username}
+                  onChange={(e) => setAppUserDraft((d) => ({ ...d, username: e.target.value }))}
+                  disabled={Boolean(appUserEditId)}
+                  placeholder="məs: ali.mammadov"
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Ad, soyad</span>
+                <input
+                  className="dg-input"
+                  value={appUserDraft.name}
+                  onChange={(e) => setAppUserDraft((d) => ({ ...d, name: e.target.value }))}
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Rol</span>
+                <select
+                  className="dg-input"
+                  value={appUserDraft.role}
+                  onChange={(e) => setAppUserDraft((d) => ({ ...d, role: e.target.value as AppUserRole }))}
+                >
+                  {APP_USER_ROLE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!appUserEditId ? (
+                <label className="dg-field">
+                  <span className="dg-label">Müvəqqəti şifrə</span>
+                  <input
+                    className="dg-input"
+                    type="password"
+                    value={appUserDraft.password}
+                    onChange={(e) => setAppUserDraft((d) => ({ ...d, password: e.target.value }))}
+                    placeholder="İlk girişdə dəyişdiriləcək"
+                  />
+                </label>
+              ) : null}
+            </div>
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelAppUserForm}>
+                Ləğv et
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void saveAppUser()}>
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dg-form-page pg-panel" aria-label="İstifadəçilər siyahısı">
+        <div className="dg-form-page-body">
+          {users.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Hələ istifadəçi yoxdur</div>
+              <div className="dg-empty-state-desc">«Yeni istifadəçi» ilə giriş hesabı yaradın. İcazələri «Sistem icazələri» bölməsində verin.</div>
+            </div>
+          ) : (
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table">
+                <thead>
+                  <tr>
+                    <th className="dg-th-num">№</th>
+                    <th>İstifadəçi adı</th>
+                    <th>Ad</th>
+                    <th>Rol</th>
+                    <th>İlk giriş</th>
+                    <th className="dg-th-actions">Əməliyyatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u, i) => (
+                    <tr key={u.id}>
+                      <td className="dg-td-num">{i + 1}</td>
+                      <td>{u.username}</td>
+                      <td>{u.name}</td>
+                      <td>{appUserRoleLabel(u.role)}</td>
+                      <td>{u.mustChangePassword ? "Şifrə dəyişməli" : "—"}</td>
+                      <td className="dg-td-actions">
+                        <div className="dg-icon-row">
+                          <button type="button" className="dg-icon-btn" title="Redaktə" aria-label="Redaktə" onClick={() => startEditAppUser(u)}>
+                            <IconEdit />
+                          </button>
+                          <button type="button" className="dg-icon-btn dg-icon-btn-danger" title="Sil" aria-label="Sil" onClick={() => void deleteAppUser(u.id)}>
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSystemPermissionsModule = () => {
+    if (!canManageSystemUsers) {
+      return (
+        <div className="dg-form-page pg-panel" aria-label="Sistem icazələri">
+          <div className="dg-form-page-body">
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Giriş icazəsi yoxdur</div>
+              <div className="dg-empty-state-desc">Bu bölmə yalnız developer, direktor və ya admin üçün əlçatandır.</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const users = [...activeUsers].filter((u) => u.role === "employee");
+
+    if (permissionMode === "form") {
+      const target = activeUsers.find((u) => u.id === permissionDraft.memberId);
+      return (
+        <div className="dg-form-page pg-panel" aria-label="Modul icazələri">
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">Sistem icazələri</h1>
+              <p className="dg-muted">{target ? `${target.name} (@${target.username})` : ""}</p>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelPermissionForm}>
+              Siyahı
+            </button>
+          </header>
+          <div className="dg-form-page-body">
+            <div className="dg-permission-grid">
+              {PERMISSION_MODULE_OPTIONS.map((m) => (
+                <label key={m.id} className="dg-permission-check">
+                  <input
+                    type="checkbox"
+                    checked={permissionDraft.modules.includes(m.id)}
+                    onChange={() => togglePermissionModule(m.id)}
+                  />
+                  <span>{m.label}</span>
+                </label>
+              ))}
+            </div>
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelPermissionForm}>
+                Ləğv et
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void savePermissions()}>
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dg-form-page pg-panel" aria-label="Sistem icazələri siyahısı">
+        <div className="dg-form-page-body">
+          {users.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">İşçi yoxdur</div>
+              <div className="dg-empty-state-desc">Əvvəlcə «İstifadəçilər» bölməsində işçi hesabı yaradın.</div>
+            </div>
+          ) : (
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table">
+                <thead>
+                  <tr>
+                    <th className="dg-th-num">№</th>
+                    <th>İstifadəçi</th>
+                    <th>Modullar</th>
+                    <th className="dg-th-actions">Əməliyyatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u, i) => (
+                    <tr key={u.id}>
+                      <td className="dg-td-num">{i + 1}</td>
+                      <td>
+                        {u.name} <span className="dg-muted">(@{u.username})</span>
+                      </td>
+                      <td>
+                        {u.modules.map((id) => PERMISSION_MODULE_OPTIONS.find((m) => m.id === id)?.label ?? id).join(", ")}
+                      </td>
+                      <td className="dg-td-actions">
+                        <button type="button" className="dg-btn dg-btn-secondary dg-btn--compact" onClick={() => startEditPermissions(u)}>
+                          İcazələr
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const resetLeaveDraft = () => {
     setLeaveEditId(null);
-    const defaultEmployeeId = currentSystemUser?.role === "employee" ? currentSystemUser.id : "";
+    const defaultEmployeeId = currentMember?.role === "employee" ? currentMember.id : "";
     setLeaveDraft(emptyLeaveRequestDraft(defaultEmployeeId));
   };
 
@@ -5058,168 +5500,12 @@ export default function App() {
     flash(setToast, "Sorğu imtina edildi");
   };
 
-  const renderSystemPermissionsModule = () => {
-    if (!canManageSystemUsers) {
-      return (
-        <div className="dg-form-page pg-panel" aria-label="Sistem icazələri">
-          <div className="dg-form-page-body">
-            <div className="dg-empty-state-card" role="status">
-              <div className="dg-empty-state-title">Giriş icazəsi yoxdur</div>
-              <div className="dg-empty-state-desc">Bu bölmə yalnız direktor və ya admin üçün əlçatandır.</div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    const users = [...(workspace.systemUsers ?? [])].sort((a, b) =>
-      a.name.localeCompare(b.name, "az", { sensitivity: "base" }),
-    );
-
-    if (systemUserMode === "form") {
-      const modulesDisabled = systemUserDraft.role === "admin" || systemUserDraft.role === "director";
-      return (
-        <div className="dg-form-page pg-panel" aria-label={systemUserEditId ? "İstifadəçi redaktəsi" : "Yeni istifadəçi"}>
-          <header className="dg-form-page-head">
-            <div>
-              <h1 className="dg-form-page-title">Sistem icazələri</h1>
-            </div>
-            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelSystemUserForm}>
-              Siyahı
-            </button>
-          </header>
-          <div className="dg-form-page-body">
-            <div className="dg-form-meta-grid">
-              <label className="dg-field">
-                <span className="dg-label">Ad, soyad</span>
-                <input
-                  className="dg-input"
-                  value={systemUserDraft.name}
-                  onChange={(e) => setSystemUserDraft((d) => ({ ...d, name: e.target.value }))}
-                />
-              </label>
-              <label className="dg-field">
-                <span className="dg-label">Email</span>
-                <input
-                  className="dg-input"
-                  type="email"
-                  value={systemUserDraft.email}
-                  onChange={(e) => setSystemUserDraft((d) => ({ ...d, email: e.target.value }))}
-                  placeholder="Giriş emaili"
-                />
-              </label>
-              <label className="dg-field">
-                <span className="dg-label">Rol</span>
-                <select
-                  className="dg-input"
-                  value={systemUserDraft.role}
-                  onChange={(e) => {
-                    const role = e.target.value as AppUserRole;
-                    setSystemUserDraft((d) => ({ ...d, role, modules: defaultModulesForRole(role) }));
-                  }}
-                >
-                  {APP_USER_ROLE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <h2 className="dg-form-inner-panel-title" style={{ marginTop: "1.25rem" }}>
-              Modul icazələri
-            </h2>
-            {modulesDisabled ? (
-              <p className="dg-muted">Direktor və admin bütün modullara giriş edir.</p>
-            ) : (
-              <div className="dg-permission-grid">
-                {PERMISSION_MODULE_OPTIONS.map((m) => (
-                  <label key={m.id} className="dg-permission-check">
-                    <input
-                      type="checkbox"
-                      checked={systemUserDraft.modules.includes(m.id)}
-                      onChange={() => toggleSystemUserModule(m.id)}
-                    />
-                    <span>{m.label}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-            <footer className="dg-form-footer-actions">
-              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelSystemUserForm}>
-                Ləğv et
-              </button>
-              <button type="button" className="dg-btn dg-btn-primary" onClick={saveSystemUser}>
-                Yadda saxla
-              </button>
-            </footer>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="dg-form-page pg-panel" aria-label="Sistem icazələri siyahısı">
-        <div className="dg-form-page-body">
-          {users.length === 0 ? (
-            <div className="dg-empty-state-card" role="status">
-              <div className="dg-empty-state-title">Hələ istifadəçi yoxdur</div>
-              <div className="dg-empty-state-desc">«Yeni istifadəçi» ilə işçi, direktor və ya admin əlavə edin.</div>
-            </div>
-          ) : (
-            <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table">
-                <thead>
-                  <tr>
-                    <th className="dg-th-num">№</th>
-                    <th>Ad</th>
-                    <th>Email</th>
-                    <th>Rol</th>
-                    <th>Modullar</th>
-                    <th className="dg-th-actions">Əməliyyatlar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u, i) => (
-                    <tr key={u.id}>
-                      <td className="dg-td-num">{i + 1}</td>
-                      <td>{u.name}</td>
-                      <td>{u.email || "—"}</td>
-                      <td>{appUserRoleLabel(u.role)}</td>
-                      <td>
-                        {u.role === "employee"
-                          ? u.modules
-                              .map((id) => PERMISSION_MODULE_OPTIONS.find((m) => m.id === id)?.label ?? id)
-                              .join(", ")
-                          : "Hamısı"}
-                      </td>
-                      <td className="dg-td-actions">
-                        <div className="dg-icon-row">
-                          <button type="button" className="dg-icon-btn" title="Redaktə" aria-label="Redaktə" onClick={() => startEditSystemUser(u)}>
-                            <IconEdit />
-                          </button>
-                          <button type="button" className="dg-icon-btn dg-icon-btn-danger" title="Sil" aria-label="Sil" onClick={() => deleteSystemUser(u.id)}>
-                            <IconTrash />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   const renderWorkLeaveModule = () => {
-    const employees = [...(workspace.systemUsers ?? [])].filter((u) => u.role === "employee" || u.role === "director");
+    const employees = [...activeUsers].filter((u) => u.role === "employee" || u.role === "director");
     const requests = [...(workspace.leaveRequests ?? [])].sort((a, b) => b.createdAt - a.createdAt);
 
     if (leaveMode === "form") {
-      const employeeOptions = employees.length > 0 ? employees : (workspace.systemUsers ?? []);
+      const employeeOptions = employees.length > 0 ? employees : activeUsers;
       return (
         <div className="dg-form-page pg-panel" aria-label={leaveEditId ? "Sorğu redaktəsi" : "Yeni sorğu"}>
           <header className="dg-form-page-head">
@@ -5238,7 +5524,7 @@ export default function App() {
                   className="dg-input"
                   value={leaveDraft.employeeId}
                   onChange={(e) => setLeaveDraft((d) => ({ ...d, employeeId: e.target.value }))}
-                  disabled={Boolean(leaveEditId) || (currentSystemUser?.role === "employee" && !leaveEditId)}
+                  disabled={Boolean(leaveEditId) || (currentMember?.role === "employee" && !leaveEditId)}
                 >
                   <option value="">— seçin —</option>
                   {employeeOptions.map((u) => (
@@ -5370,7 +5656,8 @@ export default function App() {
     else if (module === "suppliers") cancelOfferForm();
     else if (module === "storeOrders") cancelStoreOrderForm();
     else if (module === "customerOrders") cancelCustomerOrderForm();
-    else if (module === "systemPermissions") cancelSystemUserForm();
+    else if (module === "systemPermissions") cancelPermissionForm();
+    else if (module === "appUsers") cancelAppUserForm();
     else if (module === "workLeave") cancelLeaveForm();
     setModule(next);
     setSidebarOpen(false);
@@ -5390,7 +5677,7 @@ export default function App() {
       case "auth/invalid-credential":
       case "auth/wrong-password":
       case "auth/user-not-found":
-        return "Email və ya şifrə səhvdir.";
+        return "İstifadəçi adı/email və ya şifrə səhvdir.";
       case "auth/network-request-failed":
         return "Şəbəkə xətası. Yenidən cəhd edin.";
       default:
@@ -5400,61 +5687,75 @@ export default function App() {
 
   const handleSignIn = useCallback(async () => {
     if (!auth) return;
-    if (!loginEmail.trim() || !loginPassword) {
-      setAuthError("Email və şifrə daxil edin.");
+    const identifier = loginIdentifier.trim();
+    if (!identifier || !loginPassword) {
+      setAuthError("İstifadəçi adı (və ya email) və şifrə daxil edin.");
+      return;
+    }
+    const email = resolveLoginEmail(identifier, firebaseProjectId);
+    if (!email) {
+      setAuthError("İstifadəçi adı və ya email düzgün deyil.");
       return;
     }
     setAuthBusy(true);
     setAuthError("");
     try {
-      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      await signInWithEmailAndPassword(auth, email, loginPassword);
       setLoginPassword("");
     } catch (e: unknown) {
       setAuthError(mapAuthError(e));
     } finally {
       setAuthBusy(false);
     }
-  }, [loginEmail, loginPassword]);
-
-  const handleSignUp = useCallback(async () => {
-    if (!auth) return;
-    if (!loginEmail.trim() || !loginPassword) {
-      setAuthError("Email və şifrə daxil edin.");
-      return;
-    }
-    if (loginPassword.length < 6) {
-      setAuthError("Şifrə ən azı 6 simvol olmalıdır.");
-      return;
-    }
-    setAuthBusy(true);
-    setAuthError("");
-    try {
-      await createUserWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
-      setLoginPassword("");
-    } catch (e: unknown) {
-      setAuthError(mapAuthError(e));
-    } finally {
-      setAuthBusy(false);
-    }
-  }, [loginEmail, loginPassword]);
+  }, [loginIdentifier, loginPassword]);
 
   const handlePasswordReset = useCallback(async () => {
     if (!auth) return;
-    if (!loginEmail.trim()) {
-      setAuthError("Şifrə yeniləmək üçün email daxil edin.");
+    const identifier = loginIdentifier.trim();
+    if (!identifier.includes("@")) {
+      setAuthError("Şifrə yeniləmə yalnız developer email hesabları üçündür.");
+      return;
+    }
+    const email = resolveLoginEmail(identifier, firebaseProjectId);
+    if (!email) {
+      setAuthError("Email daxil edin.");
       return;
     }
     setAuthBusy(true);
     setAuthError("");
     try {
-      await sendPasswordResetEmail(auth, loginEmail.trim());
+      await sendPasswordResetEmail(auth, email);
       flash(setToast, "Şifrə yeniləmə linki email-ə göndərildi");
     } catch (e: unknown) {
       setAuthError(mapAuthError(e));
     } finally {
       setAuthBusy(false);
     }
-  }, [loginEmail]);
+  }, [loginIdentifier]);
+
+  const handleForcePasswordSubmit = useCallback(async () => {
+    if (!auth || authState.status !== "signedIn" || !currentMember) return;
+    if (newPasswordDraft.length < 6) {
+      flash(setToast, "Şifrə ən azı 6 simvol olmalıdır.", "error");
+      return;
+    }
+    if (newPasswordDraft !== newPasswordConfirm) {
+      flash(setToast, "Şifrələr uyğun gəlmir.", "error");
+      return;
+    }
+    try {
+      await updatePassword(authState.user, newPasswordDraft);
+      const rec: SystemUserRecord = { ...currentMember, mustChangePassword: false, updatedAt: Date.now() };
+      await writeOrgMember(rec);
+      setCurrentMember(rec);
+      setForcePasswordChange(false);
+      setNewPasswordDraft("");
+      setNewPasswordConfirm("");
+      flash(setToast, "Şifrə yeniləndi");
+    } catch (e: unknown) {
+      flash(setToast, mapAuthError(e), "error");
+    }
+  }, [authState, currentMember, newPasswordDraft, newPasswordConfirm]);
 
   const handleSignOut = useCallback(async () => {
     if (!auth) return;
@@ -5498,8 +5799,8 @@ export default function App() {
                 ? { label: "Yeni sifariş", onClick: openNewStoreOrderForm }
                 : module === "customerOrders" && customerOrderMode === "list"
                   ? { label: "Yeni sifariş", onClick: openNewCustomerOrderForm }
-                  : module === "systemPermissions" && systemUserMode === "list" && canManageSystemUsers
-                    ? { label: "Yeni istifadəçi", onClick: openNewSystemUserForm }
+                  : module === "appUsers" && appUserMode === "list" && canManageUsers
+                    ? { label: "Yeni istifadəçi", onClick: openNewAppUserForm }
                     : module === "workLeave" && leaveMode === "list"
                       ? { label: "Yeni sorğu", onClick: openNewLeaveForm }
         : null;
@@ -6092,6 +6393,42 @@ export default function App() {
           </div>
         </dialog>
       ) : null}
+
+      {forcePasswordChange ? (
+        <dialog ref={forcePasswordDialogRef} className="dg-modal" onCancel={(e) => e.preventDefault()}>
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">Şifrəni dəyişin</h2>
+            <p className="dg-modal-hint">İlk girişdə öz şifrənizi təyin etməlisiniz.</p>
+            <label className="dg-field">
+              <span className="dg-label">Yeni şifrə</span>
+              <input
+                className="dg-input"
+                type="password"
+                autoComplete="new-password"
+                value={newPasswordDraft}
+                onChange={(e) => setNewPasswordDraft(e.target.value)}
+                placeholder="Ən azı 6 simvol"
+              />
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Yeni şifrə (təkrar)</span>
+              <input
+                className="dg-input"
+                type="password"
+                autoComplete="new-password"
+                value={newPasswordConfirm}
+                onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                placeholder="Şifrəni təkrarlayın"
+              />
+            </label>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void handleForcePasswordSubmit()}>
+                Yadda saxla
+              </button>
+            </div>
+          </div>
+        </dialog>
+      ) : null}
     </>
   );
 
@@ -6125,8 +6462,7 @@ export default function App() {
             className="rb-auth-card"
             onSubmit={(e) => {
               e.preventDefault();
-              if (loginMode === "signin") handleSignIn();
-              else handleSignUp();
+              handleSignIn();
             }}
           >
             <div className="rb-auth-brand">
@@ -6138,17 +6474,17 @@ export default function App() {
               </div>
               <div className="rb-auth-title">GenDoc</div>
             </div>
-            <p className="rb-auth-sub">{loginMode === "signin" ? "Daxil olun" : "Yeni hesab yaradın"}</p>
+            <p className="rb-auth-sub">Daxil olun</p>
 
             <label className="dg-field">
-              <span className="dg-label">Email</span>
+              <span className="dg-label">İstifadəçi adı və ya email</span>
               <input
                 className="dg-input"
-                type="email"
-                autoComplete="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="email@example.com"
+                type="text"
+                autoComplete="username"
+                value={loginIdentifier}
+                onChange={(e) => setLoginIdentifier(e.target.value)}
+                placeholder="istifadəçi adı və ya developer@email.com"
                 disabled={authBusy}
                 required
               />
@@ -6158,10 +6494,10 @@ export default function App() {
               <input
                 className="dg-input"
                 type="password"
-                autoComplete={loginMode === "signin" ? "current-password" : "new-password"}
+                autoComplete="current-password"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="Ən azı 6 simvol"
+                placeholder="Şifrə"
                 disabled={authBusy}
                 required
               />
@@ -6175,42 +6511,16 @@ export default function App() {
 
             <div className="rb-auth-actions">
               <button type="submit" className="dg-btn dg-btn-primary" disabled={authBusy}>
-                {authBusy ? "Gözləyin…" : loginMode === "signin" ? "Daxil ol" : "Qeydiyyat"}
+                {authBusy ? "Gözləyin…" : "Daxil ol"}
               </button>
-              {loginMode === "signin" ? (
-                <button type="button" className="dg-btn dg-btn-secondary" onClick={handlePasswordReset} disabled={authBusy}>
-                  Şifrəni unutmusan?
-                </button>
-              ) : null}
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={handlePasswordReset} disabled={authBusy}>
+                Şifrəni unutmusan?
+              </button>
             </div>
 
-            <div className="rb-auth-switch">
-              {loginMode === "signin" ? (
-                <button
-                  type="button"
-                  className="rb-auth-link"
-                  onClick={() => {
-                    setLoginMode("signup");
-                    setAuthError("");
-                  }}
-                  disabled={authBusy}
-                >
-                  Hesabın yoxdur? Qeydiyyatdan keç
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="rb-auth-link"
-                  onClick={() => {
-                    setLoginMode("signin");
-                    setAuthError("");
-                  }}
-                  disabled={authBusy}
-                >
-                  Artıq hesabın var? Daxil ol
-                </button>
-              )}
-            </div>
+            <p className="rb-auth-hint dg-muted" style={{ marginTop: "0.75rem", fontSize: "0.85rem" }}>
+              Yeni hesab yalnız admin tərəfindən yaradılır.
+            </p>
           </form>
         </div>
         {toast ? (
@@ -6389,6 +6699,7 @@ export default function App() {
               {module === "suppliers" ? renderSuppliersModule() : null}
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
+              {module === "appUsers" ? renderAppUsersModule() : null}
               {module === "systemPermissions" ? renderSystemPermissionsModule() : null}
               {module === "workLeave" ? renderWorkLeaveModule() : null}
               {module === "settings" ? renderSettingsModule() : null}

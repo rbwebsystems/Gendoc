@@ -3,12 +3,41 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // İstifadəçilərin öz altında oxu/yazı icazəsi
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Default deny
+    function isOrgMember() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/orgs/default/members/$(request.auth.uid));
+    }
+
+    function memberDoc() {
+      return get(/databases/$(database)/documents/orgs/default/members/$(request.auth.uid)).data;
+    }
+
+    function isDeveloper() {
+      return isSignedIn() && !isOrgMember();
+    }
+
+    function isOrgAdmin() {
+      return isOrgMember() && (memberDoc().role == 'admin' || memberDoc().role == 'director');
+    }
+
+    // Köhnə şəxsi workspace (developer migration üçün)
+    match /users/{uid}/{document=**} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /orgs/default/workspace/default {
+      allow read, write: if isDeveloper() || isOrgMember();
+    }
+
+    match /orgs/default/members/{uid} {
+      allow read: if isDeveloper() || isOrgAdmin() || (isOrgMember() && request.auth.uid == uid);
+      allow create, update, delete: if isDeveloper() || isOrgAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

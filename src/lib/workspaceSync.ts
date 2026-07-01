@@ -67,7 +67,7 @@ export function workspaceFingerprint(workspace: DocWorkspace): string {
 const FIRESTORE_DOC_LIMIT_BYTES = 1_048_576;
 const FIRESTORE_SAFE_MARGIN_BYTES = 32_768;
 
-function assertFirestorePayloadSize(payload: DocWorkspace): void {
+export function assertFirestorePayloadSize(payload: DocWorkspace): void {
   const bytes = new TextEncoder().encode(JSON.stringify(payload)).length;
   if (bytes + FIRESTORE_SAFE_MARGIN_BYTES > FIRESTORE_DOC_LIMIT_BYTES) {
     throw new Error(
@@ -140,10 +140,12 @@ export async function writeWorkspace(uid: string, workspace: DocWorkspace): Prom
 
 /** Storage helpers */
 
-function storageFolderPath(uid: string, folderId: string, fileId: string, name: string): string {
-  // safeName: sade ad, problemli simvolları əvəz et
+function storageFolderPath(root: string, folderId: string, fileId: string, name: string): string {
   const safe = (name || "fayl").replace(/[^A-Za-z0-9._-]+/g, "_").slice(0, 80);
-  return `users/${uid}/folders/${folderId}/${fileId}-${safe}`;
+  if (root.startsWith("orgs/")) {
+    return `${root}/folders/${folderId}/${fileId}-${safe}`;
+  }
+  return `users/${root}/folders/${folderId}/${fileId}-${safe}`;
 }
 
 export interface UploadFolderFileResult extends FolderFileRecord {
@@ -161,13 +163,13 @@ function guessFolderFileMime(file: File): string {
 }
 
 export async function uploadFolderFile(
-  uid: string,
+  storageRoot: string,
   folderId: string,
   file: File,
 ): Promise<UploadFolderFileResult> {
   if (!storage) throw new Error("Firebase Storage is not configured");
   const id = crypto.randomUUID();
-  const path = storageFolderPath(uid, folderId, id, file.name);
+  const path = storageFolderPath(storageRoot, folderId, id, file.name);
   const r = ref(storage, path);
   await uploadBytes(r, file, { contentType: guessFolderFileMime(file) });
   const url = await getDownloadURL(r);
