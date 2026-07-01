@@ -30,7 +30,24 @@ import {
   workspaceToGeneratorState,
   resolveProjectVatPercent,
 } from "./lib/docStorage";
-import { emptyCompany, emptyMeta, newOrderLineRow, newProductRow, OFFICIAL_VAT_PERCENT, ORDER_STATUS_OPTIONS, orderStatusLabel, orderStatusModifier } from "./lib/defaults";
+import {
+  emptyCompany,
+  emptyMeta,
+  newOrderLineRow,
+  newProductRow,
+  OFFICIAL_VAT_PERCENT,
+  ORDER_STATUS_OPTIONS,
+  orderStatusLabel,
+  orderStatusModifier,
+  PERMISSION_MODULE_OPTIONS,
+  APP_USER_ROLE_OPTIONS,
+  appUserRoleLabel,
+  LEAVE_TYPE_OPTIONS,
+  leaveTypeLabel,
+  leaveStatusLabel,
+  leaveStatusModifier,
+  defaultModulesForRole,
+} from "./lib/defaults";
 import { formatDateAzLong, formatMoney } from "./lib/text";
 import type {
   CompanyProfile,
@@ -48,6 +65,11 @@ import type {
   CustomerOrderRecord,
   OrderLineRow,
   OrderStatus,
+  SystemUserRecord,
+  LeaveRequestRecord,
+  LeaveRequestStatus,
+  AppUserRole,
+  PermissionModuleId,
   WorkspaceFolderRecord,
 } from "./types";
 import html2pdf from "html2pdf.js";
@@ -176,12 +198,50 @@ type SidebarModule =
   | "suppliers"
   | "storeOrders"
   | "customerOrders"
+  | "systemPermissions"
+  | "workLeave"
   | "settings";
 
 type CompanyFormMode = "list" | "form";
 type ProjectFormMode = "list" | "form";
 type OfferFormMode = "list" | "form";
 type OrderFormMode = "list" | "form";
+type SystemUserFormMode = "list" | "form";
+type LeaveFormMode = "list" | "form";
+
+type SystemUserDraft = {
+  name: string;
+  email: string;
+  role: AppUserRole;
+  modules: PermissionModuleId[];
+};
+
+type LeaveRequestDraft = {
+  employeeId: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+};
+
+function emptySystemUserDraft(): SystemUserDraft {
+  return {
+    name: "",
+    email: "",
+    role: "employee",
+    modules: defaultModulesForRole("employee"),
+  };
+}
+
+function emptyLeaveRequestDraft(employeeId = ""): LeaveRequestDraft {
+  return {
+    employeeId,
+    leaveType: "annual",
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate: new Date().toISOString().slice(0, 10),
+    reason: "",
+  };
+}
 
 type StoreOrderDraft = {
   orderDate: string;
@@ -302,8 +362,12 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "suppliers", label: "Təchizatçı təklifləri" },
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
+  { id: "systemPermissions", label: "Sistem icazələri" },
+  { id: "workLeave", label: "İş icazələri" },
   { id: "settings", label: "Ayarlar" },
 ];
+
+const SIDEBAR_SYSTEM_IDS: SidebarModule[] = ["systemPermissions", "workLeave", "settings"];
 
 const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "companies",
@@ -323,6 +387,8 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   suppliers: "Təchizatçı qiymət təklifləri",
   storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
+  systemPermissions: "İstifadəçilər üçün modul və rol icazələri",
+  workLeave: "İşçi sorğuları və direktor təsdiqi",
   settings: "",
 };
 
@@ -436,6 +502,12 @@ function OrderStatusPicker(props: { status: OrderStatus; onChange: (status: Orde
   );
 }
 
+function LeaveStatusBadge(props: { status: LeaveRequestStatus }) {
+  return (
+    <span className={`dg-leave-status ${leaveStatusModifier(props.status)}`}>{leaveStatusLabel(props.status)}</span>
+  );
+}
+
 function IconPrint() {
   return (
     <SvgIcon>
@@ -528,6 +600,29 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+          />
+        </svg>
+      );
+    case "systemPermissions":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 3l7 4v5c0 4.418-3.134 8.149-7 9-3.866-.851-7-4.582-7-9V7l7-4z"
+          />
+          <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+        </svg>
+      );
+    case "workLeave":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8 7V3m8 4V3M4 11h16M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z"
           />
         </svg>
       );
@@ -999,6 +1094,16 @@ export default function App() {
   const [customerOrderDraft, setCustomerOrderDraft] = useState<CustomerOrderDraft>(() => emptyCustomerOrderDraft());
   const [customerOrderMode, setCustomerOrderMode] = useState<OrderFormMode>("list");
 
+  const [systemUserEditId, setSystemUserEditId] = useState<string | null>(null);
+  const [systemUserDraft, setSystemUserDraft] = useState<SystemUserDraft>(() => emptySystemUserDraft());
+  const [systemUserMode, setSystemUserMode] = useState<SystemUserFormMode>("list");
+
+  const [leaveEditId, setLeaveEditId] = useState<string | null>(null);
+  const [leaveDraft, setLeaveDraft] = useState<LeaveRequestDraft>(() => emptyLeaveRequestDraft());
+  const [leaveMode, setLeaveMode] = useState<LeaveFormMode>("list");
+  const [leaveInfoId, setLeaveInfoId] = useState<string | null>(null);
+  const leaveInfoDialogRef = useRef<HTMLDialogElement>(null);
+
   const [companyMode, setCompanyMode] = useState<CompanyFormMode>("list");
   const [companyEditId, setCompanyEditId] = useState<string | null>(null);
   const [companyDraft, setCompanyDraft] = useState<CompanyProfile>(() => emptyCompany());
@@ -1030,9 +1135,11 @@ export default function App() {
     defaultValue?: string;
     confirmLabel?: string;
     cancelLabel?: string;
+    multiline?: boolean;
   } | null>(null);
   const promptResolverRef = useRef<((v: string | null) => void) | null>(null);
   const promptInputRef = useRef<HTMLInputElement>(null);
+  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const reminderDialogRef = useRef<HTMLDialogElement>(null);
   const [reminderNote, setReminderNote] = useState<NoteRecord | null>(null);
   const noteInfoDialogRef = useRef<HTMLDialogElement>(null);
@@ -1354,6 +1461,13 @@ export default function App() {
   }, [noteInfoId]);
 
   useEffect(() => {
+    const el = leaveInfoDialogRef.current;
+    if (!el) return;
+    if (leaveInfoId) el.showModal();
+    else el.close();
+  }, [leaveInfoId]);
+
+  useEffect(() => {
     const onResize = () => {
       if (window.innerWidth >= 768) setSidebarOpen(false);
     };
@@ -1416,13 +1530,63 @@ export default function App() {
     return m;
   }, [workspace.companies]);
 
+  const signedInEmail = authState.status === "signedIn" ? authState.user.email?.toLowerCase() ?? "" : "";
+
+  const currentSystemUser = useMemo(() => {
+    if (!signedInEmail) return undefined;
+    return (workspace.systemUsers ?? []).find((u) => u.email?.toLowerCase() === signedInEmail);
+  }, [workspace.systemUsers, signedInEmail]);
+
+  const moduleAccessSet = useMemo(() => {
+    const users = workspace.systemUsers ?? [];
+    if (users.length === 0 || !currentSystemUser) return null;
+    if (currentSystemUser.role === "admin" || currentSystemUser.role === "director") return null;
+    return new Set(currentSystemUser.modules);
+  }, [workspace.systemUsers, currentSystemUser]);
+
+  const canReviewLeave = useMemo(() => {
+    const users = workspace.systemUsers ?? [];
+    if (users.length === 0) return true;
+    if (!currentSystemUser) {
+      return users.every((u) => u.role !== "director" && u.role !== "admin");
+    }
+    return currentSystemUser.role === "director" || currentSystemUser.role === "admin";
+  }, [workspace.systemUsers, currentSystemUser]);
+
+  const canManageSystemUsers = useMemo(() => {
+    const users = workspace.systemUsers ?? [];
+    if (users.length === 0) return true;
+    if (!currentSystemUser) return false;
+    return currentSystemUser.role === "admin" || currentSystemUser.role === "director";
+  }, [workspace.systemUsers, currentSystemUser]);
+
+  const systemUsersById = useMemo(() => {
+    const m = new Map<string, SystemUserRecord>();
+    for (const u of workspace.systemUsers ?? []) m.set(u.id, u);
+    return m;
+  }, [workspace.systemUsers]);
+
   const filteredMainNavIds = useMemo(() => {
     const q = navSearch.trim().toLowerCase();
     return SIDEBAR_MAIN_IDS.filter((id) => {
+      if (moduleAccessSet && !moduleAccessSet.has(id as PermissionModuleId)) return false;
       const label = SIDEBAR_MODULES.find((m) => m.id === id)?.label ?? "";
       return !q || label.toLowerCase().includes(q);
     });
-  }, [navSearch]);
+  }, [navSearch, moduleAccessSet]);
+
+  const filteredSystemNavIds = useMemo(() => {
+    const q = navSearch.trim().toLowerCase();
+    return SIDEBAR_SYSTEM_IDS.filter((id) => {
+      if (id === "systemPermissions" && !canManageSystemUsers) return false;
+      if (id === "workLeave") {
+        const allowed = canReviewLeave || !moduleAccessSet || moduleAccessSet.has("workLeave");
+        if (!allowed) return false;
+      }
+      const label = SIDEBAR_MODULES.find((m) => m.id === id)?.label ?? "";
+      return !q || label.toLowerCase().includes(q);
+    });
+  }, [navSearch, canManageSystemUsers, canReviewLeave, moduleAccessSet]);
 
   const workspaceHeader = useMemo(() => {
     if (module === "settings") return { title: "Ayarlar", sub: MODULE_TAGLINE.settings };
@@ -1467,8 +1631,38 @@ export default function App() {
         sub: customerOrderEditId ? "Mövcud sifarişi yeniləyin" : "Yeni müştəri sifarişi əlavə edin",
       };
     }
+    if (module === "systemPermissions") {
+      if (systemUserMode === "list") return { title: "Sistem icazələri", sub: MODULE_TAGLINE.systemPermissions };
+      return {
+        title: systemUserEditId ? "İstifadəçi redaktəsi" : "Yeni istifadəçi",
+        sub: systemUserEditId ? "İcazələri yeniləyin" : "İstifadəçi və modul icazələri əlavə edin",
+      };
+    }
+    if (module === "workLeave") {
+      if (leaveMode === "list") return { title: "İş icazələri", sub: MODULE_TAGLINE.workLeave };
+      return {
+        title: leaveEditId ? "Sorğu redaktəsi" : "Yeni sorğu",
+        sub: leaveEditId ? "İş icazəsi sorğusunu yeniləyin" : "İş icazəsi sorğusu göndərin",
+      };
+    }
     return { title: "", sub: "" };
-  }, [module, companyMode, projectMode, companyEditId, projectEditId, offerMode, offerEditId, storeOrderMode, storeOrderEditId, customerOrderMode, customerOrderEditId]);
+  }, [
+    module,
+    companyMode,
+    projectMode,
+    companyEditId,
+    projectEditId,
+    offerMode,
+    offerEditId,
+    storeOrderMode,
+    storeOrderEditId,
+    customerOrderMode,
+    customerOrderEditId,
+    systemUserMode,
+    systemUserEditId,
+    leaveMode,
+    leaveEditId,
+  ]);
 
   const patchSellerSettings = useCallback((key: keyof CompanyProfile, value: string) => {
     setWorkspace((w) => ({
@@ -1536,7 +1730,14 @@ export default function App() {
   );
 
   const askPrompt = useCallback(
-    (opts: { title: string; label: string; defaultValue?: string; confirmLabel?: string; cancelLabel?: string }) => {
+    (opts: {
+      title: string;
+      label: string;
+      defaultValue?: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+      multiline?: boolean;
+    }) => {
       return new Promise<string | null>((resolve) => {
         promptResolverRef.current = resolve;
         setPromptDialog(opts);
@@ -4601,12 +4802,576 @@ export default function App() {
     );
   };
 
+  const reviewerDisplayName = () => {
+    if (currentSystemUser?.name) return currentSystemUser.name;
+    if (authState.status === "signedIn") return authState.user.email || "Direktor";
+    return "Direktor";
+  };
+
+  const resetSystemUserDraft = () => {
+    setSystemUserEditId(null);
+    setSystemUserDraft(emptySystemUserDraft());
+  };
+
+  const openNewSystemUserForm = () => {
+    resetSystemUserDraft();
+    setSystemUserMode("form");
+  };
+
+  const cancelSystemUserForm = () => {
+    resetSystemUserDraft();
+    setSystemUserMode("list");
+  };
+
+  const startEditSystemUser = (u: SystemUserRecord) => {
+    setSystemUserEditId(u.id);
+    setSystemUserDraft({
+      name: u.name,
+      email: u.email || "",
+      role: u.role,
+      modules: [...u.modules],
+    });
+    setSystemUserMode("form");
+  };
+
+  const toggleSystemUserModule = (mod: PermissionModuleId) => {
+    setSystemUserDraft((d) => {
+      const has = d.modules.includes(mod);
+      const modules = has ? d.modules.filter((m) => m !== mod) : [...d.modules, mod];
+      return { ...d, modules };
+    });
+  };
+
+  const saveSystemUser = () => {
+    const name = systemUserDraft.name.trim();
+    if (!name) {
+      flash(setToast, "İstifadəçi adını daxil edin.", "error");
+      return;
+    }
+    const email = systemUserDraft.email.trim();
+    const role = systemUserDraft.role;
+    const modules =
+      role === "admin" || role === "director" ? defaultModulesForRole(role) : systemUserDraft.modules;
+    if (role === "employee" && modules.length === 0) {
+      flash(setToast, "Ən azı bir modul icazəsi seçin.", "error");
+      return;
+    }
+    const now = Date.now();
+    if (systemUserEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        systemUsers: (w.systemUsers ?? []).map((u) => {
+          if (u.id !== systemUserEditId) return u;
+          const rec: SystemUserRecord = {
+            id: u.id,
+            name,
+            role,
+            modules,
+            createdAt: u.createdAt,
+            updatedAt: now,
+          };
+          if (email) rec.email = email;
+          return rec;
+        }),
+      }));
+      flash(setToast, "İstifadəçi yeniləndi");
+    } else {
+      const rec: SystemUserRecord = {
+        id: crypto.randomUUID(),
+        name,
+        role,
+        modules,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (email) rec.email = email;
+      setWorkspace((w) => ({ ...w, systemUsers: [...(w.systemUsers ?? []), rec] }));
+      flash(setToast, "İstifadəçi əlavə olundu");
+    }
+    cancelSystemUserForm();
+  };
+
+  const deleteSystemUser = async (id: string) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: "Bu istifadəçi silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({
+      ...w,
+      systemUsers: (w.systemUsers ?? []).filter((u) => u.id !== id),
+      leaveRequests: (w.leaveRequests ?? []).filter((r) => r.employeeId !== id),
+    }));
+    if (systemUserEditId === id) resetSystemUserDraft();
+    flash(setToast, "İstifadəçi silindi");
+  };
+
+  const resetLeaveDraft = () => {
+    setLeaveEditId(null);
+    const defaultEmployeeId = currentSystemUser?.role === "employee" ? currentSystemUser.id : "";
+    setLeaveDraft(emptyLeaveRequestDraft(defaultEmployeeId));
+  };
+
+  const openNewLeaveForm = () => {
+    resetLeaveDraft();
+    setLeaveMode("form");
+  };
+
+  const cancelLeaveForm = () => {
+    resetLeaveDraft();
+    setLeaveMode("list");
+  };
+
+  const startEditLeaveRequest = (r: LeaveRequestRecord) => {
+    if (r.status !== "pending") {
+      flash(setToast, "Yalnız gözləyən sorğular redaktə oluna bilər.", "error");
+      return;
+    }
+    setLeaveEditId(r.id);
+    setLeaveDraft({
+      employeeId: r.employeeId,
+      leaveType: r.leaveType,
+      startDate: r.startDate,
+      endDate: r.endDate,
+      reason: r.reason,
+    });
+    setLeaveMode("form");
+  };
+
+  const saveLeaveRequest = () => {
+    const employeeId = leaveDraft.employeeId.trim();
+    const employee = systemUsersById.get(employeeId);
+    const employeeName = employee?.name.trim() || "";
+    const reason = leaveDraft.reason.trim();
+    if (!employeeId || !employeeName) {
+      flash(setToast, "İşçi seçin.", "error");
+      return;
+    }
+    if (!reason) {
+      flash(setToast, "Sorğu mətnini daxil edin.", "error");
+      return;
+    }
+    const startDate = leaveDraft.startDate.trim() || new Date().toISOString().slice(0, 10);
+    const endDate = leaveDraft.endDate.trim() || startDate;
+    const leaveType = leaveDraft.leaveType.trim() || "other";
+    const now = Date.now();
+
+    if (leaveEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        leaveRequests: (w.leaveRequests ?? []).map((r) => {
+          if (r.id !== leaveEditId) return r;
+          return {
+            ...r,
+            employeeId,
+            employeeName,
+            leaveType,
+            startDate,
+            endDate,
+            reason,
+            updatedAt: now,
+          };
+        }),
+      }));
+      flash(setToast, "Sorğu yeniləndi");
+    } else {
+      const rec: LeaveRequestRecord = {
+        id: crypto.randomUUID(),
+        employeeId,
+        employeeName,
+        leaveType,
+        startDate,
+        endDate,
+        reason,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      };
+      setWorkspace((w) => ({ ...w, leaveRequests: [...(w.leaveRequests ?? []), rec] }));
+      flash(setToast, "Sorğu göndərildi");
+    }
+    cancelLeaveForm();
+  };
+
+  const deleteLeaveRequest = async (id: string) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: "Bu sorğu silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, leaveRequests: (w.leaveRequests ?? []).filter((r) => r.id !== id) }));
+    if (leaveEditId === id) resetLeaveDraft();
+    flash(setToast, "Sorğu silindi");
+  };
+
+  const approveLeaveRequest = async (id: string) => {
+    const ok = await askConfirm({
+      title: "Təsdiq",
+      message: "Bu iş icazəsi sorğusu təsdiq olunsun?",
+      confirmLabel: "Təsdiq et",
+      cancelLabel: "Ləğv et",
+    });
+    if (!ok) return;
+    const now = Date.now();
+    const by = reviewerDisplayName();
+    setWorkspace((w) => ({
+      ...w,
+      leaveRequests: (w.leaveRequests ?? []).map((r) => {
+          if (r.id !== id) return r;
+          const { rejectReason: _omit, ...rest } = r;
+          return { ...rest, status: "approved" as const, reviewedAt: now, reviewedByName: by, updatedAt: now };
+        }),
+    }));
+    flash(setToast, "Sorğu təsdiq olundu");
+  };
+
+  const rejectLeaveRequest = async (id: string) => {
+    const reason = await askPrompt({
+      title: "İmtina səbəbi",
+      label: "İmtina səbəbini yazın (işçi görəcək)",
+      confirmLabel: "İmtina et",
+      cancelLabel: "Bağla",
+      multiline: true,
+    });
+    if (reason == null) return;
+    const rejectReason = reason.trim();
+    if (!rejectReason) {
+      flash(setToast, "İmtina səbəbi mütləqdir.", "error");
+      return;
+    }
+    const now = Date.now();
+    const by = reviewerDisplayName();
+    setWorkspace((w) => ({
+      ...w,
+      leaveRequests: (w.leaveRequests ?? []).map((r) =>
+        r.id === id
+          ? { ...r, status: "rejected" as const, rejectReason, reviewedAt: now, reviewedByName: by, updatedAt: now }
+          : r,
+      ),
+    }));
+    flash(setToast, "Sorğu imtina edildi");
+  };
+
+  const renderSystemPermissionsModule = () => {
+    if (!canManageSystemUsers) {
+      return (
+        <div className="dg-form-page pg-panel" aria-label="Sistem icazələri">
+          <div className="dg-form-page-body">
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Giriş icazəsi yoxdur</div>
+              <div className="dg-empty-state-desc">Bu bölmə yalnız direktor və ya admin üçün əlçatandır.</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const users = [...(workspace.systemUsers ?? [])].sort((a, b) =>
+      a.name.localeCompare(b.name, "az", { sensitivity: "base" }),
+    );
+
+    if (systemUserMode === "form") {
+      const modulesDisabled = systemUserDraft.role === "admin" || systemUserDraft.role === "director";
+      return (
+        <div className="dg-form-page pg-panel" aria-label={systemUserEditId ? "İstifadəçi redaktəsi" : "Yeni istifadəçi"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">Sistem icazələri</h1>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelSystemUserForm}>
+              Siyahı
+            </button>
+          </header>
+          <div className="dg-form-page-body">
+            <div className="dg-form-meta-grid">
+              <label className="dg-field">
+                <span className="dg-label">Ad, soyad</span>
+                <input
+                  className="dg-input"
+                  value={systemUserDraft.name}
+                  onChange={(e) => setSystemUserDraft((d) => ({ ...d, name: e.target.value }))}
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Email</span>
+                <input
+                  className="dg-input"
+                  type="email"
+                  value={systemUserDraft.email}
+                  onChange={(e) => setSystemUserDraft((d) => ({ ...d, email: e.target.value }))}
+                  placeholder="Giriş emaili"
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Rol</span>
+                <select
+                  className="dg-input"
+                  value={systemUserDraft.role}
+                  onChange={(e) => {
+                    const role = e.target.value as AppUserRole;
+                    setSystemUserDraft((d) => ({ ...d, role, modules: defaultModulesForRole(role) }));
+                  }}
+                >
+                  {APP_USER_ROLE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <h2 className="dg-form-inner-panel-title" style={{ marginTop: "1.25rem" }}>
+              Modul icazələri
+            </h2>
+            {modulesDisabled ? (
+              <p className="dg-muted">Direktor və admin bütün modullara giriş edir.</p>
+            ) : (
+              <div className="dg-permission-grid">
+                {PERMISSION_MODULE_OPTIONS.map((m) => (
+                  <label key={m.id} className="dg-permission-check">
+                    <input
+                      type="checkbox"
+                      checked={systemUserDraft.modules.includes(m.id)}
+                      onChange={() => toggleSystemUserModule(m.id)}
+                    />
+                    <span>{m.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelSystemUserForm}>
+                Ləğv et
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={saveSystemUser}>
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dg-form-page pg-panel" aria-label="Sistem icazələri siyahısı">
+        <div className="dg-form-page-body">
+          {users.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Hələ istifadəçi yoxdur</div>
+              <div className="dg-empty-state-desc">«Yeni istifadəçi» ilə işçi, direktor və ya admin əlavə edin.</div>
+            </div>
+          ) : (
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table">
+                <thead>
+                  <tr>
+                    <th className="dg-th-num">№</th>
+                    <th>Ad</th>
+                    <th>Email</th>
+                    <th>Rol</th>
+                    <th>Modullar</th>
+                    <th className="dg-th-actions">Əməliyyatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u, i) => (
+                    <tr key={u.id}>
+                      <td className="dg-td-num">{i + 1}</td>
+                      <td>{u.name}</td>
+                      <td>{u.email || "—"}</td>
+                      <td>{appUserRoleLabel(u.role)}</td>
+                      <td>
+                        {u.role === "employee"
+                          ? u.modules
+                              .map((id) => PERMISSION_MODULE_OPTIONS.find((m) => m.id === id)?.label ?? id)
+                              .join(", ")
+                          : "Hamısı"}
+                      </td>
+                      <td className="dg-td-actions">
+                        <div className="dg-icon-row">
+                          <button type="button" className="dg-icon-btn" title="Redaktə" aria-label="Redaktə" onClick={() => startEditSystemUser(u)}>
+                            <IconEdit />
+                          </button>
+                          <button type="button" className="dg-icon-btn dg-icon-btn-danger" title="Sil" aria-label="Sil" onClick={() => deleteSystemUser(u.id)}>
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderWorkLeaveModule = () => {
+    const employees = [...(workspace.systemUsers ?? [])].filter((u) => u.role === "employee" || u.role === "director");
+    const requests = [...(workspace.leaveRequests ?? [])].sort((a, b) => b.createdAt - a.createdAt);
+
+    if (leaveMode === "form") {
+      const employeeOptions = employees.length > 0 ? employees : (workspace.systemUsers ?? []);
+      return (
+        <div className="dg-form-page pg-panel" aria-label={leaveEditId ? "Sorğu redaktəsi" : "Yeni sorğu"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">İş icazəsi sorğusu</h1>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelLeaveForm}>
+              Siyahı
+            </button>
+          </header>
+          <div className="dg-form-page-body">
+            <div className="dg-form-meta-grid">
+              <label className="dg-field">
+                <span className="dg-label">İşçi</span>
+                <select
+                  className="dg-input"
+                  value={leaveDraft.employeeId}
+                  onChange={(e) => setLeaveDraft((d) => ({ ...d, employeeId: e.target.value }))}
+                  disabled={Boolean(leaveEditId) || (currentSystemUser?.role === "employee" && !leaveEditId)}
+                >
+                  <option value="">— seçin —</option>
+                  {employeeOptions.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">İcazə növü</span>
+                <select
+                  className="dg-input"
+                  value={leaveDraft.leaveType}
+                  onChange={(e) => setLeaveDraft((d) => ({ ...d, leaveType: e.target.value }))}
+                >
+                  {LEAVE_TYPE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Başlama tarixi</span>
+                <input className="dg-input" type="date" value={leaveDraft.startDate} onChange={(e) => setLeaveDraft((d) => ({ ...d, startDate: e.target.value }))} />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Bitmə tarixi</span>
+                <input className="dg-input" type="date" value={leaveDraft.endDate} onChange={(e) => setLeaveDraft((d) => ({ ...d, endDate: e.target.value }))} />
+              </label>
+              <label className="dg-field dg-field-span-full">
+                <span className="dg-label">Sorğu mətni</span>
+                <textarea className="dg-input" rows={3} value={leaveDraft.reason} onChange={(e) => setLeaveDraft((d) => ({ ...d, reason: e.target.value }))} />
+              </label>
+            </div>
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelLeaveForm}>
+                Ləğv et
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={saveLeaveRequest}>
+                {leaveEditId ? "Yenilə" : "Sorğu göndər"}
+              </button>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dg-form-page pg-panel" aria-label="İş icazələri siyahısı">
+        <div className="dg-form-page-body">
+          {requests.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Hələ sorğu yoxdur</div>
+              <div className="dg-empty-state-desc">«Yeni sorğu» ilə iş icazəsi müraciəti göndərin.</div>
+            </div>
+          ) : (
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table">
+                <thead>
+                  <tr>
+                    <th className="dg-th-num">№</th>
+                    <th>İşçi</th>
+                    <th>Növ</th>
+                    <th>Tarix</th>
+                    <th>Status</th>
+                    <th>İmtina səbəbi</th>
+                    <th className="dg-th-actions">Əməliyyatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {requests.map((r, i) => (
+                    <tr key={r.id}>
+                      <td className="dg-td-num">{i + 1}</td>
+                      <td>{r.employeeName}</td>
+                      <td>{leaveTypeLabel(r.leaveType)}</td>
+                      <td>
+                        {formatDateAzLong(r.startDate)}
+                        {r.endDate !== r.startDate ? ` – ${formatDateAzLong(r.endDate)}` : ""}
+                      </td>
+                      <td>
+                        <LeaveStatusBadge status={r.status} />
+                      </td>
+                      <td className={r.status === "rejected" ? "dg-leave-reject-reason" : ""}>
+                        {r.status === "rejected" ? r.rejectReason || "—" : "—"}
+                      </td>
+                      <td className="dg-td-actions">
+                        <div className="dg-icon-row dg-icon-row--wrap">
+                          <button type="button" className="dg-icon-btn" title="Məlumat" aria-label="Məlumat" onClick={() => setLeaveInfoId(r.id)}>
+                            <IconInfo />
+                          </button>
+                          {r.status === "pending" && (
+                            <button type="button" className="dg-icon-btn" title="Redaktə" aria-label="Redaktə" onClick={() => startEditLeaveRequest(r)}>
+                              <IconEdit />
+                            </button>
+                          )}
+                          {canReviewLeave && r.status === "pending" ? (
+                            <>
+                              <button type="button" className="dg-btn dg-btn-secondary dg-btn--compact" onClick={() => approveLeaveRequest(r.id)}>
+                                Təsdiq
+                              </button>
+                              <button type="button" className="dg-btn dg-btn-danger dg-btn--compact" onClick={() => rejectLeaveRequest(r.id)}>
+                                İmtina
+                              </button>
+                            </>
+                          ) : null}
+                          {(r.status === "pending" || canReviewLeave) && (
+                            <button type="button" className="dg-icon-btn dg-icon-btn-danger" title="Sil" aria-label="Sil" onClick={() => deleteLeaveRequest(r.id)}>
+                              <IconTrash />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const switchSidebarModule = (next: SidebarModule) => {
     if (module === "companies") cancelCompanyForm();
     else if (module === "projects") cancelProjectForm();
     else if (module === "suppliers") cancelOfferForm();
     else if (module === "storeOrders") cancelStoreOrderForm();
     else if (module === "customerOrders") cancelCustomerOrderForm();
+    else if (module === "systemPermissions") cancelSystemUserForm();
+    else if (module === "workLeave") cancelLeaveForm();
     setModule(next);
     setSidebarOpen(false);
   };
@@ -4733,6 +5498,10 @@ export default function App() {
                 ? { label: "Yeni sifariş", onClick: openNewStoreOrderForm }
                 : module === "customerOrders" && customerOrderMode === "list"
                   ? { label: "Yeni sifariş", onClick: openNewCustomerOrderForm }
+                  : module === "systemPermissions" && systemUserMode === "list" && canManageSystemUsers
+                    ? { label: "Yeni istifadəçi", onClick: openNewSystemUserForm }
+                    : module === "workLeave" && leaveMode === "list"
+                      ? { label: "Yeni sorğu", onClick: openNewLeaveForm }
         : null;
 
   const modalLayer = (
@@ -5146,13 +5915,25 @@ export default function App() {
             className="dg-modal-body"
             onSubmit={(e) => {
               e.preventDefault();
-              resolvePrompt(promptInputRef.current?.value ?? "");
+              const value = promptDialog.multiline
+                ? promptTextareaRef.current?.value ?? ""
+                : promptInputRef.current?.value ?? "";
+              resolvePrompt(value);
             }}
           >
             <h2 className="dg-modal-title">{promptDialog.title}</h2>
             <label className="dg-field">
               <span className="dg-label">{promptDialog.label}</span>
-              <input ref={promptInputRef} className="dg-input" defaultValue={promptDialog.defaultValue ?? ""} />
+              {promptDialog.multiline ? (
+                <textarea
+                  ref={promptTextareaRef}
+                  className="dg-input"
+                  rows={4}
+                  defaultValue={promptDialog.defaultValue ?? ""}
+                />
+              ) : (
+                <input ref={promptInputRef} className="dg-input" defaultValue={promptDialog.defaultValue ?? ""} />
+              )}
             </label>
             <div className="dg-modal-actions">
               <button type="button" className="dg-btn dg-btn-secondary" onClick={() => resolvePrompt(null)}>
@@ -5239,6 +6020,69 @@ export default function App() {
                   {n.body ? <p className="dg-modal-hint">{n.body}</p> : <p className="dg-modal-hint">—</p>}
                   <div className="dg-modal-actions">
                     <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setNoteInfoId(null)}>
+                      Bağla
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </dialog>
+      ) : null}
+
+      {leaveInfoId ? (
+        <dialog ref={leaveInfoDialogRef} className="dg-modal dg-modal--wide" onClose={() => setLeaveInfoId(null)}>
+          <div className="dg-modal-body">
+            {(() => {
+              const r = (workspace.leaveRequests ?? []).find((x) => x.id === leaveInfoId);
+              if (!r) return null;
+              return (
+                <>
+                  <h2 className="dg-modal-title">İş icazəsi sorğusu</h2>
+                  <dl className="dg-info-dl">
+                    <div className="dg-info-row">
+                      <dt>İşçi</dt>
+                      <dd>{r.employeeName}</dd>
+                    </div>
+                    <div className="dg-info-row">
+                      <dt>Növ</dt>
+                      <dd>{leaveTypeLabel(r.leaveType)}</dd>
+                    </div>
+                    <div className="dg-info-row">
+                      <dt>Tarix</dt>
+                      <dd>
+                        {formatDateAzLong(r.startDate)}
+                        {r.endDate !== r.startDate ? ` – ${formatDateAzLong(r.endDate)}` : ""}
+                      </dd>
+                    </div>
+                    <div className="dg-info-row">
+                      <dt>Status</dt>
+                      <dd>
+                        <LeaveStatusBadge status={r.status} />
+                      </dd>
+                    </div>
+                    <div className="dg-info-row">
+                      <dt>Sorğu</dt>
+                      <dd>{r.reason}</dd>
+                    </div>
+                    {r.status === "rejected" && r.rejectReason ? (
+                      <div className="dg-info-row dg-leave-reject-info">
+                        <dt>İmtina səbəbi</dt>
+                        <dd>{r.rejectReason}</dd>
+                      </div>
+                    ) : null}
+                    {r.reviewedByName ? (
+                      <div className="dg-info-row">
+                        <dt>Baxıldı</dt>
+                        <dd>
+                          {r.reviewedByName}
+                          {r.reviewedAt ? ` · ${new Date(r.reviewedAt).toLocaleString("az-AZ")}` : ""}
+                        </dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                  <div className="dg-modal-actions">
+                    <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setLeaveInfoId(null)}>
                       Bağla
                     </button>
                   </div>
@@ -5448,17 +6292,23 @@ export default function App() {
             </nav>
 
             <p className="rb-menu-section">Sistem</p>
-            <nav className="rb-menu" aria-label="Sistem ayarları">
-              <button
-                type="button"
-                className={`rb-menu-item ${module === "settings" ? "is-active" : ""}`}
-                onClick={() => switchSidebarModule("settings")}
-              >
-                <span className="rb-menu-icon">
-                  <SidebarNavIcon mod="settings" />
-                </span>
-                <span>Ayarlar</span>
-              </button>
+            <nav className="rb-menu" aria-label="Sistem modulları">
+              {filteredSystemNavIds.map((id) => {
+                const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}`}
+                    onClick={() => switchSidebarModule(m.id)}
+                  >
+                    <span className="rb-menu-icon">
+                      <SidebarNavIcon mod={m.id} />
+                    </span>
+                    <span>{m.label}</span>
+                  </button>
+                );
+              })}
             </nav>
 
             <div className="rb-sidebar-spacer" aria-hidden />
@@ -5539,6 +6389,8 @@ export default function App() {
               {module === "suppliers" ? renderSuppliersModule() : null}
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
+              {module === "systemPermissions" ? renderSystemPermissionsModule() : null}
+              {module === "workLeave" ? renderWorkLeaveModule() : null}
               {module === "settings" ? renderSettingsModule() : null}
             </main>
           </section>

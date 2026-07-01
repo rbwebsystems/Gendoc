@@ -215,6 +215,50 @@ export interface CustomerOrderRecord {
   updatedAt: number;
 }
 
+export type LeaveRequestStatus = "pending" | "approved" | "rejected";
+
+export type AppUserRole = "employee" | "director" | "admin";
+
+/** Sistem icazələri modulunda təyin olunan modul girişləri */
+export type PermissionModuleId =
+  | "companies"
+  | "projects"
+  | "folders"
+  | "notes"
+  | "suppliers"
+  | "storeOrders"
+  | "customerOrders"
+  | "workLeave";
+
+/** Sistem istifadəçisi və modul icazələri */
+export interface SystemUserRecord {
+  id: string;
+  name: string;
+  email?: string;
+  role: AppUserRole;
+  modules: PermissionModuleId[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** İşçinin iş icazəsi sorğusu */
+export interface LeaveRequestRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  leaveType: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: LeaveRequestStatus;
+  /** İmtina səbəbi — işçi görür */
+  rejectReason?: string;
+  reviewedAt?: number;
+  reviewedByName?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DocWorkspace {
   version: 3;
   /** Ayarlarda: daimi satıcı */
@@ -237,6 +281,8 @@ export interface DocWorkspace {
   supplierQuotes?: SupplierQuoteRecord[];
   storeOrders?: StoreOrderRecord[];
   customerOrders?: CustomerOrderRecord[];
+  systemUsers?: SystemUserRecord[];
+  leaveRequests?: LeaveRequestRecord[];
 }
 
 /** Köçürmə üçün köhnə format */

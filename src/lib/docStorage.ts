@@ -7,6 +7,11 @@ import type {
   SupplierOfferRow,
   StoreOrderRecord,
   CustomerOrderRecord,
+  SystemUserRecord,
+  LeaveRequestRecord,
+  PermissionModuleId,
+  AppUserRole,
+  LeaveRequestStatus,
   OrderLineRow,
   OrderStatus,
   DocWorkspace,
@@ -17,7 +22,7 @@ import type {
   SavedCompanyRecord,
   SavedProjectV2,
 } from "../types";
-import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT } from "./defaults";
+import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT, defaultModulesForRole } from "./defaults";
 
 const WS_KEY_V3 = "docgen_workspace_v3";
 const WS_KEY_V3_BACKUP = "docgen_workspace_v3_backup";
@@ -101,6 +106,103 @@ function normalizeCustomerOrders(raw: unknown): CustomerOrderRecord[] {
       };
     })
     .filter((o) => o.customerName.length > 0 && o.rows.length > 0);
+}
+
+const VALID_PERMISSION_MODULES = new Set<PermissionModuleId>([
+  "companies",
+  "projects",
+  "folders",
+  "notes",
+  "suppliers",
+  "storeOrders",
+  "customerOrders",
+  "workLeave",
+]);
+
+function normalizeAppUserRole(raw: unknown): AppUserRole {
+  if (raw === "employee" || raw === "director" || raw === "admin") return raw;
+  return "employee";
+}
+
+function normalizePermissionModules(raw: unknown, role: AppUserRole): PermissionModuleId[] {
+  if (!Array.isArray(raw)) return defaultModulesForRole(role);
+  const mods = raw
+    .filter((m) => typeof m === "string" && VALID_PERMISSION_MODULES.has(m as PermissionModuleId))
+    .map((m) => m as PermissionModuleId);
+  return mods.length > 0 ? mods : defaultModulesForRole(role);
+}
+
+function normalizeSystemUsers(raw: unknown): SystemUserRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((u) => u && typeof (u as { id?: unknown }).id === "string")
+    .map((u) => {
+      const role = normalizeAppUserRole((u as { role?: unknown }).role);
+      const email =
+        typeof (u as { email?: unknown }).email === "string" ? String((u as { email: string }).email).trim() : "";
+      return {
+        id: String((u as { id: string }).id),
+        name: typeof (u as { name?: unknown }).name === "string" ? String((u as { name: string }).name).trim() : "",
+        role,
+        modules: normalizePermissionModules((u as { modules?: unknown }).modules, role),
+        createdAt: typeof (u as { createdAt?: unknown }).createdAt === "number" ? Number((u as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (u as { updatedAt?: unknown }).updatedAt === "number" ? Number((u as { updatedAt: number }).updatedAt) : Date.now(),
+        ...(email ? { email } : {}),
+      };
+    })
+    .filter((u) => u.name.length > 0);
+}
+
+function normalizeLeaveStatus(raw: unknown): LeaveRequestStatus {
+  if (raw === "pending" || raw === "approved" || raw === "rejected") return raw;
+  return "pending";
+}
+
+function normalizeLeaveRequests(raw: unknown, usersById: Map<string, SystemUserRecord>): LeaveRequestRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((r) => r && typeof (r as { id?: unknown }).id === "string")
+    .map((r) => {
+      const employeeId = typeof (r as { employeeId?: unknown }).employeeId === "string" ? String((r as { employeeId: string }).employeeId) : "";
+      const employeeRaw =
+        typeof (r as { employeeName?: unknown }).employeeName === "string"
+          ? String((r as { employeeName: string }).employeeName).trim()
+          : "";
+      const employeeName = employeeRaw || usersById.get(employeeId)?.name || "";
+      const startDateRaw = typeof (r as { startDate?: unknown }).startDate === "string" ? String((r as { startDate: string }).startDate) : "";
+      const endDateRaw = typeof (r as { endDate?: unknown }).endDate === "string" ? String((r as { endDate: string }).endDate) : "";
+      const startDate = /^\d{4}-\d{2}-\d{2}$/.test(startDateRaw) ? startDateRaw : new Date().toISOString().slice(0, 10);
+      const endDate = /^\d{4}-\d{2}-\d{2}$/.test(endDateRaw) ? endDateRaw : startDate;
+      const leaveType =
+        typeof (r as { leaveType?: unknown }).leaveType === "string" ? String((r as { leaveType: string }).leaveType).trim() : "other";
+      const reason = typeof (r as { reason?: unknown }).reason === "string" ? String((r as { reason: string }).reason).trim() : "";
+      const rejectReason =
+        typeof (r as { rejectReason?: unknown }).rejectReason === "string"
+          ? String((r as { rejectReason: string }).rejectReason).trim()
+          : "";
+      const reviewedByName =
+        typeof (r as { reviewedByName?: unknown }).reviewedByName === "string"
+          ? String((r as { reviewedByName: string }).reviewedByName).trim()
+          : "";
+      const reviewedAt =
+        typeof (r as { reviewedAt?: unknown }).reviewedAt === "number" ? Number((r as { reviewedAt: number }).reviewedAt) : undefined;
+      return {
+        id: String((r as { id: string }).id),
+        employeeId,
+        employeeName,
+        leaveType,
+        startDate,
+        endDate,
+        reason,
+        status: normalizeLeaveStatus((r as { status?: unknown }).status),
+        createdAt: typeof (r as { createdAt?: unknown }).createdAt === "number" ? Number((r as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (r as { updatedAt?: unknown }).updatedAt === "number" ? Number((r as { updatedAt: number }).updatedAt) : Date.now(),
+        ...(rejectReason ? { rejectReason } : {}),
+        ...(typeof reviewedAt === "number" ? { reviewedAt } : {}),
+        ...(reviewedByName ? { reviewedByName } : {}),
+      };
+    })
+    .filter((r) => r.employeeName.length > 0 && r.reason.length > 0);
 }
 
 export function normalizeGeneratorState(p: GeneratorState): GeneratorState {
@@ -386,6 +488,9 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
 
   const storeOrders = normalizeStoreOrders(w.storeOrders);
   const customerOrders = normalizeCustomerOrders(w.customerOrders);
+  const systemUsers = normalizeSystemUsers(w.systemUsers);
+  const usersById = new Map(systemUsers.map((u) => [u.id, u]));
+  const leaveRequests = normalizeLeaveRequests(w.leaveRequests, usersById);
 
   return {
     version: 3,
@@ -406,6 +511,8 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     supplierOffers,
     storeOrders,
     customerOrders,
+    systemUsers,
+    leaveRequests,
   };
 }
 
@@ -601,6 +708,8 @@ export function workspaceHasUserData(w: DocWorkspace): boolean {
     (ws.supplierOffers?.length ?? 0) > 0 ||
     (ws.storeOrders?.length ?? 0) > 0 ||
     (ws.customerOrders?.length ?? 0) > 0 ||
+    (ws.systemUsers?.length ?? 0) > 0 ||
+    (ws.leaveRequests?.length ?? 0) > 0 ||
     hasFolders ||
     hasSeller
   );
