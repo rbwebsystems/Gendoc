@@ -194,7 +194,6 @@ export interface OrderLineRow {
 /** Mağaza daxili sifariş — şirkət/təklif/təchizatçı modulları ilə əlaqəli deyil */
 export interface StoreOrderRecord {
   id: string;
-  customerName: string;
   orderDate: string;
   status: OrderStatus;
   rows: OrderLineRow[];

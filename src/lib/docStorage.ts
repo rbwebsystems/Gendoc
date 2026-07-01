@@ -58,16 +58,9 @@ function normalizeStoreOrders(raw: unknown): StoreOrderRecord[] {
       const orderDateRaw = typeof (o as { orderDate?: unknown }).orderDate === "string" ? String((o as { orderDate: string }).orderDate) : "";
       const orderDate = /^\d{4}-\d{2}-\d{2}$/.test(orderDateRaw) ? orderDateRaw : new Date().toISOString().slice(0, 10);
       const note = typeof (o as { note?: unknown }).note === "string" ? String((o as { note: string }).note).trim() : "";
-      const customerNameRaw =
-        typeof (o as { customerName?: unknown }).customerName === "string"
-          ? String((o as { customerName: string }).customerName).trim()
-          : typeof (o as { title?: unknown }).title === "string"
-            ? String((o as { title: string }).title).trim()
-            : "";
       const rows = normalizeOrderLines((o as { rows?: unknown }).rows);
       return {
         id: String((o as { id: string }).id),
-        customerName: customerNameRaw,
         orderDate,
         status: normalizeOrderStatus((o as { status?: unknown }).status),
         rows,
@@ -76,7 +69,7 @@ function normalizeStoreOrders(raw: unknown): StoreOrderRecord[] {
         ...(note ? { note } : {}),
       };
     })
-    .filter((o) => o.customerName.length > 0 && o.rows.length > 0);
+    .filter((o) => o.rows.length > 0);
 }
 
 function normalizeCustomerOrders(raw: unknown): CustomerOrderRecord[] {

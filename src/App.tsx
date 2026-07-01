@@ -184,7 +184,6 @@ type OfferFormMode = "list" | "form";
 type OrderFormMode = "list" | "form";
 
 type StoreOrderDraft = {
-  customerName: string;
   orderDate: string;
   status: OrderStatus;
   note: string;
@@ -202,7 +201,6 @@ type CustomerOrderDraft = {
 
 function emptyStoreOrderDraft(): StoreOrderDraft {
   return {
-    customerName: "",
     orderDate: new Date().toISOString().slice(0, 10),
     status: "draft",
     note: "",
@@ -231,6 +229,10 @@ function normalizeOrderDraftRows(rows: OrderLineRow[]): OrderLineRow[] {
       purchasePrice: Number(r.purchasePrice) || 0,
     }))
     .filter((r) => r.name.length > 0 && r.supplierName.length > 0 && r.qty > 0 && r.purchasePrice > 0);
+}
+
+function orderPurchaseTotal(rows: OrderLineRow[]): number {
+  return rows.reduce((sum, r) => sum + r.qty * r.purchasePrice, 0);
 }
 
 type ProjectDraft = {
@@ -981,7 +983,10 @@ export default function App() {
   const [projectEditId, setProjectEditId] = useState<string | null>(null);
   const [projectDraft, setProjectDraft] = useState<ProjectDraft>(() => emptyProjectDraft());
 
-  const [infoDialog, setInfoDialog] = useState<{ kind: "company" | "project" | "offer"; id: string } | null>(null);
+  const [infoDialog, setInfoDialog] = useState<{
+    kind: "company" | "project" | "offer" | "storeOrder" | "customerOrder";
+    id: string;
+  } | null>(null);
   const printDialogRef = useRef<HTMLDialogElement>(null);
   const [printProjectId, setPrintProjectId] = useState<string | null>(null);
   const infoDialogRef = useRef<HTMLDialogElement>(null);
@@ -1825,6 +1830,12 @@ export default function App() {
   const infoOffer =
     infoDialog?.kind === "offer" ? (workspace.supplierOffers ?? []).find((o) => o.id === infoDialog.id) : undefined;
   const infoOfferTotals = infoOffer ? offerRowTotals(infoOffer.rows) : null;
+  const infoStoreOrder =
+    infoDialog?.kind === "storeOrder" ? (workspace.storeOrders ?? []).find((o) => o.id === infoDialog.id) : undefined;
+  const infoCustomerOrder =
+    infoDialog?.kind === "customerOrder"
+      ? (workspace.customerOrders ?? []).find((o) => o.id === infoDialog.id)
+      : undefined;
   const infoProjectBuyer =
     infoProject && workspace.companies.find((c) => c.id === infoProject.companyId)?.profile;
 
@@ -3343,7 +3354,6 @@ export default function App() {
   const startEditStoreOrder = (o: StoreOrderRecord) => {
     setStoreOrderEditId(o.id);
     setStoreOrderDraft({
-      customerName: o.customerName,
       orderDate: o.orderDate,
       status: o.status,
       note: o.note || "",
@@ -3353,12 +3363,7 @@ export default function App() {
   };
 
   const saveStoreOrder = () => {
-    const customerName = storeOrderDraft.customerName.trim();
     const rows = normalizeOrderDraftRows(storeOrderDraft.rows);
-    if (!customerName) {
-      flash(setToast, "Müştəri adını daxil edin.", "error");
-      return;
-    }
     if (rows.length === 0) {
       flash(setToast, "Hər sətirdə məhsul, miqdar, alış qiyməti və təchizatçı daxil edin.", "error");
       return;
@@ -3373,7 +3378,6 @@ export default function App() {
           if (o.id !== storeOrderEditId) return o;
           const rec: StoreOrderRecord = {
             id: o.id,
-            customerName,
             orderDate,
             status: storeOrderDraft.status,
             rows,
@@ -3388,7 +3392,6 @@ export default function App() {
     } else {
       const rec: StoreOrderRecord = {
         id: crypto.randomUUID(),
-        customerName,
         orderDate,
         status: storeOrderDraft.status,
         rows,
@@ -3612,10 +3615,23 @@ export default function App() {
     </div>
   );
 
-  const renderOrderListTable = <T extends { id: string; customerName: string; status: OrderStatus; rows: OrderLineRow[] }>(
+  const renderOrderListTable = <
+    T extends {
+      id: string;
+      status: OrderStatus;
+      rows: OrderLineRow[];
+      orderDate?: string;
+      customerName?: string;
+    },
+  >(
     orders: T[],
-    onEdit: (order: T) => void,
-    onDelete: (id: string) => void,
+    opts: {
+      showCustomer: boolean;
+      showDate: boolean;
+      onInfo: (order: T) => void;
+      onEdit: (order: T) => void;
+      onDelete: (id: string) => void;
+    },
   ) => {
     let rowNum = 0;
     return (
@@ -3624,7 +3640,8 @@ export default function App() {
           <thead>
             <tr>
               <th className="dg-th-num">№</th>
-              <th>Müştəri</th>
+              {opts.showDate ? <th>Tarix</th> : null}
+              {opts.showCustomer ? <th>Müştəri</th> : null}
               <th>Status</th>
               <th>Məhsul</th>
               <th>Miqdar</th>
@@ -3642,7 +3659,10 @@ export default function App() {
                     <td className="dg-td-num">{rowNum}</td>
                     {lineIdx === 0 ? (
                       <>
-                        <td rowSpan={o.rows.length}>{o.customerName}</td>
+                        {opts.showDate ? (
+                          <td rowSpan={o.rows.length}>{o.orderDate ? formatDateAzLong(o.orderDate) : "—"}</td>
+                        ) : null}
+                        {opts.showCustomer ? <td rowSpan={o.rows.length}>{o.customerName || "—"}</td> : null}
                         <td rowSpan={o.rows.length}>{orderStatusLabel(o.status)}</td>
                       </>
                     ) : null}
@@ -3656,9 +3676,18 @@ export default function App() {
                           <button
                             type="button"
                             className="dg-icon-btn"
+                            title="Məlumat"
+                            aria-label="Məlumat"
+                            onClick={() => opts.onInfo(o)}
+                          >
+                            <IconInfo />
+                          </button>
+                          <button
+                            type="button"
+                            className="dg-icon-btn"
                             title="Redaktə et"
                             aria-label="Redaktə et"
-                            onClick={() => onEdit(o)}
+                            onClick={() => opts.onEdit(o)}
                           >
                             <IconEdit />
                           </button>
@@ -3667,7 +3696,7 @@ export default function App() {
                             className="dg-icon-btn dg-icon-btn-danger"
                             title="Sil"
                             aria-label="Sil"
-                            onClick={() => onDelete(o.id)}
+                            onClick={() => opts.onDelete(o.id)}
                           >
                             <IconTrash />
                           </button>
@@ -3683,6 +3712,50 @@ export default function App() {
       </div>
     );
   };
+
+  const renderOrderInfoLinesTable = (rows: OrderLineRow[]) => (
+    <>
+      <div className="dg-info-section-title">Məhsullar</div>
+      <div className="dg-info-table-wrap">
+        <table className="dg-info-table">
+          <thead>
+            <tr>
+              <th style={{ width: 54 }} className="dg-num">
+                №
+              </th>
+              <th>Məhsul</th>
+              <th style={{ width: 90 }} className="dg-num">
+                Miqdar
+              </th>
+              <th style={{ width: 120 }} className="dg-num">
+                Alış qiyməti
+              </th>
+              <th style={{ width: 140 }}>Təchizatçı</th>
+              <th style={{ width: 120 }} className="dg-num">
+                Cəm
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, idx) => (
+              <tr key={r.id}>
+                <td className="dg-num">{idx + 1}</td>
+                <td>{r.name || "—"}</td>
+                <td className="dg-num">{r.qty}</td>
+                <td className="dg-num">{formatMoney(r.purchasePrice)}</td>
+                <td>{r.supplierName || "—"}</td>
+                <td className="dg-num">{formatMoney(r.qty * r.purchasePrice)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="dg-info-totals" aria-label="Yekun">
+        <div className="k">Alış cəmi</div>
+        <div className="v">{formatMoney(orderPurchaseTotal(rows))}</div>
+      </div>
+    </>
+  );
 
   const companyLabel = (companyId?: string) => {
     const c = companyId ? companyById.get(companyId) : undefined;
@@ -4275,15 +4348,6 @@ export default function App() {
           <div className="dg-form-page-body">
             <div className="dg-form-meta-grid">
               <label className="dg-field">
-                <span className="dg-label">Müştəri adı</span>
-                <input
-                  className="dg-input"
-                  value={storeOrderDraft.customerName}
-                  onChange={(e) => setStoreOrderDraft((d) => ({ ...d, customerName: e.target.value }))}
-                  placeholder="Ad və ya şirkət"
-                />
-              </label>
-              <label className="dg-field">
                 <span className="dg-label">Tarix</span>
                 <input
                   className="dg-input"
@@ -4353,7 +4417,13 @@ export default function App() {
               <div className="dg-empty-state-desc">«Yeni sifariş» ilə mağaza daxili sifariş əlavə edin.</div>
             </div>
           ) : (
-            renderOrderListTable(orders, startEditStoreOrder, deleteStoreOrder)
+            renderOrderListTable(orders, {
+              showCustomer: false,
+              showDate: true,
+              onInfo: (o) => setInfoDialog({ kind: "storeOrder", id: o.id }),
+              onEdit: startEditStoreOrder,
+              onDelete: deleteStoreOrder,
+            })
           )}
         </div>
       </div>
@@ -4472,7 +4542,13 @@ export default function App() {
               <div className="dg-empty-state-desc">«Yeni sifariş» ilə müştəri sifarişi əlavə edin.</div>
             </div>
           ) : (
-            renderOrderListTable(orders, startEditCustomerOrder, deleteCustomerOrder)
+            renderOrderListTable(orders, {
+              showCustomer: true,
+              showDate: false,
+              onInfo: (o) => setInfoDialog({ kind: "customerOrder", id: o.id }),
+              onEdit: startEditCustomerOrder,
+              onDelete: deleteCustomerOrder,
+            })
           )}
         </div>
       </div>
@@ -4931,6 +5007,60 @@ export default function App() {
                 <div className="k">Satış (nağd)</div>
                 <div className="v">{formatMoney(infoOfferTotals.saleCash)}</div>
               </div>
+            </>
+          ) : null}
+          {infoDialog?.kind === "storeOrder" && infoStoreOrder ? (
+            <>
+              <h2 className="dg-modal-title">Mağaza sifarişi</h2>
+              <dl className="dg-info-dl">
+                <div className="dg-info-row">
+                  <dt>Tarix</dt>
+                  <dd>{formatDateAzLong(infoStoreOrder.orderDate)}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Status</dt>
+                  <dd>{orderStatusLabel(infoStoreOrder.status)}</dd>
+                </div>
+                {infoStoreOrder.note?.trim() ? (
+                  <div className="dg-info-row">
+                    <dt>Qeyd</dt>
+                    <dd>{infoStoreOrder.note.trim()}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              {renderOrderInfoLinesTable(infoStoreOrder.rows)}
+            </>
+          ) : null}
+          {infoDialog?.kind === "customerOrder" && infoCustomerOrder ? (
+            <>
+              <h2 className="dg-modal-title">Müştəri sifarişi</h2>
+              <dl className="dg-info-dl">
+                <div className="dg-info-row">
+                  <dt>Müştəri</dt>
+                  <dd>{infoCustomerOrder.customerName}</dd>
+                </div>
+                {infoCustomerOrder.customerPhone?.trim() ? (
+                  <div className="dg-info-row">
+                    <dt>Telefon</dt>
+                    <dd>{infoCustomerOrder.customerPhone.trim()}</dd>
+                  </div>
+                ) : null}
+                <div className="dg-info-row">
+                  <dt>Tarix</dt>
+                  <dd>{formatDateAzLong(infoCustomerOrder.orderDate)}</dd>
+                </div>
+                <div className="dg-info-row">
+                  <dt>Status</dt>
+                  <dd>{orderStatusLabel(infoCustomerOrder.status)}</dd>
+                </div>
+                {infoCustomerOrder.note?.trim() ? (
+                  <div className="dg-info-row">
+                    <dt>Qeyd</dt>
+                    <dd>{infoCustomerOrder.note.trim()}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              {renderOrderInfoLinesTable(infoCustomerOrder.rows)}
             </>
           ) : null}
           <button type="button" className="dg-btn dg-btn-primary dg-btn-block dg-modal-close" onClick={() => infoDialogRef.current?.close()}>
