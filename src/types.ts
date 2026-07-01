@@ -180,6 +180,41 @@ export interface SupplierQuoteRecord {
   updatedAt: number;
 }
 
+export type OrderStatus = "draft" | "pending" | "done" | "cancelled";
+
+/** Mağaza və müştəri sifarişlərində məhsul sətri — digər modullarla əlaqəsiz */
+export interface OrderLineRow {
+  id: string;
+  name: string;
+  unit: string;
+  qty: number;
+}
+
+/** Mağaza daxili sifariş — şirkət/təklif/təchizatçı ilə əlaqəli deyil */
+export interface StoreOrderRecord {
+  id: string;
+  title: string;
+  orderDate: string;
+  status: OrderStatus;
+  rows: OrderLineRow[];
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Müştəri sifarişi — şirkətlər siyahısından asılı deyil */
+export interface CustomerOrderRecord {
+  id: string;
+  customerName: string;
+  customerPhone?: string;
+  orderDate: string;
+  status: OrderStatus;
+  rows: OrderLineRow[];
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface DocWorkspace {
   version: 3;
   /** Ayarlarda: daimi satıcı */
@@ -200,6 +235,8 @@ export interface DocWorkspace {
   supplierOffers?: SupplierOfferRecord[];
   /** @deprecated migrate → supplierOffers */
   supplierQuotes?: SupplierQuoteRecord[];
+  storeOrders?: StoreOrderRecord[];
+  customerOrders?: CustomerOrderRecord[];
 }
 
 /** Köçürmə üçün köhnə format */

@@ -5,6 +5,10 @@ import type {
   SupplierRecord,
   SupplierOfferRecord,
   SupplierOfferRow,
+  StoreOrderRecord,
+  CustomerOrderRecord,
+  OrderLineRow,
+  OrderStatus,
   DocWorkspace,
   DocWorkspaceV2,
   GeneratorState,
@@ -22,6 +26,80 @@ const LEGACY_KEY = "docgen_state_v1";
 
 export function normalizeCompany(c: CompanyProfile): CompanyProfile {
   return { ...emptyCompany(), ...c };
+}
+
+function normalizeOrderStatus(raw: unknown): OrderStatus {
+  if (raw === "draft" || raw === "pending" || raw === "done" || raw === "cancelled") return raw;
+  return "draft";
+}
+
+function normalizeOrderLines(raw: unknown): OrderLineRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((r) => r && typeof (r as { id?: unknown }).id === "string")
+    .map((r) => ({
+      id: String((r as { id: string }).id),
+      name: typeof (r as { name?: unknown }).name === "string" ? String((r as { name: string }).name).trim() : "",
+      unit: typeof (r as { unit?: unknown }).unit === "string" && String((r as { unit: string }).unit).trim()
+        ? String((r as { unit: string }).unit).trim()
+        : "ədəd",
+      qty: Math.max(0, Number((r as { qty?: unknown }).qty) || 0),
+    }))
+    .filter((r) => r.name.length > 0 && r.qty > 0);
+}
+
+function normalizeStoreOrders(raw: unknown): StoreOrderRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((o) => o && typeof (o as { id?: unknown }).id === "string")
+    .map((o) => {
+      const orderDateRaw = typeof (o as { orderDate?: unknown }).orderDate === "string" ? String((o as { orderDate: string }).orderDate) : "";
+      const orderDate = /^\d{4}-\d{2}-\d{2}$/.test(orderDateRaw) ? orderDateRaw : new Date().toISOString().slice(0, 10);
+      const note = typeof (o as { note?: unknown }).note === "string" ? String((o as { note: string }).note).trim() : "";
+      const rows = normalizeOrderLines((o as { rows?: unknown }).rows);
+      return {
+        id: String((o as { id: string }).id),
+        title: typeof (o as { title?: unknown }).title === "string" ? String((o as { title: string }).title).trim() : "",
+        orderDate,
+        status: normalizeOrderStatus((o as { status?: unknown }).status),
+        rows,
+        createdAt: typeof (o as { createdAt?: unknown }).createdAt === "number" ? Number((o as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (o as { updatedAt?: unknown }).updatedAt === "number" ? Number((o as { updatedAt: number }).updatedAt) : Date.now(),
+        ...(note ? { note } : {}),
+      };
+    })
+    .filter((o) => o.title.length > 0 && o.rows.length > 0);
+}
+
+function normalizeCustomerOrders(raw: unknown): CustomerOrderRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((o) => o && typeof (o as { id?: unknown }).id === "string")
+    .map((o) => {
+      const orderDateRaw = typeof (o as { orderDate?: unknown }).orderDate === "string" ? String((o as { orderDate: string }).orderDate) : "";
+      const orderDate = /^\d{4}-\d{2}-\d{2}$/.test(orderDateRaw) ? orderDateRaw : new Date().toISOString().slice(0, 10);
+      const note = typeof (o as { note?: unknown }).note === "string" ? String((o as { note: string }).note).trim() : "";
+      const customerPhone =
+        typeof (o as { customerPhone?: unknown }).customerPhone === "string"
+          ? String((o as { customerPhone: string }).customerPhone).trim()
+          : "";
+      const rows = normalizeOrderLines((o as { rows?: unknown }).rows);
+      return {
+        id: String((o as { id: string }).id),
+        customerName:
+          typeof (o as { customerName?: unknown }).customerName === "string"
+            ? String((o as { customerName: string }).customerName).trim()
+            : "",
+        orderDate,
+        status: normalizeOrderStatus((o as { status?: unknown }).status),
+        rows,
+        createdAt: typeof (o as { createdAt?: unknown }).createdAt === "number" ? Number((o as { createdAt: number }).createdAt) : Date.now(),
+        updatedAt: typeof (o as { updatedAt?: unknown }).updatedAt === "number" ? Number((o as { updatedAt: number }).updatedAt) : Date.now(),
+        ...(customerPhone ? { customerPhone } : {}),
+        ...(note ? { note } : {}),
+      };
+    })
+    .filter((o) => o.customerName.length > 0 && o.rows.length > 0);
 }
 
 export function normalizeGeneratorState(p: GeneratorState): GeneratorState {
@@ -305,6 +383,9 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       .filter((o) => o.companyId && o.rows.length > 0);
   }
 
+  const storeOrders = normalizeStoreOrders(w.storeOrders);
+  const customerOrders = normalizeCustomerOrders(w.customerOrders);
+
   return {
     version: 3,
     settings: {
@@ -322,6 +403,8 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     notes,
     suppliers,
     supplierOffers,
+    storeOrders,
+    customerOrders,
   };
 }
 
@@ -515,6 +598,8 @@ export function workspaceHasUserData(w: DocWorkspace): boolean {
     (ws.notes?.length ?? 0) > 0 ||
     (ws.suppliers?.length ?? 0) > 0 ||
     (ws.supplierOffers?.length ?? 0) > 0 ||
+    (ws.storeOrders?.length ?? 0) > 0 ||
+    (ws.customerOrders?.length ?? 0) > 0 ||
     hasFolders ||
     hasSeller
   );

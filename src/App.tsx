@@ -30,7 +30,7 @@ import {
   workspaceToGeneratorState,
   resolveProjectVatPercent,
 } from "./lib/docStorage";
-import { emptyCompany, emptyMeta, newProductRow, OFFICIAL_VAT_PERCENT } from "./lib/defaults";
+import { emptyCompany, emptyMeta, newOrderLineRow, newProductRow, OFFICIAL_VAT_PERCENT, ORDER_STATUS_OPTIONS, orderStatusLabel } from "./lib/defaults";
 import { formatDateAzLong, formatMoney } from "./lib/text";
 import type {
   CompanyProfile,
@@ -44,6 +44,10 @@ import type {
   SupplierOfferRecord,
   SupplierOfferRow,
   SupplierRecord,
+  StoreOrderRecord,
+  CustomerOrderRecord,
+  OrderLineRow,
+  OrderStatus,
   WorkspaceFolderRecord,
 } from "./types";
 import html2pdf from "html2pdf.js";
@@ -177,6 +181,56 @@ type SidebarModule =
 type CompanyFormMode = "list" | "form";
 type ProjectFormMode = "list" | "form";
 type OfferFormMode = "list" | "form";
+type OrderFormMode = "list" | "form";
+
+type StoreOrderDraft = {
+  title: string;
+  orderDate: string;
+  status: OrderStatus;
+  note: string;
+  rows: OrderLineRow[];
+};
+
+type CustomerOrderDraft = {
+  customerName: string;
+  customerPhone: string;
+  orderDate: string;
+  status: OrderStatus;
+  note: string;
+  rows: OrderLineRow[];
+};
+
+function emptyStoreOrderDraft(): StoreOrderDraft {
+  return {
+    title: "",
+    orderDate: new Date().toISOString().slice(0, 10),
+    status: "draft",
+    note: "",
+    rows: [newOrderLineRow()],
+  };
+}
+
+function emptyCustomerOrderDraft(): CustomerOrderDraft {
+  return {
+    customerName: "",
+    customerPhone: "",
+    orderDate: new Date().toISOString().slice(0, 10),
+    status: "draft",
+    note: "",
+    rows: [newOrderLineRow()],
+  };
+}
+
+function normalizeOrderDraftRows(rows: OrderLineRow[]): OrderLineRow[] {
+  return rows
+    .map((r) => ({
+      ...r,
+      name: r.name.trim(),
+      unit: r.unit.trim() || "ədəd",
+      qty: Number(r.qty) || 0,
+    }))
+    .filter((r) => r.name.length > 0 && r.qty > 0);
+}
 
 type ProjectDraft = {
   title: string;
@@ -264,8 +318,8 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   folders: "",
   notes: "",
   suppliers: "Təchizatçı qiymət təklifləri",
-  storeOrders: "Mağaza daxili sifarişlər",
-  customerOrders: "Müştəri sifarişlərinin idarə edilməsi",
+  storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
+  customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
   settings: "",
 };
 
@@ -910,6 +964,14 @@ export default function App() {
   const [offerDraft, setOfferDraft] = useState<OfferDraft>(() => emptyOfferDraft());
   const [offerMode, setOfferMode] = useState<OfferFormMode>("list");
 
+  const [storeOrderEditId, setStoreOrderEditId] = useState<string | null>(null);
+  const [storeOrderDraft, setStoreOrderDraft] = useState<StoreOrderDraft>(() => emptyStoreOrderDraft());
+  const [storeOrderMode, setStoreOrderMode] = useState<OrderFormMode>("list");
+
+  const [customerOrderEditId, setCustomerOrderEditId] = useState<string | null>(null);
+  const [customerOrderDraft, setCustomerOrderDraft] = useState<CustomerOrderDraft>(() => emptyCustomerOrderDraft());
+  const [customerOrderMode, setCustomerOrderMode] = useState<OrderFormMode>("list");
+
   const [companyMode, setCompanyMode] = useState<CompanyFormMode>("list");
   const [companyEditId, setCompanyEditId] = useState<string | null>(null);
   const [companyDraft, setCompanyDraft] = useState<CompanyProfile>(() => emptyCompany());
@@ -1362,13 +1424,21 @@ export default function App() {
       };
     }
     if (module === "storeOrders") {
-      return { title: "Mağaza sifarişi", sub: MODULE_TAGLINE.storeOrders };
+      if (storeOrderMode === "list") return { title: "Mağaza sifarişi", sub: MODULE_TAGLINE.storeOrders };
+      return {
+        title: storeOrderEditId ? "Mağaza sifarişi redaktəsi" : "Yeni mağaza sifarişi",
+        sub: storeOrderEditId ? "Mövcud sifarişi yeniləyin" : "Yeni mağaza sifarişi əlavə edin",
+      };
     }
     if (module === "customerOrders") {
-      return { title: "Müştəri sifarişi", sub: MODULE_TAGLINE.customerOrders };
+      if (customerOrderMode === "list") return { title: "Müştəri sifarişi", sub: MODULE_TAGLINE.customerOrders };
+      return {
+        title: customerOrderEditId ? "Müştəri sifarişi redaktəsi" : "Yeni müştəri sifarişi",
+        sub: customerOrderEditId ? "Mövcud sifarişi yeniləyin" : "Yeni müştəri sifarişi əlavə edin",
+      };
     }
     return { title: "", sub: "" };
-  }, [module, companyMode, projectMode, companyEditId, projectEditId, offerMode, offerEditId]);
+  }, [module, companyMode, projectMode, companyEditId, projectEditId, offerMode, offerEditId, storeOrderMode, storeOrderEditId, customerOrderMode, customerOrderEditId]);
 
   const patchSellerSettings = useCallback((key: keyof CompanyProfile, value: string) => {
     setWorkspace((w) => ({
@@ -3254,6 +3324,282 @@ export default function App() {
     flash(setToast, "Təklif silindi");
   };
 
+  const resetStoreOrderDraft = () => {
+    setStoreOrderEditId(null);
+    setStoreOrderDraft(emptyStoreOrderDraft());
+  };
+
+  const openNewStoreOrderForm = () => {
+    resetStoreOrderDraft();
+    setStoreOrderMode("form");
+  };
+
+  const cancelStoreOrderForm = () => {
+    resetStoreOrderDraft();
+    setStoreOrderMode("list");
+  };
+
+  const startEditStoreOrder = (o: StoreOrderRecord) => {
+    setStoreOrderEditId(o.id);
+    setStoreOrderDraft({
+      title: o.title,
+      orderDate: o.orderDate,
+      status: o.status,
+      note: o.note || "",
+      rows: o.rows.length > 0 ? o.rows.map((r) => ({ ...r })) : [newOrderLineRow()],
+    });
+    setStoreOrderMode("form");
+  };
+
+  const saveStoreOrder = () => {
+    const title = storeOrderDraft.title.trim();
+    const rows = normalizeOrderDraftRows(storeOrderDraft.rows);
+    if (!title) {
+      flash(setToast, "Sifariş başlığını daxil edin.", "error");
+      return;
+    }
+    if (rows.length === 0) {
+      flash(setToast, "Ən azı bir məhsul sətri əlavə edin.", "error");
+      return;
+    }
+    const orderDate = storeOrderDraft.orderDate.trim() || new Date().toISOString().slice(0, 10);
+    const note = storeOrderDraft.note.trim();
+    const now = Date.now();
+    if (storeOrderEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        storeOrders: (w.storeOrders ?? []).map((o) => {
+          if (o.id !== storeOrderEditId) return o;
+          const rec: StoreOrderRecord = {
+            id: o.id,
+            title,
+            orderDate,
+            status: storeOrderDraft.status,
+            rows,
+            createdAt: o.createdAt,
+            updatedAt: now,
+          };
+          if (note) rec.note = note;
+          return rec;
+        }),
+      }));
+      flash(setToast, "Mağaza sifarişi yeniləndi");
+    } else {
+      const rec: StoreOrderRecord = {
+        id: crypto.randomUUID(),
+        title,
+        orderDate,
+        status: storeOrderDraft.status,
+        rows,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (note) rec.note = note;
+      setWorkspace((w) => ({ ...w, storeOrders: [...(w.storeOrders ?? []), rec] }));
+      flash(setToast, "Mağaza sifarişi əlavə olundu");
+    }
+    cancelStoreOrderForm();
+  };
+
+  const deleteStoreOrder = async (id: string) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: "Bu mağaza sifarişi silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, storeOrders: (w.storeOrders ?? []).filter((o) => o.id !== id) }));
+    if (storeOrderEditId === id) resetStoreOrderDraft();
+    flash(setToast, "Mağaza sifarişi silindi");
+  };
+
+  const resetCustomerOrderDraft = () => {
+    setCustomerOrderEditId(null);
+    setCustomerOrderDraft(emptyCustomerOrderDraft());
+  };
+
+  const openNewCustomerOrderForm = () => {
+    resetCustomerOrderDraft();
+    setCustomerOrderMode("form");
+  };
+
+  const cancelCustomerOrderForm = () => {
+    resetCustomerOrderDraft();
+    setCustomerOrderMode("list");
+  };
+
+  const startEditCustomerOrder = (o: CustomerOrderRecord) => {
+    setCustomerOrderEditId(o.id);
+    setCustomerOrderDraft({
+      customerName: o.customerName,
+      customerPhone: o.customerPhone || "",
+      orderDate: o.orderDate,
+      status: o.status,
+      note: o.note || "",
+      rows: o.rows.length > 0 ? o.rows.map((r) => ({ ...r })) : [newOrderLineRow()],
+    });
+    setCustomerOrderMode("form");
+  };
+
+  const saveCustomerOrder = () => {
+    const customerName = customerOrderDraft.customerName.trim();
+    const rows = normalizeOrderDraftRows(customerOrderDraft.rows);
+    if (!customerName) {
+      flash(setToast, "Müştəri adını daxil edin.", "error");
+      return;
+    }
+    if (rows.length === 0) {
+      flash(setToast, "Ən azı bir məhsul sətri əlavə edin.", "error");
+      return;
+    }
+    const orderDate = customerOrderDraft.orderDate.trim() || new Date().toISOString().slice(0, 10);
+    const customerPhone = customerOrderDraft.customerPhone.trim();
+    const note = customerOrderDraft.note.trim();
+    const now = Date.now();
+    if (customerOrderEditId) {
+      setWorkspace((w) => ({
+        ...w,
+        customerOrders: (w.customerOrders ?? []).map((o) => {
+          if (o.id !== customerOrderEditId) return o;
+          const rec: CustomerOrderRecord = {
+            id: o.id,
+            customerName,
+            orderDate,
+            status: customerOrderDraft.status,
+            rows,
+            createdAt: o.createdAt,
+            updatedAt: now,
+          };
+          if (customerPhone) rec.customerPhone = customerPhone;
+          if (note) rec.note = note;
+          return rec;
+        }),
+      }));
+      flash(setToast, "Müştəri sifarişi yeniləndi");
+    } else {
+      const rec: CustomerOrderRecord = {
+        id: crypto.randomUUID(),
+        customerName,
+        orderDate,
+        status: customerOrderDraft.status,
+        rows,
+        createdAt: now,
+        updatedAt: now,
+      };
+      if (customerPhone) rec.customerPhone = customerPhone;
+      if (note) rec.note = note;
+      setWorkspace((w) => ({ ...w, customerOrders: [...(w.customerOrders ?? []), rec] }));
+      flash(setToast, "Müştəri sifarişi əlavə olundu");
+    }
+    cancelCustomerOrderForm();
+  };
+
+  const deleteCustomerOrder = async (id: string) => {
+    const ok = await askConfirm({
+      title: "Silmə təsdiqi",
+      message: "Bu müştəri sifarişi silinsin?",
+      confirmLabel: "Sil",
+      cancelLabel: "Ləğv et",
+      danger: true,
+    });
+    if (!ok) return;
+    setWorkspace((w) => ({ ...w, customerOrders: (w.customerOrders ?? []).filter((o) => o.id !== id) }));
+    if (customerOrderEditId === id) resetCustomerOrderDraft();
+    flash(setToast, "Müştəri sifarişi silindi");
+  };
+
+  const patchStoreOrderLine = (id: string, patch: Partial<OrderLineRow>) => {
+    setStoreOrderDraft((d) => ({
+      ...d,
+      rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  };
+
+  const patchCustomerOrderLine = (id: string, patch: Partial<OrderLineRow>) => {
+    setCustomerOrderDraft((d) => ({
+      ...d,
+      rows: d.rows.map((r) => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  };
+
+  const renderOrderLinesTable = (
+    rows: OrderLineRow[],
+    onPatch: (id: string, patch: Partial<OrderLineRow>) => void,
+    onAdd: () => void,
+    onRemove: (id: string) => void,
+  ) => (
+    <div className="dg-table-wrap pg-grid-host">
+      <table className="dg-table">
+        <thead>
+          <tr>
+            <th className="dg-th-num">№</th>
+            <th>Məhsul</th>
+            <th>Vahid</th>
+            <th>Miqdar</th>
+            <th className="dg-th-actions">Sil</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={5} className="dg-empty-cell">
+                Məhsul sətri əlavə edin.
+              </td>
+            </tr>
+          ) : (
+            rows.map((r, idx) => (
+              <tr key={r.id}>
+                <td className="dg-td-num">{idx + 1}</td>
+                <td>
+                  <input
+                    className="dg-input dg-input-table"
+                    value={r.name}
+                    onChange={(e) => onPatch(r.id, { name: e.target.value })}
+                  />
+                </td>
+                <td>
+                  <input
+                    className="dg-input dg-input-table dg-input-narrow"
+                    value={r.unit}
+                    onChange={(e) => onPatch(r.id, { unit: e.target.value })}
+                  />
+                </td>
+                <td>
+                  <input
+                    className="dg-input dg-input-table dg-input-num"
+                    type="number"
+                    min={0}
+                    step="any"
+                    value={r.qty}
+                    onChange={(e) => onPatch(r.id, { qty: Number(e.target.value) || 0 })}
+                  />
+                </td>
+                <td className="dg-td-actions">
+                  <button
+                    type="button"
+                    className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
+                    aria-label="Sil"
+                    title="Sil"
+                    onClick={() => onRemove(r.id)}
+                  >
+                    <IconTrash />
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+      <div className="dg-form-footer-actions" style={{ marginTop: "0.75rem" }}>
+        <button type="button" className="dg-btn dg-btn-secondary" onClick={onAdd}>
+          Sətir əlavə et
+        </button>
+      </div>
+    </div>
+  );
+
   const companyLabel = (companyId?: string) => {
     const c = companyId ? companyById.get(companyId) : undefined;
     return c?.profile.name?.trim() || c?.profile.voen?.trim() || "—";
@@ -3820,32 +4166,335 @@ export default function App() {
     );
   };
 
-  const renderStoreOrdersModule = () => (
-    <div className="dg-form-page pg-panel" aria-label="Mağaza sifarişi">
-      <div className="dg-form-page-body">
-        <div className="dg-empty-state-card" role="status">
-          <div className="dg-empty-state-title">Mağaza sifarişləri</div>
-          <div className="dg-empty-state-desc">Bu bölmədə mağaza daxili sifarişləri idarə edəcəksiniz. Tezliklə əlavə olunacaq.</div>
-        </div>
-      </div>
-    </div>
-  );
+  const renderStoreOrdersModule = () => {
+    const orders = [...(workspace.storeOrders ?? [])].sort((a, b) => b.orderDate.localeCompare(a.orderDate) || b.updatedAt - a.updatedAt);
 
-  const renderCustomerOrdersModule = () => (
-    <div className="dg-form-page pg-panel" aria-label="Müştəri sifarişi">
-      <div className="dg-form-page-body">
-        <div className="dg-empty-state-card" role="status">
-          <div className="dg-empty-state-title">Müştəri sifarişləri</div>
-          <div className="dg-empty-state-desc">Bu bölmədə müştəri sifarişlərini izləyə və idarə edəcəksiniz. Tezliklə əlavə olunacaq.</div>
+    if (storeOrderMode === "form") {
+      return (
+        <div className="dg-form-page pg-panel" aria-label={storeOrderEditId ? "Mağaza sifarişi redaktəsi" : "Yeni mağaza sifarişi"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">Mağaza sifarişi</h1>
+              <nav className="dg-form-bc" aria-label="Yol">
+                <span>Mağaza sifarişi</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span className="dg-form-bc-current">{storeOrderEditId ? "Redaktə" : "Yeni sifariş"}</span>
+              </nav>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelStoreOrderForm}>
+              Siyahı
+            </button>
+          </header>
+
+          <div className="dg-form-page-body">
+            <div className="dg-form-meta-grid">
+              <label className="dg-field">
+                <span className="dg-label">Başlıq</span>
+                <input
+                  className="dg-input"
+                  value={storeOrderDraft.title}
+                  onChange={(e) => setStoreOrderDraft((d) => ({ ...d, title: e.target.value }))}
+                  placeholder="Məs: Anbar doldurma"
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Tarix</span>
+                <input
+                  className="dg-input"
+                  type="date"
+                  value={storeOrderDraft.orderDate}
+                  onChange={(e) => setStoreOrderDraft((d) => ({ ...d, orderDate: e.target.value }))}
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Status</span>
+                <select
+                  className="dg-input"
+                  value={storeOrderDraft.status}
+                  onChange={(e) => setStoreOrderDraft((d) => ({ ...d, status: e.target.value as OrderStatus }))}
+                >
+                  {ORDER_STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dg-field dg-field-span-full">
+                <span className="dg-label">Qeyd</span>
+                <textarea
+                  className="dg-input"
+                  rows={2}
+                  value={storeOrderDraft.note}
+                  onChange={(e) => setStoreOrderDraft((d) => ({ ...d, note: e.target.value }))}
+                />
+              </label>
+            </div>
+
+            <h2 className="dg-form-inner-panel-title" style={{ marginTop: "1.25rem" }}>
+              Məhsullar
+            </h2>
+            {renderOrderLinesTable(
+              storeOrderDraft.rows,
+              patchStoreOrderLine,
+              () => setStoreOrderDraft((d) => ({ ...d, rows: [...d.rows, newOrderLineRow()] })),
+              (id) =>
+                setStoreOrderDraft((d) => ({
+                  ...d,
+                  rows: d.rows.length <= 1 ? d.rows : d.rows.filter((r) => r.id !== id),
+                })),
+            )}
+
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelStoreOrderForm}>
+                Ləğv et
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={saveStoreOrder}>
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dg-form-page pg-panel" aria-label="Mağaza sifarişləri siyahısı">
+        <div className="dg-form-page-body">
+          {orders.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Hələ mağaza sifarişi yoxdur</div>
+              <div className="dg-empty-state-desc">«Yeni sifariş» ilə mağaza daxili sifariş əlavə edin.</div>
+            </div>
+          ) : (
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table">
+                <thead>
+                  <tr>
+                    <th className="dg-th-num">№</th>
+                    <th>Tarix</th>
+                    <th>Başlıq</th>
+                    <th>Status</th>
+                    <th>Məhsul</th>
+                    <th className="dg-th-actions">Əməliyyatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o, i) => (
+                    <tr key={o.id}>
+                      <td className="dg-td-num">{i + 1}</td>
+                      <td>{formatDateAzLong(o.orderDate)}</td>
+                      <td>{o.title}</td>
+                      <td>{orderStatusLabel(o.status)}</td>
+                      <td className="dg-td-amount">{o.rows.length}</td>
+                      <td className="dg-td-actions">
+                        <div className="dg-icon-row">
+                          <button
+                            type="button"
+                            className="dg-icon-btn"
+                            title="Redaktə et"
+                            aria-label="Redaktə et"
+                            onClick={() => startEditStoreOrder(o)}
+                          >
+                            <IconEdit />
+                          </button>
+                          <button
+                            type="button"
+                            className="dg-icon-btn dg-icon-btn-danger"
+                            title="Sil"
+                            aria-label="Sil"
+                            onClick={() => deleteStoreOrder(o.id)}
+                          >
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const renderCustomerOrdersModule = () => {
+    const orders = [...(workspace.customerOrders ?? [])].sort((a, b) => b.orderDate.localeCompare(a.orderDate) || b.updatedAt - a.updatedAt);
+
+    if (customerOrderMode === "form") {
+      return (
+        <div className="dg-form-page pg-panel" aria-label={customerOrderEditId ? "Müştəri sifarişi redaktəsi" : "Yeni müştəri sifarişi"}>
+          <header className="dg-form-page-head">
+            <div>
+              <h1 className="dg-form-page-title">Müştəri sifarişi</h1>
+              <nav className="dg-form-bc" aria-label="Yol">
+                <span>Müştəri sifarişi</span>
+                <span className="dg-form-bc-sep" aria-hidden>
+                  ›
+                </span>
+                <span className="dg-form-bc-current">{customerOrderEditId ? "Redaktə" : "Yeni sifariş"}</span>
+              </nav>
+            </div>
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelCustomerOrderForm}>
+              Siyahı
+            </button>
+          </header>
+
+          <div className="dg-form-page-body">
+            <div className="dg-form-meta-grid">
+              <label className="dg-field">
+                <span className="dg-label">Müştəri adı</span>
+                <input
+                  className="dg-input"
+                  value={customerOrderDraft.customerName}
+                  onChange={(e) => setCustomerOrderDraft((d) => ({ ...d, customerName: e.target.value }))}
+                  placeholder="Ad və ya şirkət"
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Telefon</span>
+                <input
+                  className="dg-input"
+                  value={customerOrderDraft.customerPhone}
+                  onChange={(e) => setCustomerOrderDraft((d) => ({ ...d, customerPhone: e.target.value }))}
+                  placeholder="+994..."
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Tarix</span>
+                <input
+                  className="dg-input"
+                  type="date"
+                  value={customerOrderDraft.orderDate}
+                  onChange={(e) => setCustomerOrderDraft((d) => ({ ...d, orderDate: e.target.value }))}
+                />
+              </label>
+              <label className="dg-field">
+                <span className="dg-label">Status</span>
+                <select
+                  className="dg-input"
+                  value={customerOrderDraft.status}
+                  onChange={(e) => setCustomerOrderDraft((d) => ({ ...d, status: e.target.value as OrderStatus }))}
+                >
+                  {ORDER_STATUS_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="dg-field dg-field-span-full">
+                <span className="dg-label">Qeyd</span>
+                <textarea
+                  className="dg-input"
+                  rows={2}
+                  value={customerOrderDraft.note}
+                  onChange={(e) => setCustomerOrderDraft((d) => ({ ...d, note: e.target.value }))}
+                />
+              </label>
+            </div>
+
+            <h2 className="dg-form-inner-panel-title" style={{ marginTop: "1.25rem" }}>
+              Məhsullar
+            </h2>
+            {renderOrderLinesTable(
+              customerOrderDraft.rows,
+              patchCustomerOrderLine,
+              () => setCustomerOrderDraft((d) => ({ ...d, rows: [...d.rows, newOrderLineRow()] })),
+              (id) =>
+                setCustomerOrderDraft((d) => ({
+                  ...d,
+                  rows: d.rows.length <= 1 ? d.rows : d.rows.filter((r) => r.id !== id),
+                })),
+            )}
+
+            <footer className="dg-form-footer-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={cancelCustomerOrderForm}>
+                Ləğv et
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={saveCustomerOrder}>
+                Yadda saxla
+              </button>
+            </footer>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="dg-form-page pg-panel" aria-label="Müştəri sifarişləri siyahısı">
+        <div className="dg-form-page-body">
+          {orders.length === 0 ? (
+            <div className="dg-empty-state-card" role="status">
+              <div className="dg-empty-state-title">Hələ müştəri sifarişi yoxdur</div>
+              <div className="dg-empty-state-desc">«Yeni sifariş» ilə müştəri sifarişi əlavə edin.</div>
+            </div>
+          ) : (
+            <div className="dg-table-wrap pg-grid-host">
+              <table className="dg-table">
+                <thead>
+                  <tr>
+                    <th className="dg-th-num">№</th>
+                    <th>Tarix</th>
+                    <th>Müştəri</th>
+                    <th>Telefon</th>
+                    <th>Status</th>
+                    <th>Məhsul</th>
+                    <th className="dg-th-actions">Əməliyyatlar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((o, i) => (
+                    <tr key={o.id}>
+                      <td className="dg-td-num">{i + 1}</td>
+                      <td>{formatDateAzLong(o.orderDate)}</td>
+                      <td>{o.customerName}</td>
+                      <td>{o.customerPhone || "—"}</td>
+                      <td>{orderStatusLabel(o.status)}</td>
+                      <td className="dg-td-amount">{o.rows.length}</td>
+                      <td className="dg-td-actions">
+                        <div className="dg-icon-row">
+                          <button
+                            type="button"
+                            className="dg-icon-btn"
+                            title="Redaktə et"
+                            aria-label="Redaktə et"
+                            onClick={() => startEditCustomerOrder(o)}
+                          >
+                            <IconEdit />
+                          </button>
+                          <button
+                            type="button"
+                            className="dg-icon-btn dg-icon-btn-danger"
+                            title="Sil"
+                            aria-label="Sil"
+                            onClick={() => deleteCustomerOrder(o.id)}
+                          >
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const switchSidebarModule = (next: SidebarModule) => {
-    cancelCompanyForm();
-    cancelProjectForm();
-    cancelOfferForm();
+    if (module === "companies") cancelCompanyForm();
+    else if (module === "projects") cancelProjectForm();
+    else if (module === "suppliers") cancelOfferForm();
+    else if (module === "storeOrders") cancelStoreOrderForm();
+    else if (module === "customerOrders") cancelCustomerOrderForm();
     setModule(next);
     setSidebarOpen(false);
   };
@@ -3968,6 +4617,10 @@ export default function App() {
             ? { label: "Yeni qeyd", onClick: openNewNoteDialog }
             : module === "suppliers" && offerMode === "list"
               ? { label: "Yeni təklif", onClick: openNewOfferForm }
+              : module === "storeOrders" && storeOrderMode === "list"
+                ? { label: "Yeni sifariş", onClick: openNewStoreOrderForm }
+                : module === "customerOrders" && customerOrderMode === "list"
+                  ? { label: "Yeni sifariş", onClick: openNewCustomerOrderForm }
         : null;
 
   const modalLayer = (
