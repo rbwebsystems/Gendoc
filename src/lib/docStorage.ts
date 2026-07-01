@@ -501,6 +501,13 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
   const systemUsers = normalizeSystemUsers(w.systemUsers);
   const usersById = new Map(systemUsers.map((u) => [u.id, u]));
   const leaveRequests = normalizeLeaveRequests(w.leaveRequests, usersById);
+  const leaveReviewSeenAtRaw = w.settings?.leaveReviewSeenAt;
+  const leaveReviewSeenAt: Record<string, number> = {};
+  if (leaveReviewSeenAtRaw && typeof leaveReviewSeenAtRaw === "object") {
+    for (const [uid, ts] of Object.entries(leaveReviewSeenAtRaw)) {
+      if (typeof ts === "number" && Number.isFinite(ts)) leaveReviewSeenAt[uid] = ts;
+    }
+  }
 
   return {
     version: 3,
@@ -512,6 +519,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         protocol: Number(w.settings?.docSeq?.protocol) > 0 ? Number(w.settings?.docSeq?.protocol) : 1,
         quote: Number(w.settings?.docSeq?.quote) > 0 ? Number(w.settings?.docSeq?.quote) : 1,
       },
+      ...(Object.keys(leaveReviewSeenAt).length > 0 ? { leaveReviewSeenAt } : {}),
     },
     companies,
     projects,

@@ -279,6 +279,8 @@ export interface DocWorkspace {
       protocol: number;
       quote?: number;
     };
+    /** Direktor/admin: son baxılan iş icazəsi bildirişi vaxtı (uid → timestamp) */
+    leaveReviewSeenAt?: Record<string, number>;
   };
   companies: SavedCompanyRecord[];
   projects: ProjectRecord[];

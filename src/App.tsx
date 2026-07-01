@@ -743,6 +743,15 @@ function IconLogout() {
   );
 }
 
+function IconBell() {
+  return (
+    <SvgIcon>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </SvgIcon>
+  );
+}
+
 function IconFolder() {
   return (
     <svg width="62" height="50" viewBox="0 0 62 50" fill="none" aria-hidden>
@@ -1149,6 +1158,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navSearch, setNavSearch] = useState("");
   const navSearchRef = useRef<HTMLInputElement>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null);
   const [projectProductSearch, setProjectProductSearch] = useState("");
 
   const [noteEditId, setNoteEditId] = useState<string | null>(null);
@@ -1698,6 +1709,52 @@ export default function App() {
   }, [isDeveloper, sessionKind, currentMember]);
 
   const canManageSystemUsers = canManageUsers;
+
+  const reviewerUid = authState.status === "signedIn" ? authState.user.uid : null;
+
+  const leaveReviewSeenAt = workspace.settings.leaveReviewSeenAt?.[reviewerUid ?? ""] ?? 0;
+
+  const unviewedLeaveRequests = useMemo(() => {
+    if (!canReviewLeave) return [];
+    return (workspace.leaveRequests ?? [])
+      .filter((r) => r.status === "pending" && r.createdAt > leaveReviewSeenAt)
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }, [canReviewLeave, workspace.leaveRequests, leaveReviewSeenAt]);
+
+  const unviewedLeaveCount = unviewedLeaveRequests.length;
+
+  const markLeaveNotificationsSeen = useCallback(() => {
+    if (!canReviewLeave || !reviewerUid) return;
+    const now = Date.now();
+    setWorkspace((w) => ({
+      ...w,
+      settings: {
+        ...w.settings,
+        leaveReviewSeenAt: {
+          ...(w.settings.leaveReviewSeenAt ?? {}),
+          [reviewerUid]: now,
+        },
+      },
+    }));
+  }, [canReviewLeave, reviewerUid]);
+
+  useEffect(() => {
+    if (module === "workLeave" && canReviewLeave) {
+      markLeaveNotificationsSeen();
+      setNotificationsOpen(false);
+    }
+  }, [module, canReviewLeave, markLeaveNotificationsSeen]);
+
+  useEffect(() => {
+    if (!notificationsOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!notificationsRef.current?.contains(e.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [notificationsOpen]);
 
   const systemUsersById = useMemo(() => {
     const m = new Map<string, SystemUserRecord>();
@@ -6781,6 +6838,69 @@ export default function App() {
                 </div>
               </div>
               <div className="rb-topbar-tools">
+                {canReviewLeave ? (
+                  <div className="rb-notifications" ref={notificationsRef}>
+                    <button
+                      type="button"
+                      className={`rb-notifications-btn ${unviewedLeaveCount > 0 ? "has-unread" : ""}`}
+                      aria-label={
+                        unviewedLeaveCount > 0
+                          ? `${unviewedLeaveCount} yeni iş icazəsi sorğusu`
+                          : "Bildirişlər"
+                      }
+                      aria-expanded={notificationsOpen}
+                      onClick={() => setNotificationsOpen((open) => !open)}
+                    >
+                      <IconBell />
+                      {unviewedLeaveCount > 0 ? (
+                        <span className="rb-notifications-badge" aria-hidden>
+                          {unviewedLeaveCount > 9 ? "9+" : unviewedLeaveCount}
+                        </span>
+                      ) : null}
+                    </button>
+                    {notificationsOpen ? (
+                      <div className="rb-notifications-panel" role="dialog" aria-label="Bildirişlər">
+                        <div className="rb-notifications-head">Bildirişlər</div>
+                        {unviewedLeaveCount === 0 ? (
+                          <p className="rb-notifications-empty">Yeni iş icazəsi sorğusu yoxdur</p>
+                        ) : (
+                          <ul className="rb-notifications-list">
+                            {unviewedLeaveRequests.map((r) => (
+                              <li key={r.id}>
+                                <button
+                                  type="button"
+                                  className="rb-notifications-item"
+                                  onClick={() => {
+                                    markLeaveNotificationsSeen();
+                                    switchSidebarModule("workLeave");
+                                    setLeaveInfoId(r.id);
+                                    setNotificationsOpen(false);
+                                  }}
+                                >
+                                  <span className="rb-notifications-item-title">{r.employeeName}</span>
+                                  <span className="rb-notifications-item-sub">
+                                    {leaveTypeLabel(r.leaveType)} · {formatDateAzLong(r.startDate)}
+                                  </span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <button
+                          type="button"
+                          className="rb-notifications-foot"
+                          onClick={() => {
+                            markLeaveNotificationsSeen();
+                            switchSidebarModule("workLeave");
+                            setNotificationsOpen(false);
+                          }}
+                        >
+                          İş icazələrinə keç
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="rb-search-with-action">
                   <div className="rb-search-box" role="search">
                     <IconSearchSidebar />
