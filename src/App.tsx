@@ -164,7 +164,15 @@ function mm(iso: string): string {
   return m && m.length === 2 ? m : String(new Date().getMonth() + 1).padStart(2, "0");
 }
 
-type SidebarModule = "companies" | "projects" | "folders" | "notes" | "suppliers" | "settings";
+type SidebarModule =
+  | "companies"
+  | "projects"
+  | "folders"
+  | "notes"
+  | "suppliers"
+  | "storeOrders"
+  | "customerOrders"
+  | "settings";
 
 type CompanyFormMode = "list" | "form";
 type ProjectFormMode = "list" | "form";
@@ -235,10 +243,20 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "folders", label: "Qovluqlar" },
   { id: "notes", label: "Qeydlər" },
   { id: "suppliers", label: "Təchizatçı təklifləri" },
+  { id: "storeOrders", label: "Mağaza sifarişi" },
+  { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "settings", label: "Ayarlar" },
 ];
 
-const SIDEBAR_MAIN_IDS: SidebarModule[] = ["companies", "projects", "folders", "notes", "suppliers"];
+const SIDEBAR_MAIN_IDS: SidebarModule[] = [
+  "companies",
+  "projects",
+  "folders",
+  "notes",
+  "suppliers",
+  "storeOrders",
+  "customerOrders",
+];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
   companies: "",
@@ -246,6 +264,8 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   folders: "",
   notes: "",
   suppliers: "Təchizatçı qiymət təklifləri",
+  storeOrders: "Mağaza daxili sifarişlər",
+  customerOrders: "Müştəri sifarişlərinin idarə edilməsi",
   settings: "",
 };
 
@@ -405,6 +425,29 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
           />
           <circle cx="7.5" cy="18" r="1.5" strokeWidth="2" />
           <circle cx="17.5" cy="18" r="1.5" strokeWidth="2" />
+        </svg>
+      );
+    case "storeOrders":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+          />
+          <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 22V12h6v10" />
+        </svg>
+      );
+    case "customerOrders":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+          />
         </svg>
       );
     case "settings":
@@ -1317,6 +1360,12 @@ export default function App() {
         title: offerEditId ? "Təklif redaktəsi" : "Yeni təklif",
         sub: offerEditId ? "Mövcud təchizatçı təklifini yeniləyin" : "Yeni təchizatçı təklifi əlavə edin",
       };
+    }
+    if (module === "storeOrders") {
+      return { title: "Mağaza sifarişi", sub: MODULE_TAGLINE.storeOrders };
+    }
+    if (module === "customerOrders") {
+      return { title: "Müştəri sifarişi", sub: MODULE_TAGLINE.customerOrders };
     }
     return { title: "", sub: "" };
   }, [module, companyMode, projectMode, companyEditId, projectEditId, offerMode, offerEditId]);
@@ -3771,6 +3820,36 @@ export default function App() {
     );
   };
 
+  const renderStoreOrdersModule = () => (
+    <div className="dg-form-page pg-panel" aria-label="Mağaza sifarişi">
+      <div className="dg-form-page-body">
+        <div className="dg-empty-state-card" role="status">
+          <div className="dg-empty-state-title">Mağaza sifarişləri</div>
+          <div className="dg-empty-state-desc">Bu bölmədə mağaza daxili sifarişləri idarə edəcəksiniz. Tezliklə əlavə olunacaq.</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderCustomerOrdersModule = () => (
+    <div className="dg-form-page pg-panel" aria-label="Müştəri sifarişi">
+      <div className="dg-form-page-body">
+        <div className="dg-empty-state-card" role="status">
+          <div className="dg-empty-state-title">Müştəri sifarişləri</div>
+          <div className="dg-empty-state-desc">Bu bölmədə müştəri sifarişlərini izləyə və idarə edəcəksiniz. Tezliklə əlavə olunacaq.</div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const switchSidebarModule = (next: SidebarModule) => {
+    cancelCompanyForm();
+    cancelProjectForm();
+    cancelOfferForm();
+    setModule(next);
+    setSidebarOpen(false);
+  };
+
   // ----- Auth handlers -----
   const mapAuthError = (e: unknown): string => {
     const code = (e as { code?: string })?.code || "";
@@ -4534,12 +4613,7 @@ export default function App() {
                     key={m.id}
                     type="button"
                     className={`rb-menu-item ${module === m.id ? "is-active" : ""}`}
-                    onClick={() => {
-                      cancelCompanyForm();
-                      cancelProjectForm();
-                      setModule(m.id);
-                      setSidebarOpen(false);
-                    }}
+                    onClick={() => switchSidebarModule(m.id)}
                   >
                     <span className="rb-menu-icon">
                       <SidebarNavIcon mod={m.id} />
@@ -4555,12 +4629,7 @@ export default function App() {
               <button
                 type="button"
                 className={`rb-menu-item ${module === "settings" ? "is-active" : ""}`}
-                onClick={() => {
-                  cancelCompanyForm();
-                  cancelProjectForm();
-                  setModule("settings");
-                  setSidebarOpen(false);
-                }}
+                onClick={() => switchSidebarModule("settings")}
               >
                 <span className="rb-menu-icon">
                   <SidebarNavIcon mod="settings" />
@@ -4645,6 +4714,8 @@ export default function App() {
               {module === "folders" ? renderFoldersModule() : null}
               {module === "notes" ? renderNotesModule() : null}
               {module === "suppliers" ? renderSuppliersModule() : null}
+              {module === "storeOrders" ? renderStoreOrdersModule() : null}
+              {module === "customerOrders" ? renderCustomerOrdersModule() : null}
               {module === "settings" ? renderSettingsModule() : null}
             </main>
           </section>
