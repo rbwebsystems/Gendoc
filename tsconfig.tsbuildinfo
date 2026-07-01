@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/documents/generatedocuments.ts","./src/lib/defaults.ts","./src/lib/docstorage.ts","./src/lib/text.ts"],"version":"5.7.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/documents/generatedocuments.ts","./src/lib/defaults.ts","./src/lib/docstorage.ts","./src/lib/firebase.ts","./src/lib/text.ts","./src/lib/workspacesync.ts"],"version":"5.7.3"}
