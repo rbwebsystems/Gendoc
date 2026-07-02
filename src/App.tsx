@@ -4299,7 +4299,7 @@ export default function App() {
     setOrderSupplierPdfSupplier("");
   };
 
-  const downloadOrderSupplierPdf = async (): Promise<boolean> => {
+  const printOrderSupplierDoc = async (): Promise<boolean> => {
     if (!pdfOrder) {
       flash(setToast, "Sifariş tapılmadı.", "error");
       return false;
@@ -4323,10 +4323,8 @@ export default function App() {
       rows,
       ...(customerName ? { customerName } : {}),
     });
-    const slug = supplier.toLowerCase().replace(/[^a-z0-9а-яəğıöşüç_-]+/gi, "-").replace(/^-+|-+$/g, "") || "supplier";
-    const filename = `${title.toLowerCase().replace(/\s+/g, "-")}-${slug}.pdf`;
-    await downloadPdfFromHtml(html, filename);
-    flash(setToast, "PDF yükləndi");
+    openPrintableDocument(html);
+    flash(setToast, "Çap pəncərəsi açıldı");
     return true;
   };
 
@@ -4510,8 +4508,8 @@ export default function App() {
                       <button
                         type="button"
                         className="dg-icon-btn"
-                        title="PDF yüklə (təchizatçı seçimi)"
-                        aria-label="PDF yüklə"
+                        title="Çap et (təchizatçı seçimi)"
+                        aria-label="Çap et"
                         onClick={() => opts.onDownloadPdf(o)}
                       >
                         <IconPrint />
@@ -6544,9 +6542,9 @@ export default function App() {
           onClose={() => closeOrderSupplierPdfDialog()}
         >
           <div className="dg-modal-body">
-            <h2 className="dg-modal-title">PDF yüklə — təchizatçı seçin</h2>
+            <h2 className="dg-modal-title">Çap et — təchizatçı seçin</h2>
             <p className="dg-modal-hint">
-              Yalnız seçilən təchizatçıya aid məhsullarla PDF yaradılacaq.
+              Yalnız seçilən təchizatçıya aid məhsullarla sənəd birbaşa çap açılacaq.
             </p>
             <label className="dg-field">
               <span className="dg-label">Təchizatçı</span>
@@ -6571,11 +6569,11 @@ export default function App() {
                 className="dg-btn dg-btn-primary"
                 disabled={pdfSuppliers.length === 0}
                 onClick={async () => {
-                  const ok = await downloadOrderSupplierPdf();
+                  const ok = await printOrderSupplierDoc();
                   if (ok) closeOrderSupplierPdfDialog();
                 }}
               >
-                PDF yüklə
+                Çap et
               </button>
             </div>
           </div>
