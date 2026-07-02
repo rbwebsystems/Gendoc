@@ -116,6 +116,7 @@ const VALID_PERMISSION_MODULES = new Set<PermissionModuleId>([
   "suppliers",
   "storeOrders",
   "customerOrders",
+  "priceCalculations",
   "workLeave",
 ]);
 

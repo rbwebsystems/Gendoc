@@ -228,6 +228,7 @@ export type PermissionModuleId =
   | "suppliers"
   | "storeOrders"
   | "customerOrders"
+  | "priceCalculations"
   | "workLeave";
 
 /** Sistem istifadəçisi və modul icazələri */

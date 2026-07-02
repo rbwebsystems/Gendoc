@@ -220,6 +220,7 @@ type SidebarModule =
   | "suppliers"
   | "storeOrders"
   | "customerOrders"
+  | "priceCalculations"
   | "appUsers"
   | "systemPermissions"
   | "workLeave"
@@ -387,6 +388,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "suppliers", label: "Təchizatçı təklifləri" },
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
+  { id: "priceCalculations", label: "Qiymət hesablanması" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -403,6 +405,7 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "suppliers",
   "storeOrders",
   "customerOrders",
+  "priceCalculations",
 ];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
@@ -413,6 +416,7 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   suppliers: "Təchizatçı qiymət təklifləri",
   storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
+  priceCalculations: "Qiymət hesablanması — tezliklə",
   appUsers: "Giriş hesablarının idarə edilməsi",
   systemPermissions: "Modul giriş icazələri",
   workLeave: "İşçi sorğuları və direktor təsdiqi",
@@ -666,6 +670,17 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+          />
+        </svg>
+      );
+    case "priceCalculations":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 7h6m-6 4h6m-6 4h3M7 3h10a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z"
           />
         </svg>
       );
@@ -1925,6 +1940,9 @@ export default function App() {
         title: customerOrderEditId ? "Müştəri sifarişi redaktəsi" : "Yeni müştəri sifarişi",
         sub: customerOrderEditId ? "Mövcud sifarişi yeniləyin" : "Yeni müştəri sifarişi əlavə edin",
       };
+    }
+    if (module === "priceCalculations") {
+      return { title: "Qiymət hesablanması", sub: MODULE_TAGLINE.priceCalculations };
     }
     if (module === "appUsers") {
       if (appUserMode === "list") return { title: "İstifadəçilər", sub: MODULE_TAGLINE.appUsers };
@@ -5078,6 +5096,19 @@ export default function App() {
     );
   };
 
+  const renderPriceCalculationsModule = () => (
+    <div className="dg-form-page pg-panel" aria-label="Qiymət hesablanması">
+      <div className="dg-form-page-body">
+        <div className="dg-empty-state-card" role="status">
+          <div className="dg-empty-state-title">Qiymət hesablanması hazırlanır</div>
+          <div className="dg-empty-state-desc">
+            Bu modul təchizatçı təklifi məntiqindən fərqlidir. Sizin göndərəcəyiniz prompt əsasında qurulacaq.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const reviewerDisplayName = () => {
     if (currentMember?.name) return currentMember.name;
     if (authState.status === "signedIn") return authState.user.email || "Direktor";
@@ -7014,6 +7045,7 @@ export default function App() {
               {module === "suppliers" ? renderSuppliersModule() : null}
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
+              {module === "priceCalculations" ? renderPriceCalculationsModule() : null}
               {module === "appUsers" ? renderAppUsersModule() : null}
               {module === "systemPermissions" ? renderSystemPermissionsModule() : null}
               {module === "workLeave" ? renderWorkLeaveModule() : null}
