@@ -1518,6 +1518,32 @@ dialog.dg-modal[open] {
   padding: 1.15rem 1.35rem 1.35rem;
 }
 
+/* Bölmə başlıqları — cədvəl başlığı ilə eyni qırmızı/ağ stil */
+.dg-panel-section-title {
+  margin: -1.15rem -1.35rem 1rem;
+  padding: var(--table-header-padding-y) 1.35rem;
+  font-size: 0.8125rem;
+  font-weight: var(--table-header-font-weight);
+  line-height: var(--table-header-line-height);
+  letter-spacing: var(--table-header-letter-spacing);
+  text-transform: uppercase;
+  color: var(--table-header-fg);
+  background: linear-gradient(
+    90deg,
+    var(--table-header-bg-dark) 0%,
+    var(--table-header-bg) 52%,
+    color-mix(in srgb, var(--table-header-bg) 88%, #fff 12%) 100%
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--table-header-bg-dark) 72%, #000 28%);
+  border-radius: var(--win-radius-xl) var(--win-radius-xl) 0 0;
+}
+
+.dg-panel-section-title--sub {
+  margin: 1.1rem -1.35rem 0.85rem;
+  border-radius: var(--win-radius-sm);
+  font-size: var(--table-header-font-size);
+}
+
 .dg-form-inner-panel-title {
   margin: 0 0 1rem;
   padding-bottom: 0.65rem;

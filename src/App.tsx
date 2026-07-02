@@ -5118,7 +5118,7 @@ export default function App() {
     <div className="dg-form-page pg-panel" aria-label="Qiymət hesablanması">
       <div className="dg-form-page-body">
         <section className="dg-form-inner-panel">
-          <h2 className="dg-form-inner-panel-title">Hesablama girişləri</h2>
+          <h2 className="dg-panel-section-title">Hesablama girişləri</h2>
           <div className="dg-form-meta-grid">
             <label className="dg-field">
               <span className="dg-label">Məhsul növü</span>
@@ -5153,7 +5153,7 @@ export default function App() {
         </section>
 
         <section className="dg-form-inner-panel" style={{ marginTop: "1rem" }}>
-          <h2 className="dg-form-inner-panel-title">Nəticələr</h2>
+          <h2 className="dg-panel-section-title">Nəticələr</h2>
           <div className="dg-pricecalc-card-grid dg-pricecalc-card-grid--cash" style={{ marginTop: "0.5rem" }}>
             <article className="dg-pricecalc-card dg-pricecalc-card--cash" aria-label="Nağd satış qiyməti kartı">
               <div className="dg-pricecalc-card-label">Nağd satış qiyməti</div>
@@ -5161,9 +5161,7 @@ export default function App() {
             </article>
           </div>
 
-          <div className="dg-info-section-title" style={{ marginTop: "1.1rem" }}>
-            Kredit qiymətləri
-          </div>
+          <h3 className="dg-panel-section-title dg-panel-section-title--sub">Kredit qiymətləri</h3>
           <div className="dg-pricecalc-card-grid">
             {PRICE_CALC_CREDIT_PERIODS.map((period) => (
               <article key={period.key} className="dg-pricecalc-card" aria-label={`${period.label} kredit kartı`}>

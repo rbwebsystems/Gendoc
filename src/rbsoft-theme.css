@@ -811,6 +811,25 @@
   padding-bottom: 6px;
 }
 
+.rb-desktop .dg-panel-section-title {
+  margin: -1.15rem -1.35rem 1rem;
+  padding: var(--table-header-padding-y) 1.35rem;
+  font-size: var(--table-header-font-size);
+  font-weight: var(--table-header-font-weight);
+  line-height: var(--table-header-line-height);
+  letter-spacing: var(--table-header-letter-spacing);
+  text-transform: uppercase;
+  color: var(--table-header-fg);
+  background: var(--table-header-bg);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+}
+
+.rb-desktop .dg-panel-section-title--sub {
+  margin: 1.1rem -1.35rem 0.85rem;
+  border-radius: 8px;
+}
+
 .rb-desktop .dg-label {
   font-size: 12px;
   font-weight: 600;
