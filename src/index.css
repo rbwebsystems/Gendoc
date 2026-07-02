@@ -23,8 +23,8 @@
   --win-danger: #dc2626;
   --win-danger-bg: rgba(220, 38, 38, 0.08);
 
-  --table-header-bg: #dc2626;
-  --table-header-bg-dark: #b91c1c;
+  --table-header-bg: #343434;
+  --table-header-bg-dark: #2c2c2c;
   --table-header-fg: #ffffff;
   --table-header-font-size: 0.6875rem;
   --table-header-font-weight: 700;
