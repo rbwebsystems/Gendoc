@@ -351,11 +351,11 @@ function buildOrderSupplierPdfHtml(params: {
     .map((r, i) => {
       const lineTotal = (Number(r.qty) || 0) * (Number(r.purchasePrice) || 0);
       return `<tr>
-        <td>${i + 1}</td>
+        <td class="num">${i + 1}</td>
         <td>${escapeHtml(r.name || "—")}</td>
-        <td class="num">${Number(r.qty) || 0}</td>
-        <td class="num">${formatMoney(Number(r.purchasePrice) || 0)}</td>
-        <td class="num">${formatMoney(lineTotal)}</td>
+        <td class="num">${(Number(r.qty) || 0).toLocaleString("az-AZ", { maximumFractionDigits: 2 })}</td>
+        <td class="num">${escapeHtml(formatMoney(Number(r.purchasePrice) || 0))}</td>
+        <td class="num">${escapeHtml(formatMoney(lineTotal))}</td>
       </tr>`;
     })
     .join("");
@@ -372,36 +372,128 @@ function buildOrderSupplierPdfHtml(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(params.title)}</title>
   <style>
-    body { font-family: Inter, Arial, sans-serif; margin: 24px; color: #111827; }
-    h1 { font-size: 20px; margin: 0 0 12px; }
-    .meta { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: #374151; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
-    th { background: #f3f4f6; font-weight: 700; }
-    td.num, th.num { text-align: right; }
-    .totals { margin-top: 12px; text-align: right; font-size: 14px; font-weight: 700; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      color: #111827;
+      background: #ffffff;
+      font-size: 13px;
+      line-height: 1.4;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .page {
+      width: 100%;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 26px 28px;
+    }
+    .head {
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .head-title {
+      margin: 0;
+      padding: 10px 14px;
+      background: #343434;
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 14px;
+      padding: 12px 14px;
+      background: #fafafa;
+      border-top: 1px solid #e5e7eb;
+      color: #374151;
+    }
+    .meta-item strong {
+      color: #111827;
+      font-weight: 700;
+    }
+    .table-wrap {
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12.5px;
+    }
+    thead th {
+      background: #343434;
+      color: #ffffff;
+      text-align: left;
+      font-weight: 700;
+      padding: 9px 10px;
+      border-right: 1px solid rgba(255,255,255,0.2);
+    }
+    thead th:last-child { border-right: none; }
+    tbody td {
+      border-top: 1px solid #e5e7eb;
+      padding: 8px 10px;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    tbody tr:nth-child(even) td { background: #fafafa; }
+    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    tfoot td {
+      border-top: 2px solid #d1d5db;
+      background: #f3f4f6;
+      font-weight: 800;
+      padding: 9px 10px;
+    }
+    .total-label { text-align: right; }
+    .summary {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+      font-size: 14px;
+      color: #111827;
+      font-weight: 800;
+    }
   </style>
 </head>
 <body>
-  <h1>${escapeHtml(params.title)}</h1>
-  <div class="meta">
-    <div><strong>Tarix:</strong> ${escapeHtml(formatDateAzLong(params.orderDate))}</div>
-    ${customerBlock}
-    <div><strong>Təchizatçı:</strong> ${escapeHtml(params.supplierName)}</div>
+  <div class="page">
+    <div class="head">
+      <h1 class="head-title">${escapeHtml(params.title)}</h1>
+      <div class="meta">
+        <div class="meta-item"><strong>Tarix:</strong> ${escapeHtml(formatDateAzLong(params.orderDate))}</div>
+        <div class="meta-item"><strong>Təchizatçı:</strong> ${escapeHtml(params.supplierName)}</div>
+        ${customerBlock ? `<div class="meta-item" style="grid-column: 1 / -1;">${customerBlock}</div>` : ""}
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 52px;" class="num">№</th>
+            <th>Məhsul</th>
+            <th style="width: 98px;" class="num">Miqdar</th>
+            <th style="width: 150px;" class="num">Alış qiyməti</th>
+            <th style="width: 150px;" class="num">Cəm</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" class="total-label">YEKUN</td>
+            <td class="num">${escapeHtml(formatMoney(total))}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="summary">Sətir sayı: ${params.rows.length}</div>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th style="width: 44px;" class="num">№</th>
-        <th>Məhsul</th>
-        <th style="width: 90px;" class="num">Miqdar</th>
-        <th style="width: 130px;" class="num">Alış qiyməti</th>
-        <th style="width: 130px;" class="num">Cəm</th>
-      </tr>
-    </thead>
-    <tbody>${rowsHtml}</tbody>
-  </table>
-  <div class="totals">Yekun: ${escapeHtml(formatMoney(total))}</div>
 </body>
 </html>`;
 }
@@ -4341,7 +4433,6 @@ export default function App() {
       onStatusChange: (id: string, status: OrderStatus) => void;
     },
   ) => {
-    let rowNum = 0;
     return (
       <div className="dg-table-wrap pg-grid-host">
         <table className="dg-table">
@@ -4351,86 +4442,74 @@ export default function App() {
               {opts.showDate ? <th>Tarix</th> : null}
               {opts.showCustomer ? <th>Müştəri</th> : null}
               <th>Status</th>
-              <th>Məhsul</th>
-              <th>Miqdar</th>
-              <th>Alış qiyməti</th>
-              <th>Təchizatçı</th>
+              <th>Məhsul sayı</th>
+              <th>Ümumi miqdar</th>
               <th>Cəm</th>
               <th className="dg-th-actions">Əməliyyatlar</th>
             </tr>
           </thead>
           <tbody>
-            {orders.flatMap((o) =>
-              o.rows.map((row, lineIdx) => {
-                rowNum += 1;
-                return (
-                  <tr key={`${o.id}-${row.id}`}>
-                    <td className="dg-td-num">{rowNum}</td>
-                    {lineIdx === 0 ? (
-                      <>
-                        {opts.showDate ? (
-                          <td rowSpan={o.rows.length}>{o.orderDate ? formatDateAzLong(o.orderDate) : "—"}</td>
-                        ) : null}
-                        {opts.showCustomer ? <td rowSpan={o.rows.length}>{o.customerName || "—"}</td> : null}
-                        <td rowSpan={o.rows.length} className="dg-order-status-cell">
-                          <OrderStatusPicker
-                            status={o.status}
-                            onChange={(status) => opts.onStatusChange(o.id, status)}
-                          />
-                        </td>
-                      </>
-                    ) : null}
-                    <td>{row.name}</td>
-                    <td className="dg-td-amount">{row.qty}</td>
-                    <td className="dg-td-amount">{formatMoney(row.purchasePrice)}</td>
-                    <td>{row.supplierName}</td>
-                    <td className="dg-td-amount">{formatMoney(row.qty * row.purchasePrice)}</td>
-                    {lineIdx === 0 ? (
-                      <td className="dg-td-actions" rowSpan={o.rows.length}>
-                        <div className="dg-icon-row">
-                          <button
-                            type="button"
-                            className="dg-icon-btn"
-                            title="Məlumat"
-                            aria-label="Məlumat"
-                            onClick={() => opts.onInfo(o)}
-                          >
-                            <IconInfo />
-                          </button>
-                          <button
-                            type="button"
-                            className="dg-icon-btn"
-                            title="Redaktə et"
-                            aria-label="Redaktə et"
-                            onClick={() => opts.onEdit(o)}
-                          >
-                            <IconEdit />
-                          </button>
-                          <button
-                            type="button"
-                            className="dg-icon-btn"
-                            title="PDF yüklə (təchizatçı seçimi)"
-                            aria-label="PDF yüklə"
-                            onClick={() => opts.onDownloadPdf(o)}
-                          >
-                            <IconPrint />
-                          </button>
-                          <button
-                            type="button"
-                            className="dg-icon-btn dg-icon-btn-danger"
-                            title="Sil"
-                            aria-label="Sil"
-                            onClick={() => opts.onDelete(o.id)}
-                          >
-                            <IconTrash />
-                          </button>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              }),
-            )}
+            {orders.map((o, idx) => {
+              const productCount = o.rows.length;
+              const totalQty = o.rows.reduce((sum, r) => sum + (Number(r.qty) || 0), 0);
+              const totalAmount = o.rows.reduce((sum, r) => sum + (Number(r.qty) || 0) * (Number(r.purchasePrice) || 0), 0);
+              return (
+                <tr key={o.id}>
+                  <td className="dg-td-num">{idx + 1}</td>
+                  {opts.showDate ? <td>{o.orderDate ? formatDateAzLong(o.orderDate) : "—"}</td> : null}
+                  {opts.showCustomer ? <td>{o.customerName || "—"}</td> : null}
+                  <td className="dg-order-status-cell">
+                    <OrderStatusPicker
+                      status={o.status}
+                      onChange={(status) => opts.onStatusChange(o.id, status)}
+                    />
+                  </td>
+                  <td className="dg-td-amount">{productCount}</td>
+                  <td className="dg-td-amount">{totalQty}</td>
+                  <td className="dg-td-amount">{formatMoney(totalAmount)}</td>
+                  <td className="dg-td-actions">
+                    <div className="dg-icon-row">
+                      <button
+                        type="button"
+                        className="dg-icon-btn"
+                        title="Məlumat"
+                        aria-label="Məlumat"
+                        onClick={() => opts.onInfo(o)}
+                      >
+                        <IconInfo />
+                      </button>
+                      <button
+                        type="button"
+                        className="dg-icon-btn"
+                        title="Redaktə et"
+                        aria-label="Redaktə et"
+                        onClick={() => opts.onEdit(o)}
+                      >
+                        <IconEdit />
+                      </button>
+                      <button
+                        type="button"
+                        className="dg-icon-btn"
+                        title="PDF yüklə (təchizatçı seçimi)"
+                        aria-label="PDF yüklə"
+                        onClick={() => opts.onDownloadPdf(o)}
+                      >
+                        <IconPrint />
+                      </button>
+                      <button
+                        type="button"
+                        className="dg-icon-btn dg-icon-btn-danger"
+                        title="Sil"
+                        aria-label="Sil"
+                        onClick={() => opts.onDelete(o.id)}
+                      >
+                        <IconTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -4472,11 +4551,17 @@ export default function App() {
               </tr>
             ))}
           </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={5} className="dg-num" style={{ fontWeight: 700 }}>
+                Yekun
+              </td>
+              <td className="dg-num" style={{ fontWeight: 800 }}>
+                {formatMoney(orderPurchaseTotal(rows))}
+              </td>
+            </tr>
+          </tfoot>
         </table>
-      </div>
-      <div className="dg-info-totals" aria-label="Yekun">
-        <div className="k">Alış cəmi</div>
-        <div className="v">{formatMoney(orderPurchaseTotal(rows))}</div>
       </div>
     </>
   );
