@@ -5154,8 +5154,8 @@ export default function App() {
 
         <section className="dg-form-inner-panel" style={{ marginTop: "1rem" }}>
           <h2 className="dg-panel-section-title">Nəticələr</h2>
-          <div className="dg-pricecalc-card-grid dg-pricecalc-card-grid--cash" style={{ marginTop: "0.5rem" }}>
-            <article className="dg-pricecalc-card dg-pricecalc-card--cash" aria-label="Nağd satış qiyməti kartı">
+          <div className="dg-pricecalc-card-grid" style={{ marginTop: "0.5rem" }}>
+            <article className="dg-pricecalc-card" aria-label="Nağd satış qiyməti kartı">
               <div className="dg-pricecalc-card-label">Nağd satış qiyməti</div>
               <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.cashPrice)}</div>
             </article>
