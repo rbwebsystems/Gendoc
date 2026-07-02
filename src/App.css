@@ -376,6 +376,58 @@ textarea.dg-input::placeholder {
   color: var(--win-text);
 }
 
+.dg-table--order-lines,
+.dg-table--order-summary,
+.dg-info-table--order-lines {
+  table-layout: fixed;
+}
+
+.dg-table--order-lines .dg-order-col-product,
+.dg-table--order-lines .dg-order-col-supplier,
+.dg-info-table--order-lines td:nth-child(2),
+.dg-info-table--order-lines td:nth-child(5) {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.dg-table--order-lines .dg-order-col-qty,
+.dg-table--order-summary .dg-order-col-qty {
+  width: 96px;
+}
+
+.dg-table--order-lines .dg-order-col-price {
+  width: 130px;
+}
+
+.dg-table--order-lines .dg-order-col-total,
+.dg-table--order-summary .dg-order-col-total {
+  width: 136px;
+}
+
+.dg-table--order-summary .dg-order-col-products {
+  width: 110px;
+}
+
+.dg-table--order-summary .dg-th-actions,
+.dg-table--order-summary .dg-td-actions {
+  width: 172px;
+}
+
+.dg-table--order-summary .dg-icon-row {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dg-info-table--order-lines th,
+.dg-info-table--order-lines td {
+  white-space: normal;
+}
+
+.dg-info-table--order-lines tfoot td {
+  background: #f3f4f6;
+  border-top: 2px solid var(--win-border-strong);
+}
+
 .dg-table tbody tr:nth-child(even) td {
   background-color: #fafafa;
 }

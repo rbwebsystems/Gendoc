@@ -374,7 +374,7 @@ function buildOrderSupplierPdfHtml(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(params.title)}</title>
   <style>
-    @page { size: A4; margin: 14mm; }
+    @page { size: A4; margin: 10mm; }
     body {
       margin: 0;
       font-family: Arial, Helvetica, sans-serif;
@@ -385,11 +385,7 @@ function buildOrderSupplierPdfHtml(params: {
       print-color-adjust: exact;
       background: #fff;
     }
-    .doc {
-      width: 100%;
-      max-width: 180mm;
-      margin: 0 auto;
-    }
+    .doc { width: 100%; margin: 0 auto; }
     .title {
       margin: 0 0 10px;
       padding: 8px 10px;
@@ -4355,15 +4351,15 @@ export default function App() {
     onRemove: (id: string) => void,
   ) => (
     <div className="dg-table-wrap pg-grid-host">
-      <table className="dg-table">
+      <table className="dg-table dg-table--order-lines">
         <thead>
           <tr>
             <th className="dg-th-num">№</th>
-            <th>Məhsul</th>
-            <th>Miqdar</th>
-            <th>Alış qiyməti</th>
-            <th>Təchizatçı</th>
-            <th>Cəm</th>
+              <th className="dg-order-col-product">Məhsul</th>
+              <th className="dg-order-col-qty">Miqdar</th>
+              <th className="dg-order-col-price">Alış qiyməti</th>
+              <th className="dg-order-col-supplier">Təchizatçı</th>
+              <th className="dg-order-col-total">Cəm</th>
             <th className="dg-th-actions">Sil</th>
           </tr>
         </thead>
@@ -4378,14 +4374,14 @@ export default function App() {
             rows.map((r, idx) => (
               <tr key={r.id}>
                 <td className="dg-td-num">{idx + 1}</td>
-                <td>
+                <td className="dg-order-col-product">
                   <input
                     className="dg-input dg-input-table"
                     value={r.name}
                     onChange={(e) => onPatch(r.id, { name: e.target.value })}
                   />
                 </td>
-                <td>
+                <td className="dg-order-col-qty">
                   <input
                     className="dg-input dg-input-table dg-input-num"
                     type="number"
@@ -4395,7 +4391,7 @@ export default function App() {
                     onChange={(e) => onPatch(r.id, { qty: Number(e.target.value) || 0 })}
                   />
                 </td>
-                <td>
+                <td className="dg-order-col-price">
                   <input
                     className="dg-input dg-input-table dg-input-num"
                     type="number"
@@ -4405,14 +4401,14 @@ export default function App() {
                     onChange={(e) => onPatch(r.id, { purchasePrice: Number(e.target.value) || 0 })}
                   />
                 </td>
-                <td>
+                <td className="dg-order-col-supplier">
                   <input
                     className="dg-input dg-input-table"
                     value={r.supplierName}
                     onChange={(e) => onPatch(r.id, { supplierName: e.target.value })}
                   />
                 </td>
-                <td className="dg-td-amount">{formatMoney(r.qty * r.purchasePrice)}</td>
+                <td className="dg-td-amount dg-order-col-total">{formatMoney(r.qty * r.purchasePrice)}</td>
                 <td className="dg-td-actions">
                   <button
                     type="button"
@@ -4459,16 +4455,16 @@ export default function App() {
   ) => {
     return (
       <div className="dg-table-wrap pg-grid-host">
-        <table className="dg-table">
+        <table className="dg-table dg-table--order-summary">
           <thead>
             <tr>
               <th className="dg-th-num">№</th>
               {opts.showDate ? <th>Tarix</th> : null}
               {opts.showCustomer ? <th>Müştəri</th> : null}
               <th>Status</th>
-              <th>Məhsul sayı</th>
-              <th>Ümumi miqdar</th>
-              <th>Cəm</th>
+              <th className="dg-order-col-products">Məhsul sayı</th>
+              <th className="dg-order-col-qty">Ümumi miqdar</th>
+              <th className="dg-order-col-total">Cəm</th>
               <th className="dg-th-actions">Əməliyyatlar</th>
             </tr>
           </thead>
@@ -4488,9 +4484,9 @@ export default function App() {
                       onChange={(status) => opts.onStatusChange(o.id, status)}
                     />
                   </td>
-                  <td className="dg-td-amount">{productCount}</td>
-                  <td className="dg-td-amount">{totalQty}</td>
-                  <td className="dg-td-amount">{formatMoney(totalAmount)}</td>
+                  <td className="dg-td-amount dg-order-col-products">{productCount}</td>
+                  <td className="dg-td-amount dg-order-col-qty">{totalQty}</td>
+                  <td className="dg-td-amount dg-order-col-total">{formatMoney(totalAmount)}</td>
                   <td className="dg-td-actions">
                     <div className="dg-icon-row">
                       <button
@@ -4543,8 +4539,8 @@ export default function App() {
   const renderOrderInfoLinesTable = (rows: OrderLineRow[]) => (
     <>
       <div className="dg-info-section-title">Məhsullar</div>
-      <div className="dg-info-table-wrap">
-        <table className="dg-info-table">
+      <div className="dg-info-table-wrap dg-info-table-wrap--order-lines">
+        <table className="dg-info-table dg-info-table--order-lines">
           <thead>
             <tr>
               <th style={{ width: 54 }} className="dg-num">
