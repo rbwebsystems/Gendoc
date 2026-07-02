@@ -2360,6 +2360,35 @@ textarea.dg-input {
   margin-bottom: 1rem;
 }
 
+.dg-pricecalc-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 190px));
+  gap: 0.65rem;
+}
+
+.dg-pricecalc-card {
+  border: 1px solid var(--win-border);
+  border-radius: var(--win-radius-xl);
+  background: var(--win-surface);
+  box-shadow: var(--win-shadow-card);
+  padding: 0.7rem 0.8rem;
+  min-height: 72px;
+}
+
+.dg-pricecalc-card-label {
+  font-size: 0.8rem;
+  line-height: 1.25;
+  color: var(--win-text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.dg-pricecalc-card-value {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--win-text);
+}
+
 .dg-permission-check {
   display: flex;
   align-items: center;

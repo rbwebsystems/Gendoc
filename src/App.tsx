@@ -5154,31 +5154,23 @@ export default function App() {
 
         <section className="dg-form-inner-panel" style={{ marginTop: "1rem" }}>
           <h2 className="dg-form-inner-panel-title">Nəticələr</h2>
-          <div className="dg-info-grid" style={{ marginTop: "0.25rem" }}>
-            <div className="k">Nağd satış qiyməti</div>
-            <div className="v">{formatMoney(priceCalcResult.cashPrice)}</div>
+          <div className="dg-pricecalc-card-grid" style={{ marginTop: "0.5rem" }}>
+            <article className="dg-pricecalc-card" aria-label="Nağd satış qiyməti kartı">
+              <div className="dg-pricecalc-card-label">Nağd satış qiyməti</div>
+              <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.cashPrice)}</div>
+            </article>
           </div>
 
-          <div className="dg-info-section-title" style={{ marginTop: "1rem" }}>
-            Kredit qiymətləri
+          <div className="dg-info-section-title" style={{ marginTop: "1.1rem" }}>
+            Kredit qiymətləri (kartlar)
           </div>
-          <div className="dg-info-table-wrap">
-            <table className="dg-info-table">
-              <thead>
-                <tr>
-                  <th>Müddət</th>
-                  <th className="dg-num">Qiymət</th>
-                </tr>
-              </thead>
-              <tbody>
-                {PRICE_CALC_CREDIT_PERIODS.map((period) => (
-                  <tr key={period.key}>
-                    <td>{period.label}</td>
-                    <td className="dg-num">{formatMoney(priceCalcResult.creditPrices[period.key])}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="dg-pricecalc-card-grid">
+            {PRICE_CALC_CREDIT_PERIODS.map((period) => (
+              <article key={period.key} className="dg-pricecalc-card" aria-label={`${period.label} kredit kartı`}>
+                <div className="dg-pricecalc-card-label">{period.label}</div>
+                <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.creditPrices[period.key])}</div>
+              </article>
+            ))}
           </div>
         </section>
       </div>
