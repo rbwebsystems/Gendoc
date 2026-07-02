@@ -112,6 +112,12 @@ import {
   writeWorkspace,
   workspaceFingerprint,
 } from "./lib/workspaceSync";
+import {
+  calculatePricePlan,
+  PRICE_CALC_CREDIT_PERIODS,
+  PRICE_CALC_PRODUCT_OPTIONS,
+  type PriceCalcProductType,
+} from "./lib/priceCalculation";
 
 async function downloadPdfFromHtml(html: string, filename: string): Promise<void> {
   const iframe = document.createElement("iframe");
@@ -1203,6 +1209,8 @@ export default function App() {
   const [customerOrderEditId, setCustomerOrderEditId] = useState<string | null>(null);
   const [customerOrderDraft, setCustomerOrderDraft] = useState<CustomerOrderDraft>(() => emptyCustomerOrderDraft());
   const [customerOrderMode, setCustomerOrderMode] = useState<OrderFormMode>("list");
+  const [priceCalcProductType, setPriceCalcProductType] = useState<PriceCalcProductType>("mobileNew");
+  const [priceCalcCostInput, setPriceCalcCostInput] = useState("");
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
   const [permissionMode, setPermissionMode] = useState<SystemUserFormMode>("list");
@@ -1984,6 +1992,16 @@ export default function App() {
     leaveMode,
     leaveEditId,
   ]);
+
+  const priceCalcCostValue = useMemo(() => {
+    const raw = Number(priceCalcCostInput.replace(",", "."));
+    return Number.isFinite(raw) ? raw : 0;
+  }, [priceCalcCostInput]);
+
+  const priceCalcResult = useMemo(
+    () => calculatePricePlan(priceCalcProductType, priceCalcCostValue),
+    [priceCalcProductType, priceCalcCostValue],
+  );
 
   const patchSellerSettings = useCallback((key: keyof CompanyProfile, value: string) => {
     setWorkspace((w) => ({
@@ -5099,12 +5117,70 @@ export default function App() {
   const renderPriceCalculationsModule = () => (
     <div className="dg-form-page pg-panel" aria-label="Qiymət hesablanması">
       <div className="dg-form-page-body">
-        <div className="dg-empty-state-card" role="status">
-          <div className="dg-empty-state-title">Qiymət hesablanması hazırlanır</div>
-          <div className="dg-empty-state-desc">
-            Bu modul təchizatçı təklifi məntiqindən fərqlidir. Sizin göndərəcəyiniz prompt əsasında qurulacaq.
+        <section className="dg-form-inner-panel">
+          <h2 className="dg-form-inner-panel-title">Hesablama girişləri</h2>
+          <div className="dg-form-meta-grid">
+            <label className="dg-field">
+              <span className="dg-label">Məhsul növü</span>
+              <select
+                className="dg-input"
+                value={priceCalcProductType}
+                onChange={(e) => setPriceCalcProductType(e.target.value as PriceCalcProductType)}
+              >
+                {PRICE_CALC_PRODUCT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Maya dəyəri (AZN)</span>
+              <input
+                className="dg-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={priceCalcCostInput}
+                onChange={(e) => setPriceCalcCostInput(e.target.value)}
+                placeholder="0.00"
+              />
+            </label>
           </div>
-        </div>
+          <p className="dg-muted" style={{ marginTop: "0.75rem" }}>
+            Məhsul növü və maya dəyəri dəyişdikcə nəticələr avtomatik yenilənir.
+          </p>
+        </section>
+
+        <section className="dg-form-inner-panel" style={{ marginTop: "1rem" }}>
+          <h2 className="dg-form-inner-panel-title">Nəticələr</h2>
+          <div className="dg-info-grid" style={{ marginTop: "0.25rem" }}>
+            <div className="k">Nağd satış qiyməti</div>
+            <div className="v">{formatMoney(priceCalcResult.cashPrice)}</div>
+          </div>
+
+          <div className="dg-info-section-title" style={{ marginTop: "1rem" }}>
+            Kredit qiymətləri
+          </div>
+          <div className="dg-info-table-wrap">
+            <table className="dg-info-table">
+              <thead>
+                <tr>
+                  <th>Müddət</th>
+                  <th className="dg-num">Qiymət</th>
+                </tr>
+              </thead>
+              <tbody>
+                {PRICE_CALC_CREDIT_PERIODS.map((period) => (
+                  <tr key={period.key}>
+                    <td>{period.label}</td>
+                    <td className="dg-num">{formatMoney(priceCalcResult.creditPrices[period.key])}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
     </div>
   );
