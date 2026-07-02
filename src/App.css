@@ -2362,31 +2362,92 @@ textarea.dg-input {
 
 .dg-pricecalc-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 190px));
-  gap: 0.65rem;
+  grid-template-columns: repeat(auto-fill, minmax(11.75rem, 1fr));
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.dg-pricecalc-card-grid--cash {
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 18rem));
 }
 
 .dg-pricecalc-card {
-  border: 1px solid var(--win-border);
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--win-border) 88%, #ef4444 12%);
   border-radius: var(--win-radius-xl);
-  background: var(--win-surface);
-  box-shadow: var(--win-shadow-card);
-  padding: 0.7rem 0.8rem;
-  min-height: 72px;
+  background: linear-gradient(
+    165deg,
+    var(--win-surface) 0%,
+    color-mix(in srgb, var(--win-surface) 96%, #fef2f2 4%) 100%
+  );
+  box-shadow:
+    var(--win-shadow-card),
+    0 1px 0 color-mix(in srgb, #ef4444 8%, transparent);
+  padding: 1rem 1.05rem 1.1rem 1.15rem;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.dg-pricecalc-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #f87171 0%, #dc2626 52%, #b91c1c 100%);
+  border-radius: var(--win-radius-xl) 0 0 var(--win-radius-xl);
+}
+
+.dg-pricecalc-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #b91c1c 0%, #ef4444 48%, #fca5a5 100%);
+  opacity: 0.9;
+}
+
+.dg-pricecalc-card--cash {
+  min-height: 100px;
 }
 
 .dg-pricecalc-card-label {
-  font-size: 0.8rem;
-  line-height: 1.25;
+  position: relative;
+  z-index: 1;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
   color: var(--win-text-secondary);
-  margin-bottom: 0.4rem;
+  letter-spacing: 0.01em;
 }
 
 .dg-pricecalc-card-value {
-  font-size: 1rem;
+  position: relative;
+  z-index: 1;
+  font-size: 1.125rem;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.3;
   color: var(--win-text);
+  letter-spacing: -0.01em;
+  word-break: break-word;
+}
+
+.dg-pricecalc-card--cash .dg-pricecalc-card-value {
+  font-size: 1.3125rem;
+}
+
+@media (max-width: 640px) {
+  .dg-pricecalc-card-grid,
+  .dg-pricecalc-card-grid--cash {
+    grid-template-columns: 1fr;
+  }
 }
 
 .dg-permission-check {

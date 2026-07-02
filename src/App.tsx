@@ -5154,15 +5154,15 @@ export default function App() {
 
         <section className="dg-form-inner-panel" style={{ marginTop: "1rem" }}>
           <h2 className="dg-form-inner-panel-title">Nəticələr</h2>
-          <div className="dg-pricecalc-card-grid" style={{ marginTop: "0.5rem" }}>
-            <article className="dg-pricecalc-card" aria-label="Nağd satış qiyməti kartı">
+          <div className="dg-pricecalc-card-grid dg-pricecalc-card-grid--cash" style={{ marginTop: "0.5rem" }}>
+            <article className="dg-pricecalc-card dg-pricecalc-card--cash" aria-label="Nağd satış qiyməti kartı">
               <div className="dg-pricecalc-card-label">Nağd satış qiyməti</div>
               <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.cashPrice)}</div>
             </article>
           </div>
 
           <div className="dg-info-section-title" style={{ marginTop: "1.1rem" }}>
-            Kredit qiymətləri (kartlar)
+            Kredit qiymətləri
           </div>
           <div className="dg-pricecalc-card-grid">
             {PRICE_CALC_CREDIT_PERIODS.map((period) => (
