@@ -48,7 +48,7 @@ import {
   leaveStatusModifier,
   defaultModulesForRole,
 } from "./lib/defaults";
-import { formatDateAzLong, formatMoney } from "./lib/text";
+import { escapeHtml, formatDateAzLong, formatMoney } from "./lib/text";
 import type {
   CompanyProfile,
   DocWorkspace,
@@ -311,6 +311,8 @@ function emptyCustomerOrderDraft(): CustomerOrderDraft {
   };
 }
 
+type OrderModuleKind = "storeOrder" | "customerOrder";
+
 function normalizeOrderDraftRows(rows: OrderLineRow[]): OrderLineRow[] {
   return rows
     .map((r) => ({
@@ -325,6 +327,83 @@ function normalizeOrderDraftRows(rows: OrderLineRow[]): OrderLineRow[] {
 
 function orderPurchaseTotal(rows: OrderLineRow[]): number {
   return rows.reduce((sum, r) => sum + r.qty * r.purchasePrice, 0);
+}
+
+function orderSuppliers(rows: OrderLineRow[]): string[] {
+  const names = new Map<string, string>();
+  for (const row of rows) {
+    const trimmed = row.supplierName.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (!names.has(key)) names.set(key, trimmed);
+  }
+  return [...names.values()];
+}
+
+function buildOrderSupplierPdfHtml(params: {
+  title: string;
+  orderDate: string;
+  supplierName: string;
+  rows: OrderLineRow[];
+  customerName?: string;
+}): string {
+  const rowsHtml = params.rows
+    .map((r, i) => {
+      const lineTotal = (Number(r.qty) || 0) * (Number(r.purchasePrice) || 0);
+      return `<tr>
+        <td>${i + 1}</td>
+        <td>${escapeHtml(r.name || "—")}</td>
+        <td class="num">${Number(r.qty) || 0}</td>
+        <td class="num">${formatMoney(Number(r.purchasePrice) || 0)}</td>
+        <td class="num">${formatMoney(lineTotal)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const total = orderPurchaseTotal(params.rows);
+  const customerBlock = params.customerName
+    ? `<div><strong>Müştəri:</strong> ${escapeHtml(params.customerName)}</div>`
+    : "";
+
+  return `<!doctype html>
+<html lang="az">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(params.title)}</title>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; margin: 24px; color: #111827; }
+    h1 { font-size: 20px; margin: 0 0 12px; }
+    .meta { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: #374151; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+    th { background: #f3f4f6; font-weight: 700; }
+    td.num, th.num { text-align: right; }
+    .totals { margin-top: 12px; text-align: right; font-size: 14px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(params.title)}</h1>
+  <div class="meta">
+    <div><strong>Tarix:</strong> ${escapeHtml(formatDateAzLong(params.orderDate))}</div>
+    ${customerBlock}
+    <div><strong>Təchizatçı:</strong> ${escapeHtml(params.supplierName)}</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 44px;" class="num">№</th>
+        <th>Məhsul</th>
+        <th style="width: 90px;" class="num">Miqdar</th>
+        <th style="width: 130px;" class="num">Alış qiyməti</th>
+        <th style="width: 130px;" class="num">Cəm</th>
+      </tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  <div class="totals">Yekun: ${escapeHtml(formatMoney(total))}</div>
+</body>
+</html>`;
 }
 
 type ProjectDraft = {
@@ -1239,6 +1318,9 @@ export default function App() {
   } | null>(null);
   const printDialogRef = useRef<HTMLDialogElement>(null);
   const [printProjectId, setPrintProjectId] = useState<string | null>(null);
+  const orderSupplierPdfDialogRef = useRef<HTMLDialogElement>(null);
+  const [orderSupplierPdfTarget, setOrderSupplierPdfTarget] = useState<{ kind: OrderModuleKind; id: string } | null>(null);
+  const [orderSupplierPdfSupplier, setOrderSupplierPdfSupplier] = useState("");
   const infoDialogRef = useRef<HTMLDialogElement>(null);
   const confirmDialogRef = useRef<HTMLDialogElement>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -2410,8 +2492,39 @@ export default function App() {
     infoDialog?.kind === "customerOrder"
       ? (workspace.customerOrders ?? []).find((o) => o.id === infoDialog.id)
       : undefined;
+  const pdfStoreOrder =
+    orderSupplierPdfTarget?.kind === "storeOrder"
+      ? (workspace.storeOrders ?? []).find((o) => o.id === orderSupplierPdfTarget.id)
+      : undefined;
+  const pdfCustomerOrder =
+    orderSupplierPdfTarget?.kind === "customerOrder"
+      ? (workspace.customerOrders ?? []).find((o) => o.id === orderSupplierPdfTarget.id)
+      : undefined;
+  const pdfOrder = pdfStoreOrder ?? pdfCustomerOrder;
+  const pdfSuppliers = useMemo(() => orderSuppliers(pdfOrder?.rows ?? []), [pdfOrder]);
   const infoProjectBuyer =
     infoProject && workspace.companies.find((c) => c.id === infoProject.companyId)?.profile;
+
+  useEffect(() => {
+    const el = orderSupplierPdfDialogRef.current;
+    if (!el) return;
+    if (orderSupplierPdfTarget) {
+      if (!el.open) el.showModal();
+    } else if (el.open) {
+      el.close();
+    }
+  }, [orderSupplierPdfTarget]);
+
+  useEffect(() => {
+    if (!orderSupplierPdfTarget) {
+      setOrderSupplierPdfSupplier("");
+      return;
+    }
+    setOrderSupplierPdfSupplier((prev) => {
+      if (prev && pdfSuppliers.includes(prev)) return prev;
+      return pdfSuppliers[0] ?? "";
+    });
+  }, [orderSupplierPdfTarget, pdfSuppliers]);
 
   const companyProfileFields = (
     profile: CompanyProfile,
@@ -4065,6 +4178,46 @@ export default function App() {
     }));
   };
 
+  const openOrderSupplierPdfDialog = (kind: OrderModuleKind, id: string) => {
+    setOrderSupplierPdfTarget({ kind, id });
+  };
+
+  const closeOrderSupplierPdfDialog = () => {
+    setOrderSupplierPdfTarget(null);
+    setOrderSupplierPdfSupplier("");
+  };
+
+  const downloadOrderSupplierPdf = async (): Promise<boolean> => {
+    if (!pdfOrder) {
+      flash(setToast, "Sifariş tapılmadı.", "error");
+      return false;
+    }
+    const supplier = orderSupplierPdfSupplier.trim();
+    if (!supplier) {
+      flash(setToast, "Təchizatçı seçin.", "error");
+      return false;
+    }
+    const rows = pdfOrder.rows.filter((r) => r.supplierName.trim().toLowerCase() === supplier.toLowerCase());
+    if (rows.length === 0) {
+      flash(setToast, "Seçilən təchizatçı üçün məhsul yoxdur.", "error");
+      return false;
+    }
+    const title = orderSupplierPdfTarget?.kind === "customerOrder" ? "Müştəri sifarişi" : "Mağaza sifarişi";
+    const customerName = orderSupplierPdfTarget?.kind === "customerOrder" ? pdfCustomerOrder?.customerName : undefined;
+    const html = buildOrderSupplierPdfHtml({
+      title,
+      orderDate: pdfOrder.orderDate,
+      supplierName: supplier,
+      rows,
+      ...(customerName ? { customerName } : {}),
+    });
+    const slug = supplier.toLowerCase().replace(/[^a-z0-9а-яəğıöşüç_-]+/gi, "-").replace(/^-+|-+$/g, "") || "supplier";
+    const filename = `${title.toLowerCase().replace(/\s+/g, "-")}-${slug}.pdf`;
+    await downloadPdfFromHtml(html, filename);
+    flash(setToast, "PDF yükləndi");
+    return true;
+  };
+
   const patchStoreOrderLine = (id: string, patch: Partial<OrderLineRow>) => {
     setStoreOrderDraft((d) => ({
       ...d,
@@ -4094,13 +4247,14 @@ export default function App() {
             <th>Miqdar</th>
             <th>Alış qiyməti</th>
             <th>Təchizatçı</th>
+            <th>Cəm</th>
             <th className="dg-th-actions">Sil</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={6} className="dg-empty-cell">
+              <td colSpan={7} className="dg-empty-cell">
                 Məhsul sətri əlavə edin.
               </td>
             </tr>
@@ -4142,6 +4296,7 @@ export default function App() {
                     onChange={(e) => onPatch(r.id, { supplierName: e.target.value })}
                   />
                 </td>
+                <td className="dg-td-amount">{formatMoney(r.qty * r.purchasePrice)}</td>
                 <td className="dg-td-actions">
                   <button
                     type="button"
@@ -4182,6 +4337,7 @@ export default function App() {
       onInfo: (order: T) => void;
       onEdit: (order: T) => void;
       onDelete: (id: string) => void;
+      onDownloadPdf: (order: T) => void;
       onStatusChange: (id: string, status: OrderStatus) => void;
     },
   ) => {
@@ -4199,6 +4355,7 @@ export default function App() {
               <th>Miqdar</th>
               <th>Alış qiyməti</th>
               <th>Təchizatçı</th>
+              <th>Cəm</th>
               <th className="dg-th-actions">Əməliyyatlar</th>
             </tr>
           </thead>
@@ -4227,6 +4384,7 @@ export default function App() {
                     <td className="dg-td-amount">{row.qty}</td>
                     <td className="dg-td-amount">{formatMoney(row.purchasePrice)}</td>
                     <td>{row.supplierName}</td>
+                    <td className="dg-td-amount">{formatMoney(row.qty * row.purchasePrice)}</td>
                     {lineIdx === 0 ? (
                       <td className="dg-td-actions" rowSpan={o.rows.length}>
                         <div className="dg-icon-row">
@@ -4247,6 +4405,15 @@ export default function App() {
                             onClick={() => opts.onEdit(o)}
                           >
                             <IconEdit />
+                          </button>
+                          <button
+                            type="button"
+                            className="dg-icon-btn"
+                            title="PDF yüklə (təchizatçı seçimi)"
+                            aria-label="PDF yüklə"
+                            onClick={() => opts.onDownloadPdf(o)}
+                          >
+                            <IconPrint />
                           </button>
                           <button
                             type="button"
@@ -4980,6 +5147,7 @@ export default function App() {
               onInfo: (o) => setInfoDialog({ kind: "storeOrder", id: o.id }),
               onEdit: startEditStoreOrder,
               onDelete: deleteStoreOrder,
+              onDownloadPdf: (o) => openOrderSupplierPdfDialog("storeOrder", o.id),
               onStatusChange: patchStoreOrderStatus,
             })
           )}
@@ -5106,6 +5274,7 @@ export default function App() {
               onInfo: (o) => setInfoDialog({ kind: "customerOrder", id: o.id }),
               onEdit: startEditCustomerOrder,
               onDelete: deleteCustomerOrder,
+              onDownloadPdf: (o) => openOrderSupplierPdfDialog("customerOrder", o.id),
               onStatusChange: patchCustomerOrderStatus,
             })
           )}
@@ -6257,6 +6426,51 @@ export default function App() {
             <div className="dg-modal-actions">
               <button type="button" className="dg-btn dg-btn-secondary" onClick={() => closePrintDialog()}>
                 Bağla
+              </button>
+            </div>
+          </div>
+        </dialog>
+      ) : null}
+
+      {orderSupplierPdfTarget && pdfOrder ? (
+        <dialog
+          ref={orderSupplierPdfDialogRef}
+          className="dg-modal dg-modal--alert"
+          onClose={() => closeOrderSupplierPdfDialog()}
+        >
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">PDF yüklə — təchizatçı seçin</h2>
+            <p className="dg-modal-hint">
+              Yalnız seçilən təchizatçıya aid məhsullarla PDF yaradılacaq.
+            </p>
+            <label className="dg-field">
+              <span className="dg-label">Təchizatçı</span>
+              <select
+                className="dg-input"
+                value={orderSupplierPdfSupplier}
+                onChange={(e) => setOrderSupplierPdfSupplier(e.target.value)}
+              >
+                {pdfSuppliers.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={closeOrderSupplierPdfDialog}>
+                Ləğv et
+              </button>
+              <button
+                type="button"
+                className="dg-btn dg-btn-primary"
+                disabled={pdfSuppliers.length === 0}
+                onClick={async () => {
+                  const ok = await downloadOrderSupplierPdf();
+                  if (ok) closeOrderSupplierPdfDialog();
+                }}
+              >
+                PDF yüklə
               </button>
             </div>
           </div>
