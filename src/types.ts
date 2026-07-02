@@ -229,7 +229,32 @@ export type PermissionModuleId =
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"
+  | "cashReport"
   | "workLeave";
+
+/** Kassa hesabatı — hesab sətri */
+export interface CashReportRow {
+  id: string;
+  name: string;
+  /** 5 sütun: [0] cəmlənmiş balans, [1–4] gözləyən daxiletmələr */
+  slots: [number, number, number, number, number];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Kassa hesabatı tarixçə anlık görüntüsü */
+export interface CashReportSnapshot {
+  id: string;
+  label: string;
+  savedAt: number;
+  balance: number;
+  rows: CashReportRow[];
+}
+
+export interface CashReportState {
+  rows: CashReportRow[];
+  history: CashReportSnapshot[];
+}
 
 /** Sistem istifadəçisi və modul icazələri */
 export type SessionKind = "developer" | "member" | "local";
@@ -293,6 +318,7 @@ export interface DocWorkspace {
   supplierQuotes?: SupplierQuoteRecord[];
   storeOrders?: StoreOrderRecord[];
   customerOrders?: CustomerOrderRecord[];
+  cashReport?: CashReportState;
   systemUsers?: SystemUserRecord[];
   leaveRequests?: LeaveRequestRecord[];
 }

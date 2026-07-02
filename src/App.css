@@ -2534,3 +2534,191 @@ textarea.dg-input {
   font-size: 0.8125rem;
 }
 
+.dg-btn-sm {
+  min-width: auto !important;
+  padding: 0.3rem 0.55rem !important;
+  font-size: 0.8125rem;
+}
+
+.dg-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--win-text-muted);
+}
+
+.dg-btn-ghost:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--win-text);
+}
+
+/* ——— Kassa hesabatı ——— */
+.dg-cash-report {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 0;
+}
+
+.dg-cash-report-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dg-cash-report-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dg-cash-history-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  margin-left: 0.35rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--accent, #2563eb);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.dg-cash-report-hint {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.dg-cash-table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 16rem);
+  overflow: auto;
+}
+
+.dg-table.dg-table--cash-report {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.dg-table.dg-table--cash-report .dg-cash-col-idx {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.dg-table.dg-table--cash-report .dg-cash-col-name {
+  width: 14rem;
+}
+
+.dg-table.dg-table--cash-report .dg-cash-col-slot {
+  width: 5.5rem;
+  text-align: right;
+}
+
+.dg-table.dg-table--cash-report .dg-cash-col-total {
+  width: 6.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.dg-table.dg-table--cash-report .dg-cash-col-actions {
+  width: 11rem;
+}
+
+.dg-cash-name-input {
+  font-weight: 600;
+  min-width: 0;
+}
+
+.dg-cash-slot-input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.dg-cash-amount--pos,
+.dg-cash-slot-input.dg-cash-amount--pos,
+.dg-cash-col-total.dg-cash-amount--pos .dg-cash-amount {
+  color: #15803d;
+}
+
+.dg-cash-amount--neg,
+.dg-cash-slot-input.dg-cash-amount--neg,
+.dg-cash-col-total.dg-cash-amount--neg .dg-cash-amount {
+  color: #dc2626;
+}
+
+.dg-cash-amount--zero {
+  color: var(--win-text-muted);
+}
+
+.dg-cash-pending {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #ca8a04;
+}
+
+.dg-cash-actions {
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.dg-cash-balance-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+  color: #fff;
+}
+
+.dg-cash-balance-label {
+  font-size: 0.9375rem;
+  opacity: 0.92;
+}
+
+.dg-cash-balance-value {
+  font-size: 1.375rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.dg-cash-balance-value.dg-cash-amount--neg {
+  color: #fecaca;
+}
+
+.dg-cash-balance-value.dg-cash-amount--pos {
+  color: #fff;
+}
+
+.dg-table.dg-table--cash-history .dg-th-actions,
+.dg-table.dg-table--cash-history .dg-td-actions {
+  width: 11rem;
+}
+
+@media (max-width: 900px) {
+  .dg-table.dg-table--cash-report .dg-cash-col-slot {
+    width: 4.5rem;
+  }
+
+  .dg-cash-balance-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
+

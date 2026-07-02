@@ -22,6 +22,7 @@ import type {
   SavedCompanyRecord,
   SavedProjectV2,
 } from "../types";
+import { normalizeCashReportState } from "./cashReport";
 import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT, defaultModulesForRole } from "./defaults";
 
 const WS_KEY_V3 = "docgen_workspace_v3";
@@ -117,6 +118,7 @@ const VALID_PERMISSION_MODULES = new Set<PermissionModuleId>([
   "storeOrders",
   "customerOrders",
   "priceCalculations",
+  "cashReport",
   "workLeave",
 ]);
 
@@ -499,6 +501,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
 
   const storeOrders = normalizeStoreOrders(w.storeOrders);
   const customerOrders = normalizeCustomerOrders(w.customerOrders);
+  const cashReport = w.cashReport != null ? normalizeCashReportState(w.cashReport) : undefined;
   const systemUsers = normalizeSystemUsers(w.systemUsers);
   const usersById = new Map(systemUsers.map((u) => [u.id, u]));
   const leaveRequests = normalizeLeaveRequests(w.leaveRequests, usersById);
@@ -530,6 +533,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     supplierOffers,
     storeOrders,
     customerOrders,
+    ...(cashReport ? { cashReport } : {}),
     systemUsers,
     leaveRequests,
   };

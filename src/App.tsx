@@ -49,6 +49,20 @@ import {
   defaultModulesForRole,
 } from "./lib/defaults";
 import { escapeHtml, formatDateAzLong, formatMoney } from "./lib/text";
+import {
+  CASH_REPORT_SLOT_COUNT,
+  cashAmountClass,
+  cloneCashRow,
+  createCashSnapshot,
+  formatCashAmount,
+  mergeCashRowSlots,
+  newCashReportRow,
+  parseCashInput,
+  rowDisplayTotal,
+  rowPendingSum,
+  totalCashBalance,
+  defaultCashReportRows,
+} from "./lib/cashReport";
 import type {
   CompanyProfile,
   DocWorkspace,
@@ -71,6 +85,8 @@ import type {
   AppUserRole,
   PermissionModuleId,
   WorkspaceFolderRecord,
+  CashReportRow,
+  CashReportSnapshot,
 } from "./types";
 import html2pdf from "html2pdf.js";
 import { auth, firebaseConfigError, firebaseEnabled, firebaseProjectId } from "./lib/firebase";
@@ -227,6 +243,7 @@ type SidebarModule =
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"
+  | "cashReport"
   | "appUsers"
   | "systemPermissions"
   | "workLeave"
@@ -586,6 +603,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
+  { id: "cashReport", label: "Kassa" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -603,6 +621,7 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "storeOrders",
   "customerOrders",
   "priceCalculations",
+  "cashReport",
 ];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
@@ -614,6 +633,7 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
   priceCalculations: "Qiymət hesablanması — tezliklə",
+  cashReport: "Nağd və kart hesablarının gündəlik balansı",
   appUsers: "Giriş hesablarının idarə edilməsi",
   systemPermissions: "Modul giriş icazələri",
   workLeave: "İşçi sorğuları və direktor təsdiqi",
@@ -879,6 +899,15 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
             strokeLinejoin="round"
             d="M9 7h6m-6 4h6m-6 4h3M7 3h10a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z"
           />
+        </svg>
+      );
+    case "cashReport":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <rect x="3" y="6" width="18" height="13" rx="2" strokeWidth="2" />
+          <path strokeWidth="2" strokeLinecap="round" d="M3 10h18" />
+          <circle cx="12" cy="15" r="2.5" strokeWidth="2" />
+          <path strokeWidth="2" strokeLinecap="round" d="M7 3v3M17 3v3" />
         </svg>
       );
     case "systemPermissions":
@@ -1402,6 +1431,8 @@ export default function App() {
   const [customerOrderMode, setCustomerOrderMode] = useState<OrderFormMode>("list");
   const [priceCalcProductType, setPriceCalcProductType] = useState<PriceCalcProductType>("mobileNew");
   const [priceCalcCostInput, setPriceCalcCostInput] = useState("");
+  const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
+  const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
   const [permissionMode, setPermissionMode] = useState<SystemUserFormMode>("list");
@@ -2146,6 +2177,9 @@ export default function App() {
     if (module === "priceCalculations") {
       return { title: "Qiymət hesablanması", sub: MODULE_TAGLINE.priceCalculations };
     }
+    if (module === "cashReport") {
+      return { title: "Kassa hesabatı", sub: MODULE_TAGLINE.cashReport };
+    }
     if (module === "appUsers") {
       if (appUserMode === "list") return { title: "İstifadəçilər", sub: MODULE_TAGLINE.appUsers };
       return {
@@ -2195,6 +2229,100 @@ export default function App() {
   const priceCalcResult = useMemo(
     () => calculatePricePlan(priceCalcProductType, priceCalcCostValue),
     [priceCalcProductType, priceCalcCostValue],
+  );
+
+  const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
+  const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
+  const cashReportBalance = useMemo(() => totalCashBalance(cashReportRows), [cashReportRows]);
+
+  useEffect(() => {
+    if (module !== "cashReport") return;
+    if ((workspace.cashReport?.rows?.length ?? 0) > 0) return;
+    setWorkspace((w) => ({
+      ...w,
+      cashReport: { rows: defaultCashReportRows(), history: w.cashReport?.history ?? [] },
+    }));
+  }, [module, workspace.cashReport?.rows?.length]);
+
+  const patchCashReport = useCallback((patch: (prev: { rows: CashReportRow[]; history: CashReportSnapshot[] }) => {
+    rows: CashReportRow[];
+    history: CashReportSnapshot[];
+  }) => {
+    setWorkspace((w) => {
+      const prev = {
+        rows: w.cashReport?.rows ?? [],
+        history: w.cashReport?.history ?? [],
+      };
+      const next = patch(prev);
+      return { ...w, cashReport: next };
+    });
+  }, []);
+
+  const pushCashRowUndo = useCallback((row: CashReportRow) => {
+    const map = cashUndoRef.current;
+    const stack = map.get(row.id) ?? [];
+    stack.push(cloneCashRow(row));
+    if (stack.length > 12) stack.shift();
+    map.set(row.id, stack);
+  }, []);
+
+  const popCashRowUndo = useCallback((rowId: string): CashReportRow | null => {
+    const map = cashUndoRef.current;
+    const stack = map.get(rowId);
+    if (!stack || stack.length === 0) return null;
+    const prev = stack.pop()!;
+    if (stack.length === 0) map.delete(rowId);
+    return prev;
+  }, []);
+
+  const updateCashRow = useCallback(
+    (rowId: string, updater: (row: CashReportRow) => CashReportRow, trackUndo = false) => {
+      patchCashReport((prev) => {
+        const rows = prev.rows.map((row) => {
+          if (row.id !== rowId) return row;
+          if (trackUndo) pushCashRowUndo(row);
+          return updater(row);
+        });
+        return { ...prev, rows };
+      });
+    },
+    [patchCashReport, pushCashRowUndo],
+  );
+
+  const addCashReportRow = useCallback(() => {
+    patchCashReport((prev) => ({
+      ...prev,
+      rows: [...prev.rows, newCashReportRow("Yeni hesab")],
+    }));
+  }, [patchCashReport]);
+
+  const mergeCashReportRow = useCallback(
+    (rowId: string) => {
+      const row = cashReportRows.find((r) => r.id === rowId);
+      if (!row || rowPendingSum(row) === 0) {
+        flash(setToast, "Cəmlənəcək dəyər yoxdur (sütun 2–5).", "error");
+        return;
+      }
+      updateCashRow(rowId, mergeCashRowSlots, true);
+      flash(setToast, "Cəmləndi");
+    },
+    [cashReportRows, updateCashRow],
+  );
+
+  const undoCashReportRow = useCallback(
+    (rowId: string) => {
+      const prev = popCashRowUndo(rowId);
+      if (!prev) {
+        flash(setToast, "Geri alınacaq addım yoxdur.", "error");
+        return;
+      }
+      patchCashReport((state) => ({
+        ...state,
+        rows: state.rows.map((row) => (row.id === rowId ? prev : row)),
+      }));
+      flash(setToast, "Geri alındı");
+    },
+    [patchCashReport, popCashRowUndo],
   );
 
   const patchSellerSettings = useCallback((key: keyof CompanyProfile, value: string) => {
@@ -2277,6 +2405,83 @@ export default function App() {
       });
     },
     [],
+  );
+
+  const deleteCashReportRow = useCallback(
+    async (rowId: string) => {
+      const row = cashReportRows.find((r) => r.id === rowId);
+      if (!row) return;
+      const ok = await askConfirm({
+        title: "Sətri sil",
+        message: `«${row.name || "Hesab"}» silinsin?`,
+        confirmLabel: "Sil",
+        cancelLabel: "Ləğv et",
+        danger: true,
+      });
+      if (!ok) return;
+      cashUndoRef.current.delete(rowId);
+      patchCashReport((prev) => ({
+        ...prev,
+        rows: prev.rows.filter((r) => r.id !== rowId),
+      }));
+      flash(setToast, "Sətir silindi");
+    },
+    [askConfirm, cashReportRows, patchCashReport],
+  );
+
+  const saveCashReportSnapshot = useCallback(async () => {
+    const label = await askPrompt({
+      title: "Tarixçəyə yaz",
+      label: "Qeyd (boş buraxıla bilər)",
+      defaultValue: new Date().toLocaleString("az-AZ"),
+      confirmLabel: "Yadda saxla",
+      cancelLabel: "Ləğv et",
+    });
+    if (label == null) return;
+    const snapshot = createCashSnapshot(cashReportRows, label);
+    patchCashReport((prev) => ({
+      ...prev,
+      history: [snapshot, ...prev.history].slice(0, 50),
+    }));
+    flash(setToast, "Tarixçəyə yazıldı");
+  }, [askPrompt, cashReportRows, patchCashReport]);
+
+  const restoreCashReportSnapshot = useCallback(
+    async (snapshot: CashReportSnapshot) => {
+      const ok = await askConfirm({
+        title: "Tarixçədən bərpa",
+        message: `«${snapshot.label}» vəziyyəti bərpa edilsin? Cari məlumatlar əvəz olunacaq.`,
+        confirmLabel: "Bərpa et",
+        cancelLabel: "Ləğv et",
+      });
+      if (!ok) return;
+      cashUndoRef.current.clear();
+      patchCashReport((prev) => ({
+        rows: snapshot.rows.map(cloneCashRow),
+        history: prev.history,
+      }));
+      setCashHistoryOpen(false);
+      flash(setToast, "Tarixçədən bərpa olundu");
+    },
+    [askConfirm, patchCashReport],
+  );
+
+  const deleteCashReportSnapshot = useCallback(
+    async (snapshotId: string) => {
+      const ok = await askConfirm({
+        title: "Tarixçəni sil",
+        message: "Bu qeyd silinsin?",
+        confirmLabel: "Sil",
+        cancelLabel: "Ləğv et",
+        danger: true,
+      });
+      if (!ok) return;
+      patchCashReport((prev) => ({
+        ...prev,
+        history: prev.history.filter((h) => h.id !== snapshotId),
+      }));
+    },
+    [askConfirm, patchCashReport],
   );
 
   const restoreFromLocalBackup = useCallback(async () => {
@@ -5447,6 +5652,131 @@ export default function App() {
     </div>
   );
 
+  const renderCashReportModule = () => (
+    <div className="dg-cash-report pg-panel" aria-label="Kassa hesabatı">
+      <div className="dg-cash-report-toolbar">
+        <div className="dg-cash-report-toolbar-left">
+          <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashHistoryOpen(true)}>
+            Tarixçə
+            {cashReportHistory.length > 0 ? (
+              <span className="dg-cash-history-badge">{cashReportHistory.length}</span>
+            ) : null}
+          </button>
+          <button type="button" className="dg-btn dg-btn-secondary" onClick={() => void saveCashReportSnapshot()}>
+            Anlıq görüntü saxla
+          </button>
+        </div>
+        <button type="button" className="dg-btn dg-btn-primary" onClick={addCashReportRow}>
+          + Sətir əlavə et
+        </button>
+      </div>
+
+      <p className="dg-cash-report-hint dg-muted">
+        Sütun 1 — cəmlənmiş balans. Sütun 2–5 — gözləyən daxiletmələr. «Cəmlə» ilə 2–5 sütunlar balansa əlavə olunur.
+      </p>
+
+      <div className="dg-table-wrap dg-cash-table-wrap">
+        <table className="dg-table dg-table--cash-report">
+          <thead>
+            <tr>
+              <th className="dg-cash-col-idx">#</th>
+              <th className="dg-cash-col-name">Hesab</th>
+              {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, i) => (
+                <th key={i} className="dg-cash-col-slot">
+                  {i + 1}
+                </th>
+              ))}
+              <th className="dg-cash-col-total">Cəm</th>
+              <th className="dg-cash-col-actions">Əməliyyat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cashReportRows.map((row, index) => {
+              const rowTotal = rowDisplayTotal(row);
+              const pending = rowPendingSum(row);
+              return (
+                <tr key={row.id}>
+                  <td className="dg-cash-col-idx">{index + 1}</td>
+                  <td className="dg-cash-col-name">
+                    <input
+                      className="dg-input dg-cash-name-input"
+                      value={row.name}
+                      onChange={(e) =>
+                        updateCashRow(row.id, (r) => ({ ...r, name: e.target.value, updatedAt: Date.now() }))
+                      }
+                      placeholder="Hesab adı"
+                    />
+                  </td>
+                  {row.slots.map((value, slotIndex) => (
+                    <td key={slotIndex} className="dg-cash-col-slot">
+                      <input
+                        className={`dg-input dg-cash-slot-input ${cashAmountClass(value)}`}
+                        inputMode="decimal"
+                        value={value === 0 ? "" : String(value)}
+                        placeholder="0"
+                        onChange={(e) => {
+                          const next = parseCashInput(e.target.value);
+                          updateCashRow(row.id, (r) => {
+                            const slots = [...r.slots] as CashReportRow["slots"];
+                            slots[slotIndex] = next;
+                            return { ...r, slots, updatedAt: Date.now() };
+                          });
+                        }}
+                      />
+                    </td>
+                  ))}
+                  <td className={`dg-cash-col-total ${cashAmountClass(rowTotal)}`}>
+                    <span className="dg-cash-amount">{formatCashAmount(rowTotal)}</span>
+                    {pending !== 0 ? (
+                      <span className="dg-cash-pending" title="Gözləyən">
+                        +{formatCashAmount(pending)}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="dg-cash-col-actions">
+                    <div className="dg-icon-row dg-cash-actions">
+                      <button
+                        type="button"
+                        className="dg-btn dg-btn-secondary dg-btn-sm"
+                        onClick={() => mergeCashReportRow(row.id)}
+                        title="Sütun 2–5-i balansa cəmlə"
+                      >
+                        Cəmlə
+                      </button>
+                      <button
+                        type="button"
+                        className="dg-btn dg-btn-ghost dg-btn-sm"
+                        onClick={() => undoCashReportRow(row.id)}
+                        title="Son əməliyyatı geri al"
+                      >
+                        Geri
+                      </button>
+                      <button
+                        type="button"
+                        className="dg-btn dg-btn-danger dg-btn-sm"
+                        onClick={() => void deleteCashReportRow(row.id)}
+                        title="Sətiri sil"
+                      >
+                        Sil
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <footer className="dg-cash-balance-bar" aria-live="polite">
+        <span className="dg-cash-balance-label">Ümumi balans</span>
+        <strong className={`dg-cash-balance-value ${cashAmountClass(cashReportBalance)}`}>
+          {formatCashAmount(cashReportBalance)}
+        </strong>
+      </footer>
+    </div>
+  );
+
   const reviewerDisplayName = () => {
     if (currentMember?.name) return currentMember.name;
     if (authState.status === "signedIn") return authState.user.email || "Direktor";
@@ -6420,7 +6750,9 @@ export default function App() {
                 ? { label: "Yeni sifariş", onClick: openNewStoreOrderForm }
                 : module === "customerOrders" && customerOrderMode === "list"
                   ? { label: "Yeni sifariş", onClick: openNewCustomerOrderForm }
-                  : module === "appUsers" && appUserMode === "list" && canManageUsers
+                  : module === "cashReport"
+                    ? { label: "Sətir əlavə et", onClick: addCashReportRow }
+                    : module === "appUsers" && appUserMode === "list" && canManageUsers
                     ? { label: "Yeni istifadəçi", onClick: openNewAppUserForm }
                     : module === "workLeave" && leaveMode === "list"
                       ? { label: "Yeni sorğu", onClick: openNewLeaveForm }
@@ -6911,6 +7243,72 @@ export default function App() {
               </button>
             </div>
           </form>
+        </dialog>
+      ) : null}
+
+      {cashHistoryOpen ? (
+        <dialog
+          open
+          className="dg-modal dg-modal--wide"
+          onClose={() => setCashHistoryOpen(false)}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setCashHistoryOpen(false);
+          }}
+        >
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">Kassa tarixçəsi</h2>
+            <p className="dg-modal-hint">Saxlanmış anlıq görüntülər. Bərpa etdikdə cari cədvəl əvəz olunur.</p>
+            {cashReportHistory.length === 0 ? (
+              <p className="dg-muted">Hələ tarixçə yoxdur. «Anlıq görüntü saxla» ilə qeyd yaradın.</p>
+            ) : (
+              <div className="dg-table-wrap">
+                <table className="dg-table dg-table--cash-history">
+                  <thead>
+                    <tr>
+                      <th>Tarix / qeyd</th>
+                      <th>Balans</th>
+                      <th>Sətir sayı</th>
+                      <th className="dg-th-actions">Əməliyyat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cashReportHistory.map((snap) => (
+                      <tr key={snap.id}>
+                        <td>{snap.label}</td>
+                        <td className={cashAmountClass(snap.balance)}>{formatCashAmount(snap.balance)}</td>
+                        <td>{snap.rows.length}</td>
+                        <td className="dg-td-actions">
+                          <div className="dg-icon-row">
+                            <button
+                              type="button"
+                              className="dg-btn dg-btn-secondary dg-btn-sm"
+                              onClick={() => void restoreCashReportSnapshot(snap)}
+                            >
+                              Bərpa et
+                            </button>
+                            <button
+                              type="button"
+                              className="dg-btn dg-btn-danger dg-btn-sm"
+                              onClick={() => void deleteCashReportSnapshot(snap.id)}
+                            >
+                              Sil
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <button
+              type="button"
+              className="dg-btn dg-btn-primary dg-btn-block dg-modal-close"
+              onClick={() => setCashHistoryOpen(false)}
+            >
+              Bağla
+            </button>
+          </div>
         </dialog>
       ) : null}
 
@@ -7429,6 +7827,7 @@ export default function App() {
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
               {module === "priceCalculations" ? renderPriceCalculationsModule() : null}
+              {module === "cashReport" ? renderCashReportModule() : null}
               {module === "appUsers" ? renderAppUsersModule() : null}
               {module === "systemPermissions" ? renderSystemPermissionsModule() : null}
               {module === "workLeave" ? renderWorkLeaveModule() : null}
