@@ -349,20 +349,22 @@ function buildOrderSupplierPdfHtml(params: {
 }): string {
   const rowsHtml = params.rows
     .map((r, i) => {
-      const lineTotal = (Number(r.qty) || 0) * (Number(r.purchasePrice) || 0);
+      const qty = Number(r.qty) || 0;
+      const unit = Number(r.purchasePrice) || 0;
+      const lineTotal = qty * unit;
       return `<tr>
         <td class="num">${i + 1}</td>
         <td>${escapeHtml(r.name || "—")}</td>
-        <td class="num">${(Number(r.qty) || 0).toLocaleString("az-AZ", { maximumFractionDigits: 2 })}</td>
-        <td class="num">${escapeHtml(formatMoney(Number(r.purchasePrice) || 0))}</td>
+        <td class="num">${qty.toLocaleString("az-AZ", { maximumFractionDigits: 2 })}</td>
+        <td class="num">${escapeHtml(formatMoney(unit))}</td>
         <td class="num">${escapeHtml(formatMoney(lineTotal))}</td>
       </tr>`;
     })
     .join("");
 
   const total = orderPurchaseTotal(params.rows);
-  const customerBlock = params.customerName
-    ? `<div><strong>Müştəri:</strong> ${escapeHtml(params.customerName)}</div>`
+  const customerRow = params.customerName
+    ? `<tr><td class="meta-key">Müştəri</td><td class="meta-value">${escapeHtml(params.customerName)}</td></tr>`
     : "";
 
   return `<!doctype html>
@@ -372,127 +374,149 @@ function buildOrderSupplierPdfHtml(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(params.title)}</title>
   <style>
-    * { box-sizing: border-box; }
+    @page { size: A4; margin: 14mm; }
     body {
       margin: 0;
-      font-family: Inter, Arial, sans-serif;
+      font-family: Arial, Helvetica, sans-serif;
       color: #111827;
-      background: #ffffff;
-      font-size: 13px;
-      line-height: 1.4;
+      font-size: 12px;
+      line-height: 1.35;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
+      background: #fff;
     }
-    .page {
+    .doc {
       width: 100%;
-      max-width: 860px;
+      max-width: 180mm;
       margin: 0 auto;
-      padding: 26px 28px;
     }
-    .head {
-      border: 1px solid #d1d5db;
-      border-radius: 12px;
-      overflow: hidden;
-      margin-bottom: 14px;
-    }
-    .head-title {
-      margin: 0;
-      padding: 10px 14px;
+    .title {
+      margin: 0 0 10px;
+      padding: 8px 10px;
       background: #343434;
-      color: #ffffff;
-      font-size: 18px;
+      color: #fff;
+      font-size: 16px;
       font-weight: 700;
-      letter-spacing: 0.01em;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      border: 1px solid #2b2b2b;
     }
-    .meta {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px 14px;
-      padding: 12px 14px;
-      background: #fafafa;
-      border-top: 1px solid #e5e7eb;
-      color: #374151;
-    }
-    .meta-item strong {
-      color: #111827;
-      font-weight: 700;
-    }
-    .table-wrap {
-      border: 1px solid #d1d5db;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    table {
+    .meta-table,
+    .items-table {
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      font-size: 12.5px;
     }
-    thead th {
+    .meta-table {
+      margin-bottom: 10px;
+      border: 1px solid #cfd4dc;
+    }
+    .meta-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .meta-table tr:last-child td { border-bottom: none; }
+    .meta-key {
+      width: 110px;
+      font-weight: 700;
+      background: #f8fafc;
+      border-right: 1px solid #e5e7eb;
+    }
+    .meta-value { color: #1f2937; }
+    .items-table {
+      border: 1px solid #cfd4dc;
+    }
+    .items-table th {
       background: #343434;
-      color: #ffffff;
+      color: #fff;
       text-align: left;
       font-weight: 700;
-      padding: 9px 10px;
-      border-right: 1px solid rgba(255,255,255,0.2);
+      padding: 7px 8px;
+      border-right: 1px solid #5a5a5a;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      font-size: 11px;
     }
-    thead th:last-child { border-right: none; }
-    tbody td {
+    .items-table th:last-child { border-right: none; }
+    .items-table td {
+      padding: 7px 8px;
       border-top: 1px solid #e5e7eb;
-      padding: 8px 10px;
+      border-right: 1px solid #eef1f4;
       vertical-align: top;
-      word-break: break-word;
+      word-wrap: break-word;
     }
-    tbody tr:nth-child(even) td { background: #fafafa; }
-    td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-    tfoot td {
-      border-top: 2px solid #d1d5db;
-      background: #f3f4f6;
-      font-weight: 800;
-      padding: 9px 10px;
+    .items-table td:last-child { border-right: none; }
+    .items-table tbody tr:nth-child(even) td { background: #fafafa; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .total-row td {
+      font-weight: 700;
+      background: #f3f4f6 !important;
+      border-top: 2px solid #cfd4dc;
     }
     .total-label { text-align: right; }
-    .summary {
-      margin-top: 10px;
-      display: flex;
-      justify-content: flex-end;
-      font-size: 14px;
-      color: #111827;
-      font-weight: 800;
+    .foot {
+      margin-top: 12px;
+      display: table;
+      width: 100%;
+    }
+    .foot-cell {
+      display: table-cell;
+      width: 50%;
+      vertical-align: top;
+      padding-top: 18px;
+      font-size: 11px;
+      color: #374151;
+    }
+    .sign-line {
+      margin-top: 26px;
+      border-top: 1px solid #9ca3af;
+      width: 80%;
+      padding-top: 4px;
+      color: #4b5563;
     }
   </style>
 </head>
 <body>
-  <div class="page">
-    <div class="head">
-      <h1 class="head-title">${escapeHtml(params.title)}</h1>
-      <div class="meta">
-        <div class="meta-item"><strong>Tarix:</strong> ${escapeHtml(formatDateAzLong(params.orderDate))}</div>
-        <div class="meta-item"><strong>Təchizatçı:</strong> ${escapeHtml(params.supplierName)}</div>
-        ${customerBlock ? `<div class="meta-item" style="grid-column: 1 / -1;">${customerBlock}</div>` : ""}
+  <div class="doc">
+    <h1 class="title">${escapeHtml(params.title)}</h1>
+    <table class="meta-table" aria-label="Sifariş məlumatı">
+      <tbody>
+        <tr><td class="meta-key">Tarix</td><td class="meta-value">${escapeHtml(formatDateAzLong(params.orderDate))}</td></tr>
+        <tr><td class="meta-key">Təchizatçı</td><td class="meta-value">${escapeHtml(params.supplierName)}</td></tr>
+        ${customerRow}
+        <tr><td class="meta-key">Sətir sayı</td><td class="meta-value">${params.rows.length}</td></tr>
+      </tbody>
+    </table>
+
+    <table class="items-table" aria-label="Məhsul cədvəli">
+      <thead>
+        <tr>
+          <th style="width: 44px;" class="num">№</th>
+          <th>Məhsul</th>
+          <th style="width: 90px;" class="num">Miqdar</th>
+          <th style="width: 130px;" class="num">Alış qiyməti</th>
+          <th style="width: 130px;" class="num">Cəm</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+      <tfoot>
+        <tr class="total-row">
+          <td colspan="4" class="total-label">YEKUN</td>
+          <td class="num">${escapeHtml(formatMoney(total))}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div class="foot">
+      <div class="foot-cell">
+        Hazırladı:
+        <div class="sign-line">İmza</div>
+      </div>
+      <div class="foot-cell">
+        Təhvil aldı:
+        <div class="sign-line">İmza</div>
       </div>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 52px;" class="num">№</th>
-            <th>Məhsul</th>
-            <th style="width: 98px;" class="num">Miqdar</th>
-            <th style="width: 150px;" class="num">Alış qiyməti</th>
-            <th style="width: 150px;" class="num">Cəm</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-        <tfoot>
-          <tr>
-            <td colspan="4" class="total-label">YEKUN</td>
-            <td class="num">${escapeHtml(formatMoney(total))}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-    <div class="summary">Sətir sayı: ${params.rows.length}</div>
   </div>
 </body>
 </html>`;
