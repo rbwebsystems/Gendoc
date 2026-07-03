@@ -82,6 +82,21 @@ export function totalCashBalance(rows: CashReportRow[]): number {
   return rows.reduce((sum, row) => sum + rowDisplayTotal(row), 0);
 }
 
+export function totalCashBalanceWithDrafts(
+  rows: CashReportRow[],
+  drafts: Record<string, string>,
+): number {
+  return rows.reduce((sum, row) => {
+    let rowTotal = 0;
+    for (let slotIndex = 0; slotIndex < CASH_REPORT_SLOT_COUNT; slotIndex += 1) {
+      const draft = drafts[cashSlotKey(row.id, slotIndex)];
+      const slotVal = draft !== undefined ? commitCashInput(draft) : (row.slots[slotIndex] ?? 0);
+      rowTotal += slotVal;
+    }
+    return sum + rowTotal;
+  }, 0);
+}
+
 /** Sütun 2–8 dəyərlərini sütun 1-ə cəmləyir və gözləyənləri sıfırlayır */
 export function mergeCashRowSlots(row: CashReportRow): CashReportRow {
   const pending = rowPendingSum(row);

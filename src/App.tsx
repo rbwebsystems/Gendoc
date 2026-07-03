@@ -64,7 +64,7 @@ import {
   mergeCashRowSlots,
   newCashReportRow,
   rowPendingSum,
-  totalCashBalance,
+  totalCashBalanceWithDrafts,
   defaultCashReportRows,
   normalizeCashReportSlots,
 } from "./lib/cashReport";
@@ -2260,10 +2260,16 @@ export default function App() {
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
   const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
-  const cashReportBalance = useMemo(() => totalCashBalance(cashReportRows), [cashReportRows]);
+  const cashReportBalance = useMemo(
+    () => totalCashBalanceWithDrafts(cashReportRows, cashSlotEdits),
+    [cashReportRows, cashSlotEdits],
+  );
 
   useEffect(() => {
-    if (module !== "cashReport") setCashHistoryOpen(false);
+    if (module !== "cashReport") {
+      setCashHistoryOpen(false);
+      setCashSlotEdits({});
+    }
   }, [module]);
 
   useEffect(() => {
@@ -5760,22 +5766,21 @@ export default function App() {
                             const raw = e.target.value;
                             if (!isPartialCashInput(raw)) return;
                             setCashSlotEdits((prev) => ({ ...prev, [slotKey]: raw }));
-                            if (raw !== "" && raw !== "-" && !raw.endsWith(".")) {
-                              const next = commitCashInput(raw);
-                              updateCashRow(row.id, (r) => {
-                                const slots = [...r.slots] as CashReportRow["slots"];
-                                slots[slotIndex] = next;
-                                return { ...r, slots, updatedAt: Date.now() };
-                              });
-                            }
                           }}
                           onBlur={() => {
                             const raw = cashSlotEdits[slotKey] ?? (value === 0 ? "" : String(value));
                             const next = commitCashInput(raw);
-                            const hadDraft = slotKey in cashSlotEdits;
-                            const liveRow = workspaceRef.current.cashReport?.rows.find((r) => r.id === row.id);
-                            const prevSlot = liveRow?.slots[slotIndex] ?? value;
-                            const changed = next !== prevSlot || hadDraft;
+                            const committed =
+                              workspaceRef.current.cashReport?.rows.find((r) => r.id === row.id)?.slots[slotIndex] ??
+                              value;
+                            const changed = next !== committed;
+                            setCashSlotEdits((prev) => {
+                              if (!(slotKey in prev)) return prev;
+                              const rest = { ...prev };
+                              delete rest[slotKey];
+                              return rest;
+                            });
+                            if (!changed) return;
                             updateCashRow(
                               row.id,
                               (r) => {
@@ -5783,18 +5788,10 @@ export default function App() {
                                 slots[slotIndex] = next;
                                 return { ...r, slots, updatedAt: Date.now() };
                               },
-                              changed
-                                ? {
-                                    historyLabel: `${row.name || "Hesab"} — sütun ${slotIndex + 1}: ${next === 0 ? "boşaldı" : formatCashAmount(next)}`,
-                                  }
-                                : undefined,
+                              {
+                                historyLabel: `${row.name || "Hesab"} — sütun ${slotIndex + 1}: ${next === 0 ? "boşaldı" : formatCashAmount(next)}`,
+                              },
                             );
-                            setCashSlotEdits((prev) => {
-                              if (!(slotKey in prev)) return prev;
-                              const rest = { ...prev };
-                              delete rest[slotKey];
-                              return rest;
-                            });
                           }}
                         />
                       </td>
