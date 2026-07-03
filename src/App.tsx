@@ -2269,6 +2269,17 @@ export default function App() {
     });
   }, [workspace.cashReport?.rows]);
 
+  const cashHistoryAuthorName = useMemo(() => {
+    if (sessionKind === "developer") {
+      if (authState.status === "signedIn") return authState.user.email?.trim() || "Developer";
+      return "Developer";
+    }
+    const memberName = currentMember?.name?.trim();
+    if (memberName) return memberName;
+    if (authState.status === "signedIn") return authState.user.email?.trim() || "İstifadəçi";
+    return "Direktor";
+  }, [sessionKind, currentMember?.name, authState]);
+
   const patchCashReport = useCallback(
     (
       patch: (prev: { rows: CashReportRow[]; history: CashReportSnapshot[] }) => {
@@ -2285,12 +2296,17 @@ export default function App() {
         const patched = patch(prev);
         const rows = patched.rows;
         const history = historyLabel
-          ? appendCashReportHistory(patched.history ?? prev.history, rows, historyLabel)
+          ? appendCashReportHistory(
+              patched.history ?? prev.history,
+              rows,
+              historyLabel,
+              cashHistoryAuthorName,
+            )
           : (patched.history ?? prev.history);
         return { ...w, cashReport: { rows, history } };
       });
     },
-    [],
+    [cashHistoryAuthorName],
   );
 
   const pushCashRowUndo = useCallback((row: CashReportRow) => {
@@ -7287,8 +7303,13 @@ export default function App() {
               <ul className="dg-cash-changelog">
                 {cashReportHistory.map((entry) => (
                   <li key={entry.id} className="dg-cash-changelog-item">
-                    <div className="dg-cash-changelog-time">
-                      {new Date(entry.savedAt).toLocaleString("az-AZ")}
+                    <div className="dg-cash-changelog-meta">
+                      <span className="dg-cash-changelog-time">
+                        {new Date(entry.savedAt).toLocaleString("az-AZ")}
+                      </span>
+                      {entry.authorName ? (
+                        <span className="dg-cash-changelog-author">{entry.authorName}</span>
+                      ) : null}
                     </div>
                     <div className="dg-cash-changelog-text">{entry.label}</div>
                     <div className={`dg-cash-changelog-balance ${cashAmountClass(entry.balance)}`}>

@@ -122,12 +122,17 @@ export function defaultCashReportRows(): CashReportRow[] {
 
 export const CASH_REPORT_HISTORY_LIMIT = 100;
 
-export function createCashHistoryEntry(rows: CashReportRow[], label: string): CashReportSnapshot {
+export function createCashHistoryEntry(
+  rows: CashReportRow[],
+  label: string,
+  authorName: string,
+): CashReportSnapshot {
   const now = Date.now();
   const cloned = rows.map(cloneCashRow);
   return {
     id: crypto.randomUUID(),
     label: label.trim() || "Dəyişiklik",
+    authorName: authorName.trim() || "İstifadəçi",
     savedAt: now,
     balance: totalCashBalance(cloned),
     rows: cloned,
@@ -138,13 +143,14 @@ export function appendCashReportHistory(
   history: CashReportSnapshot[],
   rows: CashReportRow[],
   label: string,
+  authorName: string,
 ): CashReportSnapshot[] {
-  return [createCashHistoryEntry(rows, label), ...history].slice(0, CASH_REPORT_HISTORY_LIMIT);
+  return [createCashHistoryEntry(rows, label, authorName), ...history].slice(0, CASH_REPORT_HISTORY_LIMIT);
 }
 
 /** @deprecated createCashHistoryEntry istifadə edin */
 export function createCashSnapshot(rows: CashReportRow[], label?: string): CashReportSnapshot {
-  return createCashHistoryEntry(rows, label?.trim() || new Date().toLocaleString("az-AZ"));
+  return createCashHistoryEntry(rows, label?.trim() || new Date().toLocaleString("az-AZ"), "İstifadəçi");
 }
 
 export function normalizeCashReportSlots(raw: unknown): CashReportRow["slots"] {
@@ -199,9 +205,14 @@ export function normalizeCashReportHistory(raw: unknown): CashReportSnapshot[] {
         typeof (h as { balance?: unknown }).balance === "number"
           ? Number((h as { balance: number }).balance)
           : totalCashBalance(rows);
+      const authorName =
+        typeof (h as { authorName?: unknown }).authorName === "string"
+          ? String((h as { authorName: string }).authorName).trim()
+          : "";
       return {
         id: String((h as { id: string }).id),
         label: label || new Date(savedAt).toLocaleString("az-AZ"),
+        authorName,
         savedAt,
         balance,
         rows,

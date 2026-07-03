@@ -2846,7 +2846,20 @@ textarea.dg-input {
 .dg-cash-changelog-time {
   font-size: 0.8125rem;
   color: var(--win-text-muted);
+}
+
+.dg-cash-changelog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.65rem;
   margin-bottom: 0.25rem;
+}
+
+.dg-cash-changelog-author {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--win-text);
 }
 
 .dg-cash-changelog-text {

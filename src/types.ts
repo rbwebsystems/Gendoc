@@ -246,6 +246,8 @@ export interface CashReportRow {
 export interface CashReportSnapshot {
   id: string;
   label: string;
+  /** Dəyişikliyi edən profil sahibinin adı */
+  authorName: string;
   savedAt: number;
   balance: number;
   rows: CashReportRow[];
