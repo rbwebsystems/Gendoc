@@ -599,6 +599,7 @@ const COMPANY_FIELD_GROUPS: { title: string; fields: ReqFieldSpec[] }[] = [
 ];
 
 const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
+  { id: "cashReport", label: "Kassa hesabatı" },
   { id: "companies", label: "Şirkətlər" },
   { id: "projects", label: "Təkliflər" },
   { id: "folders", label: "Qovluqlar" },
@@ -607,7 +608,6 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
-  { id: "cashReport", label: "Kassa hesabatı" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -617,6 +617,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
 const SIDEBAR_SYSTEM_IDS: SidebarModule[] = ["appUsers", "systemPermissions", "workLeave", "settings"];
 
 const SIDEBAR_MAIN_IDS: SidebarModule[] = [
+  "cashReport",
   "companies",
   "projects",
   "folders",
@@ -625,7 +626,6 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "storeOrders",
   "customerOrders",
   "priceCalculations",
-  "cashReport",
 ];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
@@ -645,13 +645,10 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
 };
 
 function preferredModuleForSession(
-  member: SystemUserRecord | null,
+  _member: SystemUserRecord | null,
   access: Set<PermissionModuleId> | null,
 ): SidebarModule {
-  if (member?.role === "employee") {
-    if (!access || access.has("workLeave")) return "workLeave";
-  }
-  if (!access) return "companies";
+  if (!access || access.has("cashReport")) return "cashReport";
   for (const id of SIDEBAR_MAIN_IDS) {
     if (access.has(id as PermissionModuleId)) return id;
   }
@@ -1403,7 +1400,7 @@ export default function App() {
   const [remoteSyncEpoch, setRemoteSyncEpoch] = useState(0);
   const sessionModuleAppliedRef = useRef(false);
   const prevMemberModulesRef = useRef<PermissionModuleId[]>([]);
-  const [module, setModule] = useState<SidebarModule>("companies");
+  const [module, setModule] = useState<SidebarModule>("cashReport");
   const [toast, setToast] = useState<{ kind: ToastKind; msg: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navSearch, setNavSearch] = useState("");

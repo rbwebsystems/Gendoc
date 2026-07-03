@@ -2803,7 +2803,7 @@ textarea.dg-input {
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance {
   text-align: center;
   text-transform: none;
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: normal;
@@ -2816,7 +2816,7 @@ textarea.dg-input {
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--pos {
-  color: #bbf7d0;
+  color: #0fff50;
   font-weight: 700;
 }
 
