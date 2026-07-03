@@ -2621,7 +2621,7 @@ textarea.dg-input {
 .dg-table.dg-table--cash-report thead th.dg-cash-col-slot,
 .dg-table.dg-table--cash-report tbody td.dg-cash-col-slot {
   width: 7.75rem;
-  text-align: right;
+  text-align: center;
 }
 
 .dg-table.dg-table--cash-report thead th.dg-cash-col-actions,
@@ -2645,7 +2645,7 @@ textarea.dg-input {
 }
 
 .dg-cash-slot-input {
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   min-width: 0;
   width: 100%;
@@ -2657,11 +2657,13 @@ textarea.dg-input {
 .dg-cash-amount--pos,
 .dg-cash-slot-input.dg-cash-amount--pos {
   color: #15803d;
+  font-weight: 700;
 }
 
 .dg-cash-amount--neg,
 .dg-cash-slot-input.dg-cash-amount--neg {
   color: #dc2626;
+  font-weight: 700;
 }
 
 .dg-cash-amount--zero {
@@ -2693,7 +2695,7 @@ textarea.dg-input {
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance {
-  text-align: right;
+  text-align: center;
   text-transform: none;
   font-size: 1rem;
   font-weight: 700;
@@ -2703,10 +2705,12 @@ textarea.dg-input {
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--pos {
   color: #86efac;
+  font-weight: 700;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--neg {
   color: #fca5a5;
+  font-weight: 700;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--zero {

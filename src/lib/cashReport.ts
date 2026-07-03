@@ -14,8 +14,35 @@ export function cashAmountClass(n: number): string {
 }
 
 export function parseCashInput(raw: string): number {
-  const cleaned = raw.replace(/\s/g, "").replace(",", ".");
-  if (!cleaned || cleaned === "-" || cleaned === ".") return 0;
+  return commitCashInput(raw);
+}
+
+/** Yazılan mətn mənfi və ya natamam rəqəm ola bilərmi */
+export function isPartialCashInput(raw: string): boolean {
+  const cleaned = raw.trim().replace(/\s/g, "").replace(",", ".");
+  if (cleaned === "" || cleaned === "-") return true;
+  return /^-?\d*\.?\d*$/.test(cleaned);
+}
+
+export function cashSlotKey(rowId: string, slotIndex: number): string {
+  return `${rowId}:${slotIndex}`;
+}
+
+export function cashSlotDisplayValue(value: number, draft?: string): string {
+  if (draft !== undefined) return draft;
+  return value === 0 ? "" : String(value);
+}
+
+export function cashAmountClassForInput(value: number, draft?: string): string {
+  if (draft !== undefined && draft.trim() !== "" && draft.trim() !== "-") {
+    return cashAmountClass(commitCashInput(draft));
+  }
+  return cashAmountClass(value);
+}
+
+export function commitCashInput(raw: string): number {
+  const cleaned = raw.trim().replace(/\s/g, "").replace(",", ".");
+  if (!cleaned || cleaned === "-") return 0;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : 0;
 }

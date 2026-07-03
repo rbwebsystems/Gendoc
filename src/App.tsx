@@ -53,11 +53,15 @@ import {
   CASH_REPORT_SLOT_COUNT,
   cashAmountClass,
   cloneCashRow,
+  commitCashInput,
   createCashSnapshot,
   formatCashAmount,
+  cashAmountClassForInput,
+  cashSlotDisplayValue,
+  cashSlotKey,
+  isPartialCashInput,
   mergeCashRowSlots,
   newCashReportRow,
-  parseCashInput,
   rowPendingSum,
   totalCashBalance,
   defaultCashReportRows,
@@ -1431,6 +1435,7 @@ export default function App() {
   const [priceCalcProductType, setPriceCalcProductType] = useState<PriceCalcProductType>("mobileNew");
   const [priceCalcCostInput, setPriceCalcCostInput] = useState("");
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
+  const [cashSlotEdits, setCashSlotEdits] = useState<Record<string, string>>({});
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
@@ -5702,24 +5707,49 @@ export default function App() {
                       placeholder="Hesab adı"
                     />
                   </td>
-                  {row.slots.map((value, slotIndex) => (
+                  {row.slots.map((value, slotIndex) => {
+                    const slotKey = cashSlotKey(row.id, slotIndex);
+                    const slotDraft = cashSlotEdits[slotKey];
+                    const slotDisplay = cashSlotDisplayValue(value, slotDraft);
+                    return (
                     <td key={slotIndex} className="dg-cash-col-slot">
                       <input
-                        className={`dg-input dg-cash-slot-input ${cashAmountClass(value)}`}
+                        className={`dg-input dg-cash-slot-input ${cashAmountClassForInput(value, slotDraft)}`}
                         inputMode="decimal"
-                        value={value === 0 ? "" : String(value)}
+                        value={slotDisplay}
                         placeholder="0"
                         onChange={(e) => {
-                          const next = parseCashInput(e.target.value);
+                          const raw = e.target.value;
+                          if (!isPartialCashInput(raw)) return;
+                          setCashSlotEdits((prev) => ({ ...prev, [slotKey]: raw }));
+                          if (raw !== "" && raw !== "-" && !raw.endsWith(".")) {
+                            const next = commitCashInput(raw);
+                            updateCashRow(row.id, (r) => {
+                              const slots = [...r.slots] as CashReportRow["slots"];
+                              slots[slotIndex] = next;
+                              return { ...r, slots, updatedAt: Date.now() };
+                            });
+                          }
+                        }}
+                        onBlur={() => {
+                          const raw = cashSlotEdits[slotKey] ?? (value === 0 ? "" : String(value));
+                          const next = commitCashInput(raw);
                           updateCashRow(row.id, (r) => {
                             const slots = [...r.slots] as CashReportRow["slots"];
                             slots[slotIndex] = next;
                             return { ...r, slots, updatedAt: Date.now() };
                           });
+                          setCashSlotEdits((prev) => {
+                            if (!(slotKey in prev)) return prev;
+                            const rest = { ...prev };
+                            delete rest[slotKey];
+                            return rest;
+                          });
                         }}
                       />
                     </td>
-                  ))}
+                    );
+                  })}
                 <td className="dg-cash-col-actions">
                     <div className="dg-icon-row dg-cash-actions">
                       <button
