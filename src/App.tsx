@@ -55,6 +55,7 @@ import {
   cloneCashRow,
   commitCashInput,
   appendCashReportHistory,
+  mergeCashReportOnSync,
   formatCashAmount,
   cashAmountClassForInput,
   cashSlotDisplayValue,
@@ -1396,6 +1397,8 @@ export default function App() {
   const remoteWriteInFlightRef = useRef(false);
   // İlk snapshot gəlmədən yazmaq olmaz (yoxsa migration ilə yaza bilərik)
   const remoteReadyRef = useRef<boolean>(false);
+  /** Kassa dəyişikliyi remote-a yazılmamışdırsa snapshot köhnə məlumatı geri qaytarmasın */
+  const cashReportDirtyRef = useRef(false);
   /** remoteReadyRef dəyişəndə debounced yazını yenidən işə salmaq üçün */
   const [remoteSyncEpoch, setRemoteSyncEpoch] = useState(0);
   const sessionModuleAppliedRef = useRef(false);
@@ -1545,6 +1548,7 @@ export default function App() {
         remoteReadyRef.current = false;
         lastSyncedJsonRef.current = "";
         pendingLocalWriteRef.current = false;
+        cashReportDirtyRef.current = false;
         if (remoteWriteTimerRef.current != null) {
           window.clearTimeout(remoteWriteTimerRef.current);
           remoteWriteTimerRef.current = null;
@@ -1641,6 +1645,7 @@ export default function App() {
         }
         lastSyncedJsonRef.current = json;
         pendingLocalWriteRef.current = false;
+        cashReportDirtyRef.current = false;
         if (remoteWriteRetryTimerRef.current != null) {
           window.clearTimeout(remoteWriteRetryTimerRef.current);
           remoteWriteRetryTimerRef.current = null;
@@ -1699,9 +1704,24 @@ export default function App() {
 
         if (!cancelled) {
           remoteReadyRef.current = true;
+          let resolved = merged;
+          if (cashReportDirtyRef.current) {
+            const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, merged.cashReport, {
+              preferLocalRows: true,
+            });
+            if (mergedCash) resolved = { ...merged, cashReport: mergedCash };
+          }
           if (!pendingLocalWriteRef.current) {
-            lastSyncedJsonRef.current = workspaceFingerprint(merged);
-            setWorkspace(merged);
+            lastSyncedJsonRef.current = workspaceFingerprint(resolved);
+            setWorkspace(resolved);
+          } else {
+            const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, resolved.cashReport, {
+              preferLocalRows: true,
+            });
+            if (mergedCash) {
+              const withLocalCash = { ...workspaceRef.current, cashReport: mergedCash };
+              setWorkspace(withLocalCash);
+            }
           }
           setRemoteSyncEpoch((e) => e + 1);
         }
@@ -1721,7 +1741,11 @@ export default function App() {
       if (!exists || !remoteWs) {
         return;
       }
-      const normalized = normalizeWorkspace(remoteWs);
+      const normalizedBase = normalizeWorkspace(remoteWs);
+      const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, normalizedBase.cashReport, {
+        preferLocalRows: cashReportDirtyRef.current || pendingLocalWriteRef.current,
+      });
+      const normalized = mergedCash ? { ...normalizedBase, cashReport: mergedCash } : normalizedBase;
       const json = workspaceFingerprint(normalized);
       if (json === lastSyncedJsonRef.current) {
         remoteReadyRef.current = true;
@@ -2289,6 +2313,10 @@ export default function App() {
       },
       historyLabel?: string,
     ) => {
+      cashReportDirtyRef.current = true;
+      if (firebaseEnabled && authState.status === "signedIn") {
+        pendingLocalWriteRef.current = true;
+      }
       setWorkspace((w) => {
         const prev = {
           rows: w.cashReport?.rows ?? [],
@@ -2307,7 +2335,7 @@ export default function App() {
         return { ...w, cashReport: { rows, history } };
       });
     },
-    [cashHistoryAuthorName],
+    [cashHistoryAuthorName, authState.status],
   );
 
   const pushCashRowUndo = useCallback((row: CashReportRow) => {
@@ -5744,7 +5772,10 @@ export default function App() {
                           onBlur={() => {
                             const raw = cashSlotEdits[slotKey] ?? (value === 0 ? "" : String(value));
                             const next = commitCashInput(raw);
-                            const changed = next !== value || slotKey in cashSlotEdits;
+                            const hadDraft = slotKey in cashSlotEdits;
+                            const liveRow = workspaceRef.current.cashReport?.rows.find((r) => r.id === row.id);
+                            const prevSlot = liveRow?.slots[slotIndex] ?? value;
+                            const changed = next !== prevSlot || hadDraft;
                             updateCashRow(
                               row.id,
                               (r) => {

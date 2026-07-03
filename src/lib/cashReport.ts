@@ -148,6 +148,35 @@ export function appendCashReportHistory(
   return [createCashHistoryEntry(rows, label, authorName), ...history].slice(0, CASH_REPORT_HISTORY_LIMIT);
 }
 
+/** Remote sinxronizasiyasında sətir və tarixçəni birləşdirir */
+export function mergeCashReportOnSync(
+  local: CashReportState | undefined,
+  remote: CashReportState | undefined,
+  opts?: { preferLocalRows?: boolean },
+): CashReportState | undefined {
+  if (!local && !remote) return undefined;
+  if (!remote) return local;
+  if (!local) return remote;
+
+  const remoteRows = remote.rows ?? [];
+  const localRows = local.rows ?? [];
+  const rows =
+    opts?.preferLocalRows && localRows.length > 0
+      ? localRows
+      : remoteRows.length > 0
+        ? remoteRows
+        : localRows;
+
+  const historyMap = new Map<string, CashReportSnapshot>();
+  for (const entry of remote.history ?? []) historyMap.set(entry.id, entry);
+  for (const entry of local.history ?? []) historyMap.set(entry.id, entry);
+  const history = [...historyMap.values()]
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
+
+  return { rows, history };
+}
+
 /** @deprecated createCashHistoryEntry istifadə edin */
 export function createCashSnapshot(rows: CashReportRow[], label?: string): CashReportSnapshot {
   return createCashHistoryEntry(rows, label?.trim() || new Date().toLocaleString("az-AZ"), "İstifadəçi");
