@@ -79,7 +79,7 @@ export function rowDisplayTotal(row: CashReportRow): number {
 }
 
 export function totalCashBalance(rows: CashReportRow[]): number {
-  return rows.reduce((sum, row) => sum + rowPostedBalance(row), 0);
+  return rows.reduce((sum, row) => sum + rowDisplayTotal(row), 0);
 }
 
 /** Sütun 2–8 dəyərlərini sütun 1-ə cəmləyir və gözləyənləri sıfırlayır */
