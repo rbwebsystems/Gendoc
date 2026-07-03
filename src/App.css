@@ -2580,7 +2580,6 @@ textarea.dg-input {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  max-height: calc(100vh - 13.5rem);
   border: 1px solid #e5e7eb;
   border-radius: 0.625rem;
   overflow: hidden;
@@ -2591,6 +2590,10 @@ textarea.dg-input {
 .dg-cash-table-head,
 .dg-cash-table-foot {
   flex-shrink: 0;
+}
+
+.dg-cash-table-foot {
+  margin-top: auto;
 }
 
 .dg-cash-table-head.dg-table-wrap,

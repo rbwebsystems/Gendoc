@@ -550,6 +550,12 @@
   background: transparent;
 }
 
+.rb-content.rb-content--cash-report {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .rb-sidebar-backdrop {
   display: none;
 }

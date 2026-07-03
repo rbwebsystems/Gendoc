@@ -607,7 +607,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
-  { id: "cashReport", label: "Kassa" },
+  { id: "cashReport", label: "Kassa hesabatı" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -7817,7 +7817,7 @@ export default function App() {
               </div>
             </header>
 
-            <main className="rb-content">
+            <main className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}`}>
               {toast ? (
                 <div className={`dg-toast ${toast.kind === "error" ? "dg-toast--error" : "dg-toast--success"}`} role="status">
                   {toast.msg}
