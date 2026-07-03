@@ -236,8 +236,8 @@ export type PermissionModuleId =
 export interface CashReportRow {
   id: string;
   name: string;
-  /** 5 sütun: [0] cəmlənmiş balans, [1–4] gözləyən daxiletmələr */
-  slots: [number, number, number, number, number];
+  /** 8 sütun: [0] cəmlənmiş balans, [1–7] gözləyən daxiletmələr */
+  slots: [number, number, number, number, number, number, number, number];
   createdAt: number;
   updatedAt: number;
 }

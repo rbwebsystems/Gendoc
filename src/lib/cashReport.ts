@@ -1,6 +1,6 @@
 import type { CashReportRow, CashReportSnapshot, CashReportState } from "../types";
 
-export const CASH_REPORT_SLOT_COUNT = 5;
+export const CASH_REPORT_SLOT_COUNT = 8;
 
 export function formatCashAmount(n: number): string {
   const v = Number.isFinite(n) ? Math.round(n) : 0;
@@ -52,7 +52,7 @@ export function newCashReportRow(name = ""): CashReportRow {
   return {
     id: crypto.randomUUID(),
     name,
-    slots: [0, 0, 0, 0, 0],
+    slots: [0, 0, 0, 0, 0, 0, 0, 0],
     createdAt: now,
     updatedAt: now,
   };
@@ -81,7 +81,7 @@ export function totalCashBalance(rows: CashReportRow[]): number {
   return rows.reduce((sum, row) => sum + rowPostedBalance(row), 0);
 }
 
-/** Sütun 2–5 dəyərlərini sütun 1-ə cəmləyir və gözləyənləri sıfırlayır */
+/** Sütun 2–8 dəyərlərini sütun 1-ə cəmləyir və gözləyənləri sıfırlayır */
 export function mergeCashRowSlots(row: CashReportRow): CashReportRow {
   const pending = rowPendingSum(row);
   if (pending === 0) return row;

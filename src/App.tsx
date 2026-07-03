@@ -65,6 +65,7 @@ import {
   rowPendingSum,
   totalCashBalance,
   defaultCashReportRows,
+  normalizeCashReportSlots,
 } from "./lib/cashReport";
 import type {
   CompanyProfile,
@@ -2248,6 +2249,25 @@ export default function App() {
     }));
   }, [module, workspace.cashReport?.rows?.length]);
 
+  useEffect(() => {
+    const rows = workspace.cashReport?.rows;
+    if (!rows?.length) return;
+    if (!rows.some((r) => r.slots.length < CASH_REPORT_SLOT_COUNT)) return;
+    setWorkspace((w) => {
+      const prev = w.cashReport?.rows ?? [];
+      return {
+        ...w,
+        cashReport: {
+          rows: prev.map((r) => ({ ...r, slots: normalizeCashReportSlots(r.slots) })),
+          history: (w.cashReport?.history ?? []).map((snap) => ({
+            ...snap,
+            rows: snap.rows.map((r) => ({ ...r, slots: normalizeCashReportSlots(r.slots) })),
+          })),
+        },
+      };
+    });
+  }, [workspace.cashReport?.rows]);
+
   const patchCashReport = useCallback((patch: (prev: { rows: CashReportRow[]; history: CashReportSnapshot[] }) => {
     rows: CashReportRow[];
     history: CashReportSnapshot[];
@@ -2304,7 +2324,7 @@ export default function App() {
     (rowId: string) => {
       const row = cashReportRows.find((r) => r.id === rowId);
       if (!row || rowPendingSum(row) === 0) {
-        flash(setToast, "Cəmlənəcək dəyər yoxdur (sütun 2–5).", "error");
+        flash(setToast, "Cəmlənəcək dəyər yoxdur (sütun 2–8).", "error");
         return;
       }
       updateCashRow(rowId, mergeCashRowSlots, true);
@@ -5659,43 +5679,44 @@ export default function App() {
   const renderCashReportModule = () => (
     <div className="dg-cash-report pg-panel" aria-label="Kassa hesabatı">
       <div className="dg-cash-report-toolbar">
-        <div className="dg-cash-report-toolbar-left">
-          <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashHistoryOpen(true)}>
-            Tarixçə
-            {cashReportHistory.length > 0 ? (
-              <span className="dg-cash-history-badge">{cashReportHistory.length}</span>
-            ) : null}
-          </button>
-          <button type="button" className="dg-btn dg-btn-secondary" onClick={() => void saveCashReportSnapshot()}>
-            Anlıq görüntü saxla
-          </button>
-        </div>
-        <button type="button" className="dg-btn dg-btn-primary" onClick={addCashReportRow}>
-          + Sətir əlavə et
+        <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashHistoryOpen(true)}>
+          Tarixçə
+          {cashReportHistory.length > 0 ? (
+            <span className="dg-cash-history-badge">{cashReportHistory.length}</span>
+          ) : null}
+        </button>
+        <button type="button" className="dg-btn dg-btn-secondary" onClick={() => void saveCashReportSnapshot()}>
+          Anlıq görüntü saxla
         </button>
       </div>
 
       <p className="dg-cash-report-hint dg-muted">
-        Sütun 1 — cəmlənmiş balans. Sütun 2–5 — gözləyən daxiletmələr. «Cəmlə» ilə 2–5 sütunlar balansa əlavə olunur.
+        Sütun 1 — cəmlənmiş balans. Sütun 2–8 — gözləyən daxiletmələr. «Cəmlə» ilə 2–8 sütunlar balansa əlavə olunur.
       </p>
 
-      <div className="dg-table-wrap dg-cash-table-wrap">
-        <table className="dg-table dg-table--cash-report">
-          <thead>
-            <tr>
-              <th className="dg-cash-col-idx">#</th>
-              <th className="dg-cash-col-name">Hesab</th>
-              {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, i) => (
-                <th key={i} className="dg-cash-col-slot">
-                  {i + 1}
-                </th>
-              ))}
-              <th className="dg-cash-col-actions">Əməliyyat</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cashReportRows.map((row, index) => (
-              <tr key={row.id}>
+      <div className="dg-cash-table-shell">
+        <div className="dg-cash-table-head dg-table-wrap">
+          <table className="dg-table dg-table--cash-report">
+            <thead>
+              <tr>
+                <th className="dg-cash-col-idx">#</th>
+                <th className="dg-cash-col-name">Hesab</th>
+                {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, i) => (
+                  <th key={i} className="dg-cash-col-slot">
+                    {i + 1}
+                  </th>
+                ))}
+                <th className="dg-cash-col-actions">Əməliyyat</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+
+        <div className="dg-cash-table-body dg-table-wrap">
+          <table className="dg-table dg-table--cash-report">
+            <tbody>
+              {cashReportRows.map((row, index) => (
+                <tr key={row.id}>
                   <td className="dg-cash-col-idx">{index + 1}</td>
                   <td className="dg-cash-col-name">
                     <input
@@ -5712,51 +5733,51 @@ export default function App() {
                     const slotDraft = cashSlotEdits[slotKey];
                     const slotDisplay = cashSlotDisplayValue(value, slotDraft);
                     return (
-                    <td key={slotIndex} className="dg-cash-col-slot">
-                      <input
-                        className={`dg-input dg-cash-slot-input ${cashAmountClassForInput(value, slotDraft)}`}
-                        inputMode="decimal"
-                        value={slotDisplay}
-                        placeholder="0"
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          if (!isPartialCashInput(raw)) return;
-                          setCashSlotEdits((prev) => ({ ...prev, [slotKey]: raw }));
-                          if (raw !== "" && raw !== "-" && !raw.endsWith(".")) {
+                      <td key={slotIndex} className="dg-cash-col-slot">
+                        <input
+                          className={`dg-input dg-cash-slot-input ${cashAmountClassForInput(value, slotDraft)}`}
+                          inputMode="decimal"
+                          value={slotDisplay}
+                          placeholder="0"
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            if (!isPartialCashInput(raw)) return;
+                            setCashSlotEdits((prev) => ({ ...prev, [slotKey]: raw }));
+                            if (raw !== "" && raw !== "-" && !raw.endsWith(".")) {
+                              const next = commitCashInput(raw);
+                              updateCashRow(row.id, (r) => {
+                                const slots = [...r.slots] as CashReportRow["slots"];
+                                slots[slotIndex] = next;
+                                return { ...r, slots, updatedAt: Date.now() };
+                              });
+                            }
+                          }}
+                          onBlur={() => {
+                            const raw = cashSlotEdits[slotKey] ?? (value === 0 ? "" : String(value));
                             const next = commitCashInput(raw);
                             updateCashRow(row.id, (r) => {
                               const slots = [...r.slots] as CashReportRow["slots"];
                               slots[slotIndex] = next;
                               return { ...r, slots, updatedAt: Date.now() };
                             });
-                          }
-                        }}
-                        onBlur={() => {
-                          const raw = cashSlotEdits[slotKey] ?? (value === 0 ? "" : String(value));
-                          const next = commitCashInput(raw);
-                          updateCashRow(row.id, (r) => {
-                            const slots = [...r.slots] as CashReportRow["slots"];
-                            slots[slotIndex] = next;
-                            return { ...r, slots, updatedAt: Date.now() };
-                          });
-                          setCashSlotEdits((prev) => {
-                            if (!(slotKey in prev)) return prev;
-                            const rest = { ...prev };
-                            delete rest[slotKey];
-                            return rest;
-                          });
-                        }}
-                      />
-                    </td>
+                            setCashSlotEdits((prev) => {
+                              if (!(slotKey in prev)) return prev;
+                              const rest = { ...prev };
+                              delete rest[slotKey];
+                              return rest;
+                            });
+                          }}
+                        />
+                      </td>
                     );
                   })}
-                <td className="dg-cash-col-actions">
+                  <td className="dg-cash-col-actions">
                     <div className="dg-icon-row dg-cash-actions">
                       <button
                         type="button"
                         className="dg-btn dg-btn-secondary dg-btn-sm"
                         onClick={() => mergeCashReportRow(row.id)}
-                        title="Sütun 2–5-i balansa cəmlə"
+                        title="Sütun 2–8-i balansa cəmlə"
                       >
                         Cəmlə
                       </button>
@@ -5779,21 +5800,27 @@ export default function App() {
                     </div>
                   </td>
                 </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="dg-cash-foot-row">
-              <td colSpan={2} className="dg-cash-foot-label">
-                Ümumi balans
-              </td>
-              <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
-                {formatCashAmount(cashReportBalance)}
-              </td>
-              <td colSpan={CASH_REPORT_SLOT_COUNT - 1} />
-              <td className="dg-cash-col-actions" />
-            </tr>
-          </tfoot>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="dg-cash-table-foot dg-table-wrap">
+          <table className="dg-table dg-table--cash-report">
+            <tfoot>
+              <tr className="dg-cash-foot-row">
+                <td colSpan={2} className="dg-cash-foot-label">
+                  Ümumi balans
+                </td>
+                <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
+                  {formatCashAmount(cashReportBalance)}
+                </td>
+                <td colSpan={CASH_REPORT_SLOT_COUNT - 1} />
+                <td className="dg-cash-col-actions" />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
     </div>
   );
