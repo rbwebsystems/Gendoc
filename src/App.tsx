@@ -58,7 +58,6 @@ import {
   mergeCashRowSlots,
   newCashReportRow,
   parseCashInput,
-  rowDisplayTotal,
   rowPendingSum,
   totalCashBalance,
   defaultCashReportRows,
@@ -5686,16 +5685,12 @@ export default function App() {
                   {i + 1}
                 </th>
               ))}
-              <th className="dg-cash-col-total">Cəm</th>
               <th className="dg-cash-col-actions">Əməliyyat</th>
             </tr>
           </thead>
           <tbody>
-            {cashReportRows.map((row, index) => {
-              const rowTotal = rowDisplayTotal(row);
-              const pending = rowPendingSum(row);
-              return (
-                <tr key={row.id}>
+            {cashReportRows.map((row, index) => (
+              <tr key={row.id}>
                   <td className="dg-cash-col-idx">{index + 1}</td>
                   <td className="dg-cash-col-name">
                     <input
@@ -5725,15 +5720,7 @@ export default function App() {
                       />
                     </td>
                   ))}
-                  <td className={`dg-cash-col-total ${cashAmountClass(rowTotal)}`}>
-                    <span className="dg-cash-amount">{formatCashAmount(rowTotal)}</span>
-                    {pending !== 0 ? (
-                      <span className="dg-cash-pending" title="Gözləyən">
-                        +{formatCashAmount(pending)}
-                      </span>
-                    ) : null}
-                  </td>
-                  <td className="dg-cash-col-actions">
+                <td className="dg-cash-col-actions">
                     <div className="dg-icon-row dg-cash-actions">
                       <button
                         type="button"
@@ -5762,18 +5749,22 @@ export default function App() {
                     </div>
                   </td>
                 </tr>
-              );
-            })}
+            ))}
           </tbody>
+          <tfoot>
+            <tr className="dg-cash-foot-row">
+              <td colSpan={2} className="dg-cash-foot-label">
+                Ümumi balans
+              </td>
+              <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
+                {formatCashAmount(cashReportBalance)}
+              </td>
+              <td colSpan={CASH_REPORT_SLOT_COUNT - 1} />
+              <td className="dg-cash-col-actions" />
+            </tr>
+          </tfoot>
         </table>
       </div>
-
-      <footer className="dg-cash-balance-bar" aria-live="polite">
-        <span className="dg-cash-balance-label">Ümumi balans</span>
-        <strong className={`dg-cash-balance-value ${cashAmountClass(cashReportBalance)}`}>
-          {formatCashAmount(cashReportBalance)}
-        </strong>
-      </footer>
     </div>
   );
 

@@ -2606,53 +2606,61 @@ textarea.dg-input {
   width: 100%;
 }
 
-.dg-table.dg-table--cash-report .dg-cash-col-idx {
-  width: 2.5rem;
+.dg-table.dg-table--cash-report thead th.dg-cash-col-idx,
+.dg-table.dg-table--cash-report tbody td.dg-cash-col-idx {
+  width: 2.75rem;
   text-align: center;
 }
 
-.dg-table.dg-table--cash-report .dg-cash-col-name {
-  width: 14rem;
+.dg-table.dg-table--cash-report thead th.dg-cash-col-name,
+.dg-table.dg-table--cash-report tbody td.dg-cash-col-name {
+  width: 8.5rem;
+  text-align: left;
 }
 
-.dg-table.dg-table--cash-report .dg-cash-col-slot {
-  width: 5.5rem;
+.dg-table.dg-table--cash-report thead th.dg-cash-col-slot,
+.dg-table.dg-table--cash-report tbody td.dg-cash-col-slot {
+  width: 7.75rem;
   text-align: right;
 }
 
-.dg-table.dg-table--cash-report .dg-cash-col-total {
-  width: 6.5rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
+.dg-table.dg-table--cash-report thead th.dg-cash-col-actions,
+.dg-table.dg-table--cash-report tbody td.dg-cash-col-actions {
+  width: 10.5rem;
+  text-align: center;
 }
 
-.dg-table.dg-table--cash-report .dg-cash-col-actions {
-  width: 11rem;
+.dg-table.dg-table--cash-report tbody td {
+  padding: 0.45rem 0.5rem;
+  vertical-align: middle;
 }
 
 .dg-cash-name-input {
   font-weight: 600;
   min-width: 0;
+  width: 100%;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+  font-size: 0.875rem;
 }
 
 .dg-cash-slot-input {
   text-align: right;
   font-variant-numeric: tabular-nums;
   min-width: 0;
-  padding-left: 0.35rem;
-  padding-right: 0.35rem;
+  width: 100%;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  font-size: 0.9375rem;
 }
 
 .dg-cash-amount--pos,
-.dg-cash-slot-input.dg-cash-amount--pos,
-.dg-cash-col-total.dg-cash-amount--pos .dg-cash-amount {
+.dg-cash-slot-input.dg-cash-amount--pos {
   color: #15803d;
 }
 
 .dg-cash-amount--neg,
-.dg-cash-slot-input.dg-cash-amount--neg,
-.dg-cash-col-total.dg-cash-amount--neg .dg-cash-amount {
+.dg-cash-slot-input.dg-cash-amount--neg {
   color: #dc2626;
 }
 
@@ -2660,49 +2668,49 @@ textarea.dg-input {
   color: var(--win-text-muted);
 }
 
-.dg-cash-pending {
-  display: block;
-  margin-top: 0.15rem;
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: #ca8a04;
-}
-
 .dg-cash-actions {
   flex-wrap: wrap;
   gap: 0.25rem;
+  justify-content: center;
 }
 
-.dg-cash-balance-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  margin-top: 0.25rem;
-  padding: 0.85rem 1.1rem;
-  border-radius: 0.5rem;
-  background: linear-gradient(135deg, #166534 0%, #15803d 100%);
-  color: #fff;
+.dg-table.dg-table--cash-report tfoot td {
+  background: var(--table-header-bg);
+  color: var(--table-header-fg);
+  font-size: var(--table-header-font-size);
+  font-weight: var(--table-header-font-weight);
+  line-height: var(--table-header-line-height);
+  letter-spacing: var(--table-header-letter-spacing);
+  text-transform: uppercase;
+  border-bottom: none;
+  border-top: none;
+  padding: var(--table-header-padding-y) var(--table-header-padding-x);
+  vertical-align: middle;
 }
 
-.dg-cash-balance-label {
-  font-size: 0.9375rem;
-  opacity: 0.92;
+.dg-table.dg-table--cash-report tfoot .dg-cash-foot-label {
+  text-align: left;
 }
 
-.dg-cash-balance-value {
-  font-size: 1.375rem;
+.dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance {
+  text-align: right;
+  text-transform: none;
+  font-size: 1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: normal;
 }
 
-.dg-cash-balance-value.dg-cash-amount--neg {
-  color: #fecaca;
+.dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--pos {
+  color: #86efac;
 }
 
-.dg-cash-balance-value.dg-cash-amount--pos {
-  color: #fff;
+.dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--neg {
+  color: #fca5a5;
+}
+
+.dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--zero {
+  color: var(--table-header-fg);
 }
 
 .dg-table.dg-table--cash-history .dg-th-actions,
@@ -2711,14 +2719,14 @@ textarea.dg-input {
 }
 
 @media (max-width: 900px) {
-  .dg-table.dg-table--cash-report .dg-cash-col-slot {
-    width: 4.5rem;
+  .dg-table.dg-table--cash-report thead th.dg-cash-col-name,
+  .dg-table.dg-table--cash-report tbody td.dg-cash-col-name {
+    width: 7rem;
   }
 
-  .dg-cash-balance-bar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.25rem;
+  .dg-table.dg-table--cash-report thead th.dg-cash-col-slot,
+  .dg-table.dg-table--cash-report tbody td.dg-cash-col-slot {
+    width: 6.25rem;
   }
 }
 
