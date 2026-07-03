@@ -2706,13 +2706,23 @@ textarea.dg-input {
 
 .dg-cash-amount--pos,
 .dg-cash-slot-input.dg-cash-amount--pos {
-  color: #16a34a;
+  color: #16a34a !important;
   font-weight: 700;
 }
 
 .dg-cash-amount--neg,
 .dg-cash-slot-input.dg-cash-amount--neg {
-  color: #dc2626;
+  color: #dc2626 !important;
+  font-weight: 700;
+}
+
+.rb-desktop .dg-table.dg-table--cash-report .dg-cash-slot-input.dg-cash-amount--pos {
+  color: #16a34a !important;
+  font-weight: 700;
+}
+
+.rb-desktop .dg-table.dg-table--cash-report .dg-cash-slot-input.dg-cash-amount--neg {
+  color: #dc2626 !important;
   font-weight: 700;
 }
 

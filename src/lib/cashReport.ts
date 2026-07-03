@@ -33,7 +33,9 @@ export function cashSlotDisplayValue(value: number, draft?: string): string {
 }
 
 export function cashAmountClassForInput(value: number, draft?: string): string {
-  if (draft !== undefined && draft.trim() !== "" && draft.trim() !== "-") {
+  if (draft !== undefined) {
+    const trimmed = draft.trim().replace(/\s/g, "").replace(",", ".");
+    if (!trimmed || trimmed === "-") return "dg-cash-amount--pos";
     return cashAmountClass(commitCashInput(draft));
   }
   return cashAmountClass(value);
