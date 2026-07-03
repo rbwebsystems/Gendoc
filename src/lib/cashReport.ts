@@ -107,6 +107,51 @@ export function mergeCashRowSlots(row: CashReportRow): CashReportRow {
   return { ...row, slots, updatedAt: Date.now() };
 }
 
+export function applyCashRowDrafts(row: CashReportRow, drafts: Record<string, string>): CashReportRow {
+  const slots = [...row.slots] as CashReportRow["slots"];
+  let changed = false;
+  for (let slotIndex = 0; slotIndex < CASH_REPORT_SLOT_COUNT; slotIndex += 1) {
+    const draft = drafts[cashSlotKey(row.id, slotIndex)];
+    if (draft === undefined) continue;
+    slots[slotIndex] = commitCashInput(draft);
+    changed = true;
+  }
+  return changed ? { ...row, slots } : row;
+}
+
+export function clearCashRowDraftKeys(drafts: Record<string, string>, rowId: string): Record<string, string> {
+  const next = { ...drafts };
+  for (let slotIndex = 0; slotIndex < CASH_REPORT_SLOT_COUNT; slotIndex += 1) {
+    delete next[cashSlotKey(rowId, slotIndex)];
+  }
+  return next;
+}
+
+export function mergeCashReportRowsByUpdatedAt(
+  localRows: CashReportRow[],
+  remoteRows: CashReportRow[],
+): CashReportRow[] {
+  const remoteById = new Map(remoteRows.map((row) => [row.id, row]));
+  const usedRemoteIds = new Set<string>();
+  const merged: CashReportRow[] = [];
+
+  for (const local of localRows) {
+    const remote = remoteById.get(local.id);
+    if (!remote) {
+      merged.push(local);
+      continue;
+    }
+    usedRemoteIds.add(local.id);
+    merged.push(local.updatedAt >= remote.updatedAt ? local : remote);
+  }
+
+  for (const remote of remoteRows) {
+    if (!usedRemoteIds.has(remote.id)) merged.push(remote);
+  }
+
+  return merged;
+}
+
 export function emptyCashReportState(): CashReportState {
   return { rows: [], history: [] };
 }
@@ -178,9 +223,7 @@ export function mergeCashReportOnSync(
   const rows =
     opts?.preferLocalRows && localRows.length > 0
       ? localRows
-      : remoteRows.length > 0
-        ? remoteRows
-        : localRows;
+      : mergeCashReportRowsByUpdatedAt(localRows, remoteRows);
 
   const historyMap = new Map<string, CashReportSnapshot>();
   for (const entry of remote.history ?? []) historyMap.set(entry.id, entry);

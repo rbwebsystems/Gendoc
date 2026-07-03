@@ -61,6 +61,8 @@ import {
   cashSlotDisplayValue,
   cashSlotKey,
   isPartialCashInput,
+  applyCashRowDrafts,
+  clearCashRowDraftKeys,
   mergeCashRowSlots,
   newCashReportRow,
   rowPendingSum,
@@ -1390,6 +1392,8 @@ export default function App() {
   workspaceRef.current = workspace;
   // Remote ilə yerli arasında "echo" yazıların qarşısını almaq üçün son sinxronlaşmış JSON
   const lastSyncedJsonRef = useRef<string>("");
+  /** Serverə göndərilmiş, snapshot ilə təsdiqlənməyi gözləyən yazı */
+  const lastWrittenJsonRef = useRef<string>("");
   // Yerli dəyişiklik remote-a yazılmamışdırsa snapshot köhnə məlumatı geri qaytarmasın
   const pendingLocalWriteRef = useRef(false);
   const remoteWriteTimerRef = useRef<number | null>(null);
@@ -1547,6 +1551,7 @@ export default function App() {
         setForcePasswordChange(false);
         remoteReadyRef.current = false;
         lastSyncedJsonRef.current = "";
+        lastWrittenJsonRef.current = "";
         pendingLocalWriteRef.current = false;
         cashReportDirtyRef.current = false;
         if (remoteWriteTimerRef.current != null) {
@@ -1643,9 +1648,7 @@ export default function App() {
         } else {
           await writeWorkspace(uid, payload);
         }
-        lastSyncedJsonRef.current = json;
-        pendingLocalWriteRef.current = false;
-        cashReportDirtyRef.current = false;
+        lastWrittenJsonRef.current = json;
         if (remoteWriteRetryTimerRef.current != null) {
           window.clearTimeout(remoteWriteRetryTimerRef.current);
           remoteWriteRetryTimerRef.current = null;
@@ -1752,7 +1755,15 @@ export default function App() {
         setRemoteSyncEpoch((e) => e + 1);
         return;
       }
-      if (pendingLocalWriteRef.current) {
+      if (json === lastWrittenJsonRef.current) {
+        lastSyncedJsonRef.current = json;
+        pendingLocalWriteRef.current = false;
+        cashReportDirtyRef.current = false;
+        remoteReadyRef.current = true;
+        setRemoteSyncEpoch((e) => e + 1);
+        return;
+      }
+      if (pendingLocalWriteRef.current || remoteWriteInFlightRef.current || cashReportDirtyRef.current) {
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
         return;
@@ -1781,7 +1792,6 @@ export default function App() {
     if (firebaseEnabled && authState.status === "signedIn") {
       if (!remoteReadyRef.current) return; // hələ ilk snapshot gəlməyib
       if (json === lastSyncedJsonRef.current) {
-        pendingLocalWriteRef.current = false;
         return;
       }
 
@@ -2392,17 +2402,25 @@ export default function App() {
   const mergeCashReportRow = useCallback(
     (rowId: string) => {
       const row = cashReportRows.find((r) => r.id === rowId);
-      if (!row || rowPendingSum(row) === 0) {
+      if (!row) return;
+      const rowWithDrafts = applyCashRowDrafts(row, cashSlotEdits);
+      if (rowPendingSum(rowWithDrafts) === 0) {
         flash(setToast, "Cəmlənəcək dəyər yoxdur (sütun 2–8).", "error");
         return;
       }
-      updateCashRow(rowId, mergeCashRowSlots, {
-        trackUndo: true,
-        historyLabel: `Cəmləndi: ${row.name || "Hesab"}`,
-      });
+      const draftsSnapshot = cashSlotEdits;
+      setCashSlotEdits((prev) => clearCashRowDraftKeys(prev, rowId));
+      updateCashRow(
+        rowId,
+        (current) => mergeCashRowSlots(applyCashRowDrafts(current, draftsSnapshot)),
+        {
+          trackUndo: true,
+          historyLabel: `Cəmləndi: ${rowWithDrafts.name || "Hesab"}`,
+        },
+      );
       flash(setToast, "Cəmləndi");
     },
-    [cashReportRows, updateCashRow],
+    [cashReportRows, cashSlotEdits, updateCashRow],
   );
 
   const undoCashReportRow = useCallback(
