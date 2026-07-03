@@ -2580,109 +2580,128 @@ textarea.dg-input {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.625rem;
+  border: 1px solid #c8cdd3;
+  border-radius: 0.375rem;
   overflow: hidden;
-  background: #fafafa;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-
-.dg-cash-table-head,
-.dg-cash-table-foot {
-  flex-shrink: 0;
-}
-
-.dg-cash-table-foot {
-  margin-top: auto;
-}
-
-.dg-cash-table-head.dg-table-wrap,
-.dg-cash-table-foot.dg-table-wrap {
-  overflow: hidden;
-}
-
-.dg-cash-table-body.dg-table-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  border-top: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
   background: #fff;
 }
 
-.dg-table.dg-table--cash-report tbody tr:nth-child(even) td {
-  background: #f8fafc;
+.dg-cash-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  background: #fff;
 }
 
-.dg-table.dg-table--cash-report tbody tr:hover td {
-  background: #f1f5f9;
-}
-
-.dg-table.dg-table--cash-report tbody tr:hover:nth-child(even) td {
-  background: #eef2f7;
-}
-
-.dg-cash-table-head .dg-table,
-.dg-cash-table-body .dg-table,
-.dg-cash-table-foot .dg-table {
+.dg-cash-table-scroll .dg-table {
   margin: 0;
-}
-
-.dg-cash-table-body .dg-table tbody tr:last-child td {
-  border-bottom: none;
 }
 
 .dg-table.dg-table--cash-report {
   table-layout: fixed;
   width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.dg-table.dg-table--cash-report col.dg-cash-col-idx {
+  width: 2.5rem;
+}
+
+.dg-table.dg-table--cash-report col.dg-cash-col-name {
+  width: 9rem;
+}
+
+.dg-table.dg-table--cash-report col.dg-cash-col-slot {
+  width: 5.75rem;
+}
+
+.dg-table.dg-table--cash-report col.dg-cash-col-actions {
+  width: 10rem;
+}
+
+.dg-table.dg-table--cash-report thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border: 1px solid #b8bfc7;
+  border-top: none;
 }
 
 .dg-table.dg-table--cash-report thead th.dg-cash-col-idx,
 .dg-table.dg-table--cash-report tbody td.dg-cash-col-idx {
-  width: 2.75rem;
   text-align: center;
+  color: #64748b;
+  font-weight: 600;
 }
 
 .dg-table.dg-table--cash-report thead th.dg-cash-col-name,
 .dg-table.dg-table--cash-report tbody td.dg-cash-col-name {
-  width: 8.5rem;
   text-align: left;
 }
 
 .dg-table.dg-table--cash-report thead th.dg-cash-col-slot,
 .dg-table.dg-table--cash-report tbody td.dg-cash-col-slot,
 .dg-table.dg-table--cash-report tfoot td.dg-cash-col-slot {
-  width: 6.25rem;
   text-align: center;
 }
 
 .dg-table.dg-table--cash-report thead th.dg-cash-col-actions,
 .dg-table.dg-table--cash-report tbody td.dg-cash-col-actions {
-  width: 10.5rem;
   text-align: center;
 }
 
-.dg-table.dg-table--cash-report tbody td {
-  padding: 0.4rem 0.45rem;
+.dg-table.dg-table--cash-report tbody td,
+.dg-table.dg-table--cash-report tfoot td {
+  border: 1px solid #d4d4d4;
+  padding: 0;
   vertical-align: middle;
-  border-bottom-color: #eef2f7;
+  background: #fff;
+}
+
+.dg-table.dg-table--cash-report tbody tr:nth-child(even) td {
+  background: #fafafa;
+}
+
+.dg-table.dg-table--cash-report tbody tr:hover td {
+  background: #f5f9ff;
+}
+
+.dg-table.dg-table--cash-report tbody td.dg-cash-col-idx {
+  padding: 0.35rem 0.25rem;
+  background: #f3f4f6;
+  border-color: #d4d4d4;
+}
+
+.dg-table.dg-table--cash-report tbody tr:nth-child(even) td.dg-cash-col-idx {
+  background: #eceef1;
+}
+
+.dg-table.dg-table--cash-report tbody td.dg-cash-col-actions {
+  padding: 0.3rem 0.35rem;
+  background: #fff;
 }
 
 .dg-cash-name-input {
   font-weight: 700;
   min-width: 0;
   width: 100%;
-  padding-left: 0.45rem;
-  padding-right: 0.45rem;
-  font-size: 0.875rem;
+  min-height: 30px;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8125rem;
   background: transparent;
-  border-color: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  color: #1e293b;
 }
 
 .dg-cash-name-input:hover,
 .dg-cash-name-input:focus {
   background: #fff;
-  border-color: var(--win-border);
+  outline: 2px solid #93c5fd;
+  outline-offset: -2px;
 }
 
 .dg-cash-slot-input {
@@ -2690,18 +2709,42 @@ textarea.dg-input {
   font-variant-numeric: tabular-nums;
   min-width: 0;
   width: 100%;
-  padding-left: 0.5rem;
-  padding-right: 0.5rem;
-  font-size: 0.9375rem;
+  min-height: 30px;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.8125rem;
   background: transparent;
-  border-color: #e8edf3;
-  border-radius: 0.375rem;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.dg-cash-slot-input:hover,
+.dg-cash-slot-input:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
 .dg-cash-slot-input:focus {
   background: #fff;
-  border-color: #cbd5e1;
+  outline: 2px solid #93c5fd;
+  outline-offset: -2px;
+}
+
+.rb-desktop .dg-table.dg-table--cash-report .dg-cash-slot-input,
+.rb-desktop .dg-table.dg-table--cash-report .dg-cash-name-input {
+  min-height: 30px;
+  padding: 0.35rem 0.4rem;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.rb-desktop .dg-table.dg-table--cash-report .dg-cash-slot-input:focus,
+.rb-desktop .dg-table.dg-table--cash-report .dg-cash-name-input:focus {
+  border: none;
+  box-shadow: none;
+  outline: 2px solid #93c5fd;
+  outline-offset: -2px;
+  background: #fff;
 }
 
 .dg-cash-amount--pos,
@@ -2737,6 +2780,9 @@ textarea.dg-input {
 }
 
 .dg-table.dg-table--cash-report tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
   background: var(--table-header-bg);
   color: var(--table-header-fg);
   font-size: var(--table-header-font-size);
@@ -2744,32 +2790,38 @@ textarea.dg-input {
   line-height: var(--table-header-line-height);
   letter-spacing: var(--table-header-letter-spacing);
   text-transform: uppercase;
-  border-bottom: none;
-  border-top: none;
-  padding: var(--table-header-padding-y) var(--table-header-padding-x);
+  border: 1px solid #b8bfc7;
+  padding: 0.55rem 0.5rem;
   vertical-align: middle;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-label {
   text-align: left;
+  padding-left: 0.65rem;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance {
   text-align: center;
   text-transform: none;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: normal;
+  padding: 0.55rem 0.4rem;
+}
+
+.dg-table.dg-table--cash-report tfoot .dg-cash-foot-spacer {
+  padding: 0;
+  border-top: 1px solid #b8bfc7;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--pos {
-  color: #86efac;
+  color: #bbf7d0;
   font-weight: 700;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--neg {
-  color: #fca5a5;
+  color: #fecaca;
   font-weight: 700;
 }
 
@@ -2819,15 +2871,12 @@ textarea.dg-input {
 }
 
 @media (max-width: 900px) {
-  .dg-table.dg-table--cash-report thead th.dg-cash-col-name,
-  .dg-table.dg-table--cash-report tbody td.dg-cash-col-name {
+  .dg-table.dg-table--cash-report col.dg-cash-col-name {
     width: 7rem;
   }
 
-  .dg-table.dg-table--cash-report thead th.dg-cash-col-slot,
-  .dg-table.dg-table--cash-report tbody td.dg-cash-col-slot,
-  .dg-table.dg-table--cash-report tfoot td.dg-cash-col-slot {
-    width: 5.25rem;
+  .dg-table.dg-table--cash-report col.dg-cash-col-slot {
+    width: 4.75rem;
   }
 }
 

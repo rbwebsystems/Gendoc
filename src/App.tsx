@@ -5648,11 +5648,24 @@ export default function App() {
     </div>
   );
 
-  const renderCashReportModule = () => (
+  const renderCashReportModule = () => {
+    const cashColGroup = (
+      <colgroup>
+        <col className="dg-cash-col-idx" />
+        <col className="dg-cash-col-name" />
+        {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, i) => (
+          <col key={i} className="dg-cash-col-slot" />
+        ))}
+        <col className="dg-cash-col-actions" />
+      </colgroup>
+    );
+
+    return (
     <div className="dg-cash-report pg-panel" aria-label="Kassa hesabatı">
       <div className="dg-cash-table-shell">
-        <div className="dg-cash-table-head dg-table-wrap">
+        <div className="dg-cash-table-scroll dg-table-wrap">
           <table className="dg-table dg-table--cash-report">
+            {cashColGroup}
             <thead>
               <tr>
                 <th className="dg-cash-col-idx">#</th>
@@ -5665,11 +5678,6 @@ export default function App() {
                 <th className="dg-cash-col-actions">Əməliyyat</th>
               </tr>
             </thead>
-          </table>
-        </div>
-
-        <div className="dg-cash-table-body dg-table-wrap">
-          <table className="dg-table dg-table--cash-report">
             <tbody>
               {cashReportRows.map((row, index) => (
                 <tr key={row.id}>
@@ -5775,11 +5783,6 @@ export default function App() {
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
-
-        <div className="dg-cash-table-foot dg-table-wrap">
-          <table className="dg-table dg-table--cash-report">
             <tfoot>
               <tr className="dg-cash-foot-row">
                 <td colSpan={2} className="dg-cash-foot-label">
@@ -5788,15 +5791,16 @@ export default function App() {
                 <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
                   {cashReportBalance === 0 ? "" : formatCashAmount(cashReportBalance)}
                 </td>
-                <td colSpan={CASH_REPORT_SLOT_COUNT - 1} />
-                <td className="dg-cash-col-actions" />
+                <td colSpan={CASH_REPORT_SLOT_COUNT - 1} className="dg-cash-foot-spacer" />
+                <td className="dg-cash-col-actions dg-cash-foot-spacer" />
               </tr>
             </tfoot>
           </table>
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const reviewerDisplayName = () => {
     if (currentMember?.name) return currentMember.name;
