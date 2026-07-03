@@ -5650,19 +5650,6 @@ export default function App() {
 
   const renderCashReportModule = () => (
     <div className="dg-cash-report pg-panel" aria-label="Kassa hesabatı">
-      <div className="dg-cash-report-toolbar">
-        <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashHistoryOpen(true)}>
-          Tarixçə
-          {cashReportHistory.length > 0 ? (
-            <span className="dg-cash-history-badge">{cashReportHistory.length}</span>
-          ) : null}
-        </button>
-      </div>
-
-      <p className="dg-cash-report-hint dg-muted">
-        Sütun 1 — cəmlənmiş balans. Sütun 2–8 — gözləyən daxiletmələr. «Cəmlə» ilə 2–8 sütunlar balansa əlavə olunur.
-      </p>
-
       <div className="dg-cash-table-shell">
         <div className="dg-cash-table-head dg-table-wrap">
           <table className="dg-table dg-table--cash-report">
@@ -6784,8 +6771,6 @@ export default function App() {
                 ? { label: "Yeni sifariş", onClick: openNewStoreOrderForm }
                 : module === "customerOrders" && customerOrderMode === "list"
                   ? { label: "Yeni sifariş", onClick: openNewCustomerOrderForm }
-                  : module === "cashReport"
-                    ? { label: "Sətir əlavə et", onClick: addCashReportRow }
                     : module === "appUsers" && appUserMode === "list" && canManageUsers
                     ? { label: "Yeni istifadəçi", onClick: openNewAppUserForm }
                     : module === "workLeave" && leaveMode === "list"
@@ -7811,7 +7796,19 @@ export default function App() {
                       aria-label="Modullarda süzgəc"
                     />
                   </div>
-                  {headerPrimaryAction ? (
+                  {module === "cashReport" ? (
+                    <>
+                      <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashHistoryOpen(true)}>
+                        Tarixçə
+                        {cashReportHistory.length > 0 ? (
+                          <span className="dg-cash-history-badge">{cashReportHistory.length}</span>
+                        ) : null}
+                      </button>
+                      <button type="button" className="dg-btn dg-btn-primary" onClick={addCashReportRow}>
+                        Sətir əlavə et
+                      </button>
+                    </>
+                  ) : headerPrimaryAction ? (
                     <button type="button" className="dg-btn dg-btn-primary" onClick={headerPrimaryAction.onClick}>
                       {headerPrimaryAction.label}
                     </button>
