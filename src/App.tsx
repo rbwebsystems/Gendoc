@@ -54,7 +54,7 @@ import {
   cashAmountClass,
   cloneCashRow,
   commitCashInput,
-  createCashSnapshot,
+  appendCashReportHistory,
   formatCashAmount,
   cashAmountClassForInput,
   cashSlotDisplayValue,
@@ -1438,6 +1438,7 @@ export default function App() {
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
   const [cashSlotEdits, setCashSlotEdits] = useState<Record<string, string>>({});
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
+  const cashNameFocusRef = useRef<Map<string, string>>(new Map());
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
   const [permissionMode, setPermissionMode] = useState<SystemUserFormMode>("list");
@@ -2268,19 +2269,29 @@ export default function App() {
     });
   }, [workspace.cashReport?.rows]);
 
-  const patchCashReport = useCallback((patch: (prev: { rows: CashReportRow[]; history: CashReportSnapshot[] }) => {
-    rows: CashReportRow[];
-    history: CashReportSnapshot[];
-  }) => {
-    setWorkspace((w) => {
-      const prev = {
-        rows: w.cashReport?.rows ?? [],
-        history: w.cashReport?.history ?? [],
-      };
-      const next = patch(prev);
-      return { ...w, cashReport: next };
-    });
-  }, []);
+  const patchCashReport = useCallback(
+    (
+      patch: (prev: { rows: CashReportRow[]; history: CashReportSnapshot[] }) => {
+        rows: CashReportRow[];
+        history?: CashReportSnapshot[];
+      },
+      historyLabel?: string,
+    ) => {
+      setWorkspace((w) => {
+        const prev = {
+          rows: w.cashReport?.rows ?? [],
+          history: w.cashReport?.history ?? [],
+        };
+        const patched = patch(prev);
+        const rows = patched.rows;
+        const history = historyLabel
+          ? appendCashReportHistory(patched.history ?? prev.history, rows, historyLabel)
+          : (patched.history ?? prev.history);
+        return { ...w, cashReport: { rows, history } };
+      });
+    },
+    [],
+  );
 
   const pushCashRowUndo = useCallback((row: CashReportRow) => {
     const map = cashUndoRef.current;
@@ -2300,24 +2311,31 @@ export default function App() {
   }, []);
 
   const updateCashRow = useCallback(
-    (rowId: string, updater: (row: CashReportRow) => CashReportRow, trackUndo = false) => {
+    (
+      rowId: string,
+      updater: (row: CashReportRow) => CashReportRow,
+      opts?: { trackUndo?: boolean; historyLabel?: string },
+    ) => {
       patchCashReport((prev) => {
         const rows = prev.rows.map((row) => {
           if (row.id !== rowId) return row;
-          if (trackUndo) pushCashRowUndo(row);
+          if (opts?.trackUndo) pushCashRowUndo(row);
           return updater(row);
         });
-        return { ...prev, rows };
-      });
+        return { rows };
+      }, opts?.historyLabel);
     },
     [patchCashReport, pushCashRowUndo],
   );
 
   const addCashReportRow = useCallback(() => {
-    patchCashReport((prev) => ({
-      ...prev,
-      rows: [...prev.rows, newCashReportRow("Yeni hesab")],
-    }));
+    patchCashReport(
+      (prev) => ({
+        ...prev,
+        rows: [...prev.rows, newCashReportRow("Yeni hesab")],
+      }),
+      "Yeni hesab sətri əlavə edildi",
+    );
   }, [patchCashReport]);
 
   const mergeCashReportRow = useCallback(
@@ -2327,7 +2345,10 @@ export default function App() {
         flash(setToast, "Cəmlənəcək dəyər yoxdur (sütun 2–8).", "error");
         return;
       }
-      updateCashRow(rowId, mergeCashRowSlots, true);
+      updateCashRow(rowId, mergeCashRowSlots, {
+        trackUndo: true,
+        historyLabel: `Cəmləndi: ${row.name || "Hesab"}`,
+      });
       flash(setToast, "Cəmləndi");
     },
     [cashReportRows, updateCashRow],
@@ -2340,10 +2361,13 @@ export default function App() {
         flash(setToast, "Geri alınacaq addım yoxdur.", "error");
         return;
       }
-      patchCashReport((state) => ({
-        ...state,
-        rows: state.rows.map((row) => (row.id === rowId ? prev : row)),
-      }));
+      patchCashReport(
+        (state) => ({
+          ...state,
+          rows: state.rows.map((row) => (row.id === rowId ? prev : row)),
+        }),
+        `Geri alındı: ${prev.name || "Hesab"}`,
+      );
       flash(setToast, "Geri alındı");
     },
     [patchCashReport, popCashRowUndo],
@@ -2444,68 +2468,16 @@ export default function App() {
       });
       if (!ok) return;
       cashUndoRef.current.delete(rowId);
-      patchCashReport((prev) => ({
-        ...prev,
-        rows: prev.rows.filter((r) => r.id !== rowId),
-      }));
+      patchCashReport(
+        (prev) => ({
+          ...prev,
+          rows: prev.rows.filter((r) => r.id !== rowId),
+        }),
+        `Sətir silindi: ${row.name || "Hesab"}`,
+      );
       flash(setToast, "Sətir silindi");
     },
     [askConfirm, cashReportRows, patchCashReport],
-  );
-
-  const saveCashReportSnapshot = useCallback(async () => {
-    const label = await askPrompt({
-      title: "Tarixçəyə yaz",
-      label: "Qeyd (boş buraxıla bilər)",
-      defaultValue: new Date().toLocaleString("az-AZ"),
-      confirmLabel: "Yadda saxla",
-      cancelLabel: "Ləğv et",
-    });
-    if (label == null) return;
-    const snapshot = createCashSnapshot(cashReportRows, label);
-    patchCashReport((prev) => ({
-      ...prev,
-      history: [snapshot, ...prev.history].slice(0, 50),
-    }));
-    flash(setToast, "Tarixçəyə yazıldı");
-  }, [askPrompt, cashReportRows, patchCashReport]);
-
-  const restoreCashReportSnapshot = useCallback(
-    async (snapshot: CashReportSnapshot) => {
-      const ok = await askConfirm({
-        title: "Tarixçədən bərpa",
-        message: `«${snapshot.label}» vəziyyəti bərpa edilsin? Cari məlumatlar əvəz olunacaq.`,
-        confirmLabel: "Bərpa et",
-        cancelLabel: "Ləğv et",
-      });
-      if (!ok) return;
-      cashUndoRef.current.clear();
-      patchCashReport((prev) => ({
-        rows: snapshot.rows.map(cloneCashRow),
-        history: prev.history,
-      }));
-      setCashHistoryOpen(false);
-      flash(setToast, "Tarixçədən bərpa olundu");
-    },
-    [askConfirm, patchCashReport],
-  );
-
-  const deleteCashReportSnapshot = useCallback(
-    async (snapshotId: string) => {
-      const ok = await askConfirm({
-        title: "Tarixçəni sil",
-        message: "Bu qeyd silinsin?",
-        confirmLabel: "Sil",
-        cancelLabel: "Ləğv et",
-        danger: true,
-      });
-      if (!ok) return;
-      patchCashReport((prev) => ({
-        ...prev,
-        history: prev.history.filter((h) => h.id !== snapshotId),
-      }));
-    },
-    [askConfirm, patchCashReport],
   );
 
   const restoreFromLocalBackup = useCallback(async () => {
@@ -5685,9 +5657,6 @@ export default function App() {
             <span className="dg-cash-history-badge">{cashReportHistory.length}</span>
           ) : null}
         </button>
-        <button type="button" className="dg-btn dg-btn-secondary" onClick={() => void saveCashReportSnapshot()}>
-          Anlıq görüntü saxla
-        </button>
       </div>
 
       <p className="dg-cash-report-hint dg-muted">
@@ -5722,9 +5691,18 @@ export default function App() {
                     <input
                       className="dg-input dg-cash-name-input"
                       value={row.name}
+                      onFocus={() => cashNameFocusRef.current.set(row.id, row.name)}
                       onChange={(e) =>
                         updateCashRow(row.id, (r) => ({ ...r, name: e.target.value, updatedAt: Date.now() }))
                       }
+                      onBlur={(e) => {
+                        const prevName = (cashNameFocusRef.current.get(row.id) ?? row.name).trim();
+                        const nextName = e.target.value.trim();
+                        cashNameFocusRef.current.delete(row.id);
+                        if (nextName && nextName !== prevName) {
+                          patchCashReport((prev) => ({ rows: prev.rows }), `Hesab adı dəyişdirildi: ${nextName}`);
+                        }
+                      }}
                       placeholder="Hesab adı"
                     />
                   </td>
@@ -5738,7 +5716,6 @@ export default function App() {
                           className={`dg-input dg-cash-slot-input ${cashAmountClassForInput(value, slotDraft)}`}
                           inputMode="decimal"
                           value={slotDisplay}
-                          placeholder="0"
                           onChange={(e) => {
                             const raw = e.target.value;
                             if (!isPartialCashInput(raw)) return;
@@ -5755,11 +5732,20 @@ export default function App() {
                           onBlur={() => {
                             const raw = cashSlotEdits[slotKey] ?? (value === 0 ? "" : String(value));
                             const next = commitCashInput(raw);
-                            updateCashRow(row.id, (r) => {
-                              const slots = [...r.slots] as CashReportRow["slots"];
-                              slots[slotIndex] = next;
-                              return { ...r, slots, updatedAt: Date.now() };
-                            });
+                            const changed = next !== value || slotKey in cashSlotEdits;
+                            updateCashRow(
+                              row.id,
+                              (r) => {
+                                const slots = [...r.slots] as CashReportRow["slots"];
+                                slots[slotIndex] = next;
+                                return { ...r, slots, updatedAt: Date.now() };
+                              },
+                              changed
+                                ? {
+                                    historyLabel: `${row.name || "Hesab"} — sütun ${slotIndex + 1}: ${next === 0 ? "boşaldı" : formatCashAmount(next)}`,
+                                  }
+                                : undefined,
+                            );
                             setCashSlotEdits((prev) => {
                               if (!(slotKey in prev)) return prev;
                               const rest = { ...prev };
@@ -5775,7 +5761,7 @@ export default function App() {
                     <div className="dg-icon-row dg-cash-actions">
                       <button
                         type="button"
-                        className="dg-btn dg-btn-secondary dg-btn-sm"
+                        className="dg-btn dg-btn-primary dg-btn-sm dg-cash-btn-merge"
                         onClick={() => mergeCashReportRow(row.id)}
                         title="Sütun 2–8-i balansa cəmlə"
                       >
@@ -5813,7 +5799,7 @@ export default function App() {
                   Ümumi balans
                 </td>
                 <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
-                  {formatCashAmount(cashReportBalance)}
+                  {cashReportBalance === 0 ? "" : formatCashAmount(cashReportBalance)}
                 </td>
                 <td colSpan={CASH_REPORT_SLOT_COUNT - 1} />
                 <td className="dg-cash-col-actions" />
@@ -7305,49 +7291,23 @@ export default function App() {
         >
           <div className="dg-modal-body">
             <h2 className="dg-modal-title">Kassa tarixçəsi</h2>
-            <p className="dg-modal-hint">Saxlanmış anlıq görüntülər. Bərpa etdikdə cari cədvəl əvəz olunur.</p>
+            <p className="dg-modal-hint">Hər dəyişiklik avtomatik qeyd olunur.</p>
             {cashReportHistory.length === 0 ? (
-              <p className="dg-muted">Hələ tarixçə yoxdur. «Anlıq görüntü saxla» ilə qeyd yaradın.</p>
+              <p className="dg-muted">Hələ dəyişiklik qeydi yoxdur.</p>
             ) : (
-              <div className="dg-table-wrap">
-                <table className="dg-table dg-table--cash-history">
-                  <thead>
-                    <tr>
-                      <th>Tarix / qeyd</th>
-                      <th>Balans</th>
-                      <th>Sətir sayı</th>
-                      <th className="dg-th-actions">Əməliyyat</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cashReportHistory.map((snap) => (
-                      <tr key={snap.id}>
-                        <td>{snap.label}</td>
-                        <td className={cashAmountClass(snap.balance)}>{formatCashAmount(snap.balance)}</td>
-                        <td>{snap.rows.length}</td>
-                        <td className="dg-td-actions">
-                          <div className="dg-icon-row">
-                            <button
-                              type="button"
-                              className="dg-btn dg-btn-secondary dg-btn-sm"
-                              onClick={() => void restoreCashReportSnapshot(snap)}
-                            >
-                              Bərpa et
-                            </button>
-                            <button
-                              type="button"
-                              className="dg-btn dg-btn-danger dg-btn-sm"
-                              onClick={() => void deleteCashReportSnapshot(snap.id)}
-                            >
-                              Sil
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="dg-cash-changelog">
+                {cashReportHistory.map((entry) => (
+                  <li key={entry.id} className="dg-cash-changelog-item">
+                    <div className="dg-cash-changelog-time">
+                      {new Date(entry.savedAt).toLocaleString("az-AZ")}
+                    </div>
+                    <div className="dg-cash-changelog-text">{entry.label}</div>
+                    <div className={`dg-cash-changelog-balance ${cashAmountClass(entry.balance)}`}>
+                      {entry.balance === 0 ? "—" : `Balans: ${formatCashAmount(entry.balance)}`}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
             <button
               type="button"

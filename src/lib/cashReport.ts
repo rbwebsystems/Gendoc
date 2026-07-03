@@ -8,9 +8,8 @@ export function formatCashAmount(n: number): string {
 }
 
 export function cashAmountClass(n: number): string {
-  if (n > 0) return "dg-cash-amount--pos";
   if (n < 0) return "dg-cash-amount--neg";
-  return "dg-cash-amount--zero";
+  return "dg-cash-amount--pos";
 }
 
 export function parseCashInput(raw: string): number {
@@ -119,16 +118,31 @@ export function defaultCashReportRows(): CashReportRow[] {
   });
 }
 
-export function createCashSnapshot(rows: CashReportRow[], label?: string): CashReportSnapshot {
+export const CASH_REPORT_HISTORY_LIMIT = 100;
+
+export function createCashHistoryEntry(rows: CashReportRow[], label: string): CashReportSnapshot {
   const now = Date.now();
   const cloned = rows.map(cloneCashRow);
   return {
     id: crypto.randomUUID(),
-    label: label?.trim() || new Date(now).toLocaleString("az-AZ"),
+    label: label.trim() || "Dəyişiklik",
     savedAt: now,
     balance: totalCashBalance(cloned),
     rows: cloned,
   };
+}
+
+export function appendCashReportHistory(
+  history: CashReportSnapshot[],
+  rows: CashReportRow[],
+  label: string,
+): CashReportSnapshot[] {
+  return [createCashHistoryEntry(rows, label), ...history].slice(0, CASH_REPORT_HISTORY_LIMIT);
+}
+
+/** @deprecated createCashHistoryEntry istifadə edin */
+export function createCashSnapshot(rows: CashReportRow[], label?: string): CashReportSnapshot {
+  return createCashHistoryEntry(rows, label?.trim() || new Date().toLocaleString("az-AZ"));
 }
 
 export function normalizeCashReportSlots(raw: unknown): CashReportRow["slots"] {
@@ -192,7 +206,7 @@ export function normalizeCashReportHistory(raw: unknown): CashReportSnapshot[] {
       };
     })
     .sort((a, b) => b.savedAt - a.savedAt)
-    .slice(0, 50);
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
 }
 
 export function normalizeCashReportState(raw: unknown): CashReportState | undefined {
