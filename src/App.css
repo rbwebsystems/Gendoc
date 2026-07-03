@@ -2747,13 +2747,11 @@ textarea.dg-input {
   background: #fff;
 }
 
-.dg-cash-amount--pos,
 .dg-cash-slot-input.dg-cash-amount--pos {
   color: #16a34a !important;
   font-weight: 700;
 }
 
-.dg-cash-amount--neg,
 .dg-cash-slot-input.dg-cash-amount--neg {
   color: #dc2626 !important;
   font-weight: 700;
@@ -2816,12 +2814,22 @@ textarea.dg-input {
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--pos {
-  color: #0fff50;
+  color: #0fff50 !important;
   font-weight: 700;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--neg {
-  color: #fecaca;
+  color: #fecaca !important;
+  font-weight: 700;
+}
+
+.rb-desktop .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--pos {
+  color: #0fff50 !important;
+  font-weight: 700;
+}
+
+.rb-desktop .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance.dg-cash-amount--neg {
+  color: #fecaca !important;
   font-weight: 700;
 }
 
