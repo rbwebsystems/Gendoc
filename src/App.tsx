@@ -2239,6 +2239,10 @@ export default function App() {
   const cashReportBalance = useMemo(() => totalCashBalance(cashReportRows), [cashReportRows]);
 
   useEffect(() => {
+    if (module !== "cashReport") setCashHistoryOpen(false);
+  }, [module]);
+
+  useEffect(() => {
     if (module !== "cashReport") return;
     if ((workspace.cashReport?.rows?.length ?? 0) > 0) return;
     setWorkspace((w) => ({
