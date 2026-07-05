@@ -289,6 +289,11 @@ function emptyAppUserDraft(): AppUserDraft {
   return { username: "", name: "", password: "", currentPassword: "", role: "employee" };
 }
 
+function formatErpClock(date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(date.getDate())}.${p(date.getMonth() + 1)}.${date.getFullYear()} ${p(date.getHours())}:${p(date.getMinutes())}:${p(date.getSeconds())}`;
+}
+
 function emptyLeaveRequestDraft(employeeId = ""): LeaveRequestDraft {
   return {
     employeeId,
@@ -1412,6 +1417,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navSearch, setNavSearch] = useState("");
   const navSearchRef = useRef<HTMLInputElement>(null);
+  const [erpClock, setErpClock] = useState(() => formatErpClock());
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const [projectProductSearch, setProjectProductSearch] = useState("");
@@ -1967,7 +1973,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!sidebarOpen) return;
+    const id = window.setInterval(() => setErpClock(formatErpClock()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSidebarOpen(false);
     };
@@ -7696,21 +7706,20 @@ export default function App() {
 
         <div className="rb-shell">
           <aside className={`rb-sidebar ${sidebarOpen ? "is-open" : ""}`} aria-label="Modullar">
-            <div className="rb-profile-card">
-              <div className="rb-profile-avatar" aria-hidden>
-                <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false">
-                  <circle cx="20" cy="20" r="20" fill="rgba(255,255,255,0.12)" />
-                  <circle cx="20" cy="16" r="7" fill="rgba(255,255,255,0.9)" />
-                  <path d="M7.5 36.5c2.7-6.7 8.2-10 12.5-10s9.8 3.3 12.5 10" fill="rgba(255,255,255,0.9)" />
-                </svg>
-              </div>
-              <div className="rb-profile-meta">
-                <div className="rb-profile-name">GenDoc</div>
-                <div className="rb-profile-sub">Sənəd generatoru</div>
-              </div>
+            <div className="rb-sidebar-brand">GenDoc</div>
+            <div className="rb-sidebar-search" role="search">
+              <IconSearchSidebar />
+              <input
+                ref={navSearchRef}
+                type="search"
+                placeholder="Global axtarış..."
+                value={navSearch}
+                onChange={(e) => setNavSearch(e.target.value)}
+                aria-label="Global axtarış"
+              />
             </div>
 
-            <p className="rb-menu-section">Modullar</p>
+            <p className="rb-menu-section">Bölmələr</p>
             <nav className="rb-menu" aria-label="Əsas modullar">
               {filteredMainNavIds.map((id) => {
                 const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
@@ -7777,7 +7786,7 @@ export default function App() {
           </aside>
 
           <section className="rb-workspace">
-            <header className="rb-topbar">
+            <header className="rb-module-bar">
               <div className="rb-topbar-leading">
                 <button
                   type="button"
@@ -7792,6 +7801,12 @@ export default function App() {
                   {workspaceHeader.sub ? <p>{workspaceHeader.sub}</p> : null}
                 </div>
               </div>
+              <div className="rb-module-clock" aria-live="polite">
+                {erpClock}
+              </div>
+            </header>
+
+            <header className="rb-topbar">
               <div className="rb-topbar-tools">
                 {canReviewLeave ? (
                   <div className="rb-notifications" ref={notificationsRef}>
@@ -7857,17 +7872,6 @@ export default function App() {
                   </div>
                 ) : null}
                 <div className="rb-search-with-action">
-                  <div className="rb-search-box" role="search">
-                    <IconSearchSidebar />
-                    <input
-                      ref={navSearchRef}
-                      type="search"
-                      placeholder="Modullarda süzgəc..."
-                      value={navSearch}
-                      onChange={(e) => setNavSearch(e.target.value)}
-                      aria-label="Modullarda süzgəc"
-                    />
-                  </div>
                   {module === "cashReport" ? (
                     <>
                       <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashHistoryOpen(true)}>
@@ -7877,12 +7881,12 @@ export default function App() {
                         ) : null}
                       </button>
                       <button type="button" className="dg-btn dg-btn-primary" onClick={addCashReportRow}>
-                        Sətir əlavə et
+                        + Sətir əlavə et
                       </button>
                     </>
                   ) : headerPrimaryAction ? (
                     <button type="button" className="dg-btn dg-btn-primary" onClick={headerPrimaryAction.onClick}>
-                      {headerPrimaryAction.label}
+                      + {headerPrimaryAction.label}
                     </button>
                   ) : null}
                 </div>
