@@ -15,23 +15,23 @@
   --win-text-secondary: #4b5563;
   --win-text-tertiary: #6b7280;
 
-  --win-accent: #00897b;
-  --win-accent-hover: #00796b;
-  --win-accent-pressed: #00695c;
-  --win-accent-subtle: rgba(0, 137, 123, 0.14);
+  --win-accent: #0ea5e9;
+  --win-accent-hover: #0284c7;
+  --win-accent-pressed: #0369a1;
+  --win-accent-subtle: rgba(14, 165, 233, 0.14);
 
   --win-danger: #dc2626;
   --win-danger-bg: rgba(220, 38, 38, 0.08);
 
-  --table-header-bg: #00897b;
-  --table-header-bg-dark: #00796b;
+  --table-header-bg: #343434;
+  --table-header-bg-dark: #2c2c2c;
   --table-header-fg: #ffffff;
-  --table-header-font-size: 0.75rem;
-  --table-header-font-weight: 600;
+  --table-header-font-size: 0.6875rem;
+  --table-header-font-weight: 700;
   --table-header-line-height: 1.35;
-  --table-header-letter-spacing: 0.02em;
-  --table-header-padding-y: 0.65rem;
-  --table-header-padding-x: 0.75rem;
+  --table-header-letter-spacing: 0.055em;
+  --table-header-padding-y: 0.8rem;
+  --table-header-padding-x: 0.7rem;
 
   --xp-input-border: #e2e8f0;
   --xp-btn-outline: #e2e8f0;

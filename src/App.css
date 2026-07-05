@@ -2569,7 +2569,7 @@ textarea.dg-input {
   margin-left: 0.35rem;
   padding: 0 0.35rem;
   border-radius: 999px;
-  background: var(--win-accent);
+  background: var(--accent, #2563eb);
   color: #fff;
   font-size: 0.7rem;
   font-weight: 700;
@@ -2580,8 +2580,8 @@ textarea.dg-input {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  border: none;
-  border-radius: 0;
+  border: 1px solid #c8cdd3;
+  border-radius: 0.375rem;
   overflow: hidden;
   background: #fff;
 }
@@ -2625,13 +2625,8 @@ textarea.dg-input {
   position: sticky;
   top: 0;
   z-index: 3;
-  border: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
-  background: #00897b;
-  color: #ffffff;
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0.01em;
+  border: 1px solid #b8bfc7;
+  border-top: none;
 }
 
 .dg-table.dg-table--cash-report thead th.dg-cash-col-idx,
@@ -2786,16 +2781,15 @@ textarea.dg-input {
   position: sticky;
   bottom: 0;
   z-index: 3;
-  background: #00897b;
-  color: #ffffff;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  border: none;
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 0.65rem 0.5rem;
+  background: var(--table-header-bg);
+  color: var(--table-header-fg);
+  font-size: var(--table-header-font-size);
+  font-weight: var(--table-header-font-weight);
+  line-height: var(--table-header-line-height);
+  letter-spacing: var(--table-header-letter-spacing);
+  text-transform: uppercase;
+  border: 1px solid #b8bfc7;
+  padding: 0.55rem 0.5rem;
   vertical-align: middle;
 }
 
