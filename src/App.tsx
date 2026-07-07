@@ -1422,6 +1422,9 @@ export default function App() {
   const cashReportDirtyRef = useRef(false);
   /** Remote/workspace sinxronizasiyasından sonra köhnə kassa draft-larını sıfırlamaq */
   const cashExternalSyncRef = useRef(false);
+  /** İlk workspace bootstrap bitənə qədər snapshot tətbiq etmə */
+  const workspaceSyncReadyRef = useRef(!firebaseEnabled);
+  const [cashReportHydrated, setCashReportHydrated] = useState(!firebaseEnabled);
   /** remoteReadyRef dəyişəndə debounced yazını yenidən işə salmaq üçün */
   const [remoteSyncEpoch, setRemoteSyncEpoch] = useState(0);
   const sessionModuleAppliedRef = useRef(false);
@@ -1573,6 +1576,8 @@ export default function App() {
         lastWrittenJsonRef.current = "";
         pendingLocalWriteRef.current = false;
         cashReportDirtyRef.current = false;
+        workspaceSyncReadyRef.current = !firebaseEnabled;
+        setCashReportHydrated(!firebaseEnabled);
         if (remoteWriteTimerRef.current != null) {
           window.clearTimeout(remoteWriteTimerRef.current);
           remoteWriteTimerRef.current = null;
@@ -1699,6 +1704,8 @@ export default function App() {
     if (authState.status !== "signedIn") return;
     const uid = authState.user.uid;
     let cancelled = false;
+    workspaceSyncReadyRef.current = false;
+    setCashReportHydrated(false);
 
     (async () => {
       try {
@@ -1736,6 +1743,7 @@ export default function App() {
           if (!pendingLocalWriteRef.current) {
             lastSyncedJsonRef.current = workspaceFingerprint(resolved);
             cashExternalSyncRef.current = true;
+            setCashSlotEdits({});
             setWorkspace(resolved);
           } else {
             const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, resolved.cashReport, {
@@ -1743,13 +1751,20 @@ export default function App() {
             });
             if (mergedCash) {
               const withLocalCash = { ...workspaceRef.current, cashReport: mergedCash };
+              cashExternalSyncRef.current = true;
+              setCashSlotEdits({});
               setWorkspace(withLocalCash);
             }
           }
+          workspaceSyncReadyRef.current = true;
+          setCashReportHydrated(true);
           setRemoteSyncEpoch((e) => e + 1);
         }
       } catch {
-        /* ignore — onSnapshot da işə düşəcək */
+        if (!cancelled) {
+          workspaceSyncReadyRef.current = true;
+          setCashReportHydrated(true);
+        }
       }
     })();
 
@@ -1762,6 +1777,10 @@ export default function App() {
       remoteUpdatedAt?: number | null;
     }) => {
       if (!exists || !remoteWs) {
+        return;
+      }
+      if (!workspaceSyncReadyRef.current) {
+        remoteReadyRef.current = true;
         return;
       }
       const normalizedBase = normalizeWorkspace(remoteWs);
@@ -1780,6 +1799,7 @@ export default function App() {
         pendingLocalWriteRef.current = false;
         cashReportDirtyRef.current = false;
         cashExternalSyncRef.current = true;
+        setCashSlotEdits({});
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
         return;
@@ -1793,6 +1813,7 @@ export default function App() {
       remoteReadyRef.current = true;
       setRemoteSyncEpoch((e) => e + 1);
       cashExternalSyncRef.current = true;
+      setCashSlotEdits({});
       setWorkspace(normalized);
     };
 
@@ -5754,6 +5775,16 @@ export default function App() {
   );
 
   const renderCashReportModule = () => {
+    if (firebaseEnabled && authState.status === "signedIn" && !cashReportHydrated) {
+      return (
+        <div className="dg-cash-report pg-panel dg-cash-report--loading" aria-label="Kassa hesabatı yüklənir">
+          <p className="dg-muted" role="status">
+            Kassa hesabatı yüklənir…
+          </p>
+        </div>
+      );
+    }
+
     const cashColGroup = (
       <colgroup>
         <col className="dg-cash-col-idx" />

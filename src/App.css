@@ -2686,6 +2686,12 @@ textarea.dg-input {
   flex: 1;
 }
 
+.dg-cash-report--loading {
+  align-items: center;
+  justify-content: center;
+  min-height: 12rem;
+}
+
 .dg-cash-history-badge {
   display: inline-flex;
   align-items: center;
