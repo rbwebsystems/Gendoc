@@ -229,6 +229,7 @@ export type PermissionModuleId =
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"
+  | "bakfonGuide"
   | "cashReport"
   | "workLeave";
 

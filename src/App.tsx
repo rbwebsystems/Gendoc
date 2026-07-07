@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "./App.css";
 import "./rbsoft-theme.css";
+import { BakfonGuideModule } from "./components/BakfonGuideModule";
 import {
   buildDeliveryActHtml,
   buildDeliveryActNoPriceHtml,
@@ -250,6 +251,7 @@ type SidebarModule =
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"
+  | "bakfonGuide"
   | "cashReport"
   | "appUsers"
   | "systemPermissions"
@@ -611,6 +613,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
+  { id: "bakfonGuide", label: "Bakfon Təlimat" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -629,6 +632,7 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "storeOrders",
   "customerOrders",
   "priceCalculations",
+  "bakfonGuide",
 ];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
@@ -640,6 +644,7 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
   priceCalculations: "Qiymət hesablanması — tezliklə",
+  bakfonGuide: "Qiymət, kredit və post faizləri üzrə təlimat",
   cashReport: "Nağd və kart hesablarının gündəlik balansı",
   appUsers: "Giriş hesablarının idarə edilməsi",
   systemPermissions: "Modul giriş icazələri",
@@ -903,6 +908,18 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
             strokeLinejoin="round"
             d="M9 7h6m-6 4h6m-6 4h3M7 3h10a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z"
           />
+        </svg>
+      );
+    case "bakfonGuide":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 6h16M4 10h16M4 14h10M4 18h10"
+          />
+          <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth="2" />
         </svg>
       );
     case "cashReport":
@@ -2213,6 +2230,9 @@ export default function App() {
     }
     if (module === "priceCalculations") {
       return { title: "Qiymət hesablanması", sub: MODULE_TAGLINE.priceCalculations };
+    }
+    if (module === "bakfonGuide") {
+      return { title: "Bakfon Təlimat", sub: MODULE_TAGLINE.bakfonGuide };
     }
     if (module === "cashReport") {
       return { title: "Kassa hesabatı", sub: MODULE_TAGLINE.cashReport };
@@ -7904,6 +7924,7 @@ export default function App() {
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
               {module === "priceCalculations" ? renderPriceCalculationsModule() : null}
+              {module === "bakfonGuide" ? <BakfonGuideModule /> : null}
               {module === "cashReport" ? renderCashReportModule() : null}
               {module === "appUsers" ? renderAppUsersModule() : null}
               {module === "systemPermissions" ? renderSystemPermissionsModule() : null}

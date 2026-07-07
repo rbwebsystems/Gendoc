@@ -118,6 +118,7 @@ const VALID_PERMISSION_MODULES = new Set<PermissionModuleId>([
   "storeOrders",
   "customerOrders",
   "priceCalculations",
+  "bakfonGuide",
   "cashReport",
   "workLeave",
 ]);
