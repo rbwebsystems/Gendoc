@@ -38,6 +38,36 @@ function str(raw: unknown, fallback = ""): string {
   return typeof raw === "string" ? raw : fallback;
 }
 
+export const POS_TERMINAL_ORDER = ["ABB Terminal", "Kapital Terminal"] as const;
+
+export type PosTerminalName = (typeof POS_TERMINAL_ORDER)[number];
+
+export function normalizePosTerminal(terminal: string): string {
+  const value = terminal.trim().toLowerCase();
+  if (value === "abb" || value === "abb terminal") return "ABB Terminal";
+  if (value === "kapital" || value === "kapİtal" || value === "kapital terminal") return "Kapital Terminal";
+  return terminal.trim() || "ABB Terminal";
+}
+
+function migratePosPaymentType(terminal: string, operationType: string): string {
+  const op = operationType.trim();
+  if (!op) return op;
+  const isAbb = normalizePosTerminal(terminal) === "ABB Terminal";
+  const mapAbb: Record<string, string> = {
+    ABB: "ABB kartı ilə ödəniş",
+    "D.b.k": "Digər yerli bank kartı ilə ödəniş",
+    "X.b.k": "Xarici ölkə kartı ilə ödəniş",
+  };
+  const mapKapital: Record<string, string> = {
+    Kapital: "Kapital kartı ilə ödəniş",
+    "D.b.k": "Digər yerli bank kartı ilə ödəniş",
+    "X.b.k": "Xarici ölkə kartı ilə ödəniş",
+  };
+  if (isAbb && mapAbb[op]) return mapAbb[op];
+  if (!isAbb && mapKapital[op]) return mapKapital[op];
+  return op;
+}
+
 export function newInstructionCashSaleRow(partial?: Partial<InstructionCashSaleRow>): InstructionCashSaleRow {
   const now = nowRow();
   return {
@@ -174,40 +204,49 @@ export function defaultInstructionsState(): InstructionsState {
     ],
     posFees: [
       newInstructionPosFeeRow({
-        terminal: "ABB",
-        operationType: "ABB",
+        terminal: "ABB Terminal",
+        operationType: "ABB kartı ilə ödəniş",
         commissionRate: "1%",
-        note: "ABB Kartı ilə ABB terminalında; KEŞBEK 5%",
       }),
       newInstructionPosFeeRow({
-        terminal: "ABB",
-        operationType: "D.b.k",
+        terminal: "ABB Terminal",
+        operationType: "Digər yerli bank kartı ilə ödəniş",
         commissionRate: "1.5%",
-        note: "ABB Kartı ilə ABB terminalında",
       }),
       newInstructionPosFeeRow({
-        terminal: "ABB",
-        operationType: "X.b.k",
+        terminal: "ABB Terminal",
+        operationType: "Xarici ölkə kartı ilə ödəniş",
         commissionRate: "2.5%",
-        note: "KEŞBEK 5%",
       }),
       newInstructionPosFeeRow({
-        terminal: "KAPİTAL",
-        operationType: "Kapital",
-        commissionRate: "1,5%",
-        note: "Kapital kartı və M10 birmarket varsa keçərlidir; KEŞBEK 5%",
+        terminal: "ABB Terminal",
+        operationType: "ABB kart + Keşbek istifadə olunarsa",
+        commissionRate: "5%",
       }),
       newInstructionPosFeeRow({
-        terminal: "KAPİTAL",
-        operationType: "D.b.k",
+        terminal: "Kapital Terminal",
+        operationType: "Kapital kartı ilə ödəniş",
+        commissionRate: "1.5%",
+      }),
+      newInstructionPosFeeRow({
+        terminal: "Kapital Terminal",
+        operationType: "Digər yerli bank kartı ilə ödəniş",
         commissionRate: "2%",
-        note: "KEŞBEK 5%",
       }),
       newInstructionPosFeeRow({
-        terminal: "KAPİTAL",
-        operationType: "X.b.k",
+        terminal: "Kapital Terminal",
+        operationType: "Xarici ölkə kartı ilə ödəniş",
         commissionRate: "3%",
-        note: "UMİCO 2%",
+      }),
+      newInstructionPosFeeRow({
+        terminal: "Kapital Terminal",
+        operationType: "Kapital kart + Keşbek istifadə olunarsa",
+        commissionRate: "5%",
+      }),
+      newInstructionPosFeeRow({
+        terminal: "Kapital Terminal",
+        operationType: "Umico istifadə olunarsa",
+        commissionRate: "əlavə 2%",
       }),
     ],
   };
@@ -252,14 +291,18 @@ export function normalizeInstructionsState(raw: unknown | undefined): Instructio
     .filter((row): row is InstructionCorporateSaleRow => row != null);
 
   const posFees = (Array.isArray(w.posFees) ? w.posFees : [])
-    .map((row) =>
-      baseRow<InstructionPosFeeRow>(row, {
-        terminal: str((row as { terminal?: unknown }).terminal),
-        operationType: str((row as { operationType?: unknown }).operationType),
+    .map((row) => {
+      const terminalRaw = str((row as { terminal?: unknown }).terminal);
+      const operationRaw = str((row as { operationType?: unknown }).operationType);
+      const terminal = normalizePosTerminal(terminalRaw);
+      const operationType = migratePosPaymentType(terminal, operationRaw);
+      return baseRow<InstructionPosFeeRow>(row, {
+        terminal,
+        operationType,
         commissionRate: str((row as { commissionRate?: unknown }).commissionRate),
         note: str((row as { note?: unknown }).note),
-      }),
-    )
+      });
+    })
     .filter((row): row is InstructionPosFeeRow => row != null);
 
   return { cashSales, creditSales, corporateSales, posFees };

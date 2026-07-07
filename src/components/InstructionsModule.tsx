@@ -12,6 +12,8 @@ import {
   newInstructionCorporateSaleRow,
   newInstructionCreditSaleRow,
   newInstructionPosFeeRow,
+  normalizePosTerminal,
+  POS_TERMINAL_ORDER,
 } from "../lib/instructions";
 
 type InstructionTab = "cash" | "credit" | "corporate" | "pos";
@@ -21,7 +23,7 @@ const TABS: { id: InstructionTab; label: string }[] = [
   { id: "cash", label: "Nəğd satış" },
   { id: "credit", label: "Kredit satış" },
   { id: "corporate", label: "Korporativ satış" },
-  { id: "pos", label: "POS faizləri" },
+  { id: "pos", label: "POS / Kart komissiyaları" },
 ];
 
 const STATUS_OPTIONS: { value: InstructionRowStatus; label: string }[] = [
@@ -157,6 +159,36 @@ export function InstructionsModule({ state, onChange }: Props) {
     [state.posFees, search, statusFilter],
   );
 
+  const posSections = useMemo(() => {
+    const grouped = new Map<string, InstructionPosFeeRow[]>();
+    for (const terminal of POS_TERMINAL_ORDER) grouped.set(terminal, []);
+    const extras: { terminal: string; rows: InstructionPosFeeRow[] }[] = [];
+
+    for (const row of posRows) {
+      const terminal = normalizePosTerminal(row.terminal);
+      if (grouped.has(terminal)) {
+        grouped.get(terminal)!.push(row);
+      } else if (extras.some((section) => section.terminal === terminal)) {
+        extras.find((section) => section.terminal === terminal)!.rows.push(row);
+      } else {
+        extras.push({ terminal, rows: [row] });
+      }
+    }
+
+    const ordered = POS_TERMINAL_ORDER.map((terminal) => ({
+      terminal,
+      rows: grouped.get(terminal) ?? [],
+    }));
+    return [...ordered, ...extras];
+  }, [posRows]);
+
+  const addPosRow = (terminal: string) => {
+    onChange({
+      ...state,
+      posFees: [...state.posFees, newInstructionPosFeeRow({ terminal: normalizePosTerminal(terminal) })],
+    });
+  };
+
   const addRow = () => {
     if (tab === "cash") {
       onChange({ ...state, cashSales: [...state.cashSales, newInstructionCashSaleRow()] });
@@ -168,9 +200,7 @@ export function InstructionsModule({ state, onChange }: Props) {
     }
     if (tab === "corporate") {
       onChange({ ...state, corporateSales: [...state.corporateSales, newInstructionCorporateSaleRow()] });
-      return;
     }
-    onChange({ ...state, posFees: [...state.posFees, newInstructionPosFeeRow()] });
   };
 
   const renderToolbar = () => (
@@ -212,9 +242,11 @@ export function InstructionsModule({ state, onChange }: Props) {
             </option>
           ))}
         </select>
-        <button type="button" className="dg-btn dg-btn-primary" onClick={addRow}>
-          Yeni sətir
-        </button>
+        {tab !== "pos" ? (
+          <button type="button" className="dg-btn dg-btn-primary" onClick={addRow}>
+            Yeni sətir
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -420,65 +452,73 @@ export function InstructionsModule({ state, onChange }: Props) {
 
       {tab === "pos" ? (
         posRows.length === 0 ? (
-          renderEmpty("POS faizi sətri tapılmadı")
+          renderEmpty("POS komissiya sətri tapılmadı")
         ) : (
-          <div className="dg-instructions-table-wrap dg-table-wrap pg-grid-host">
-            <table className="dg-table dg-table--sales dg-table--instructions">
-              <thead>
-                <tr>
-                  <th className="dg-th-num">№</th>
-                  <th>Terminal</th>
-                  <th>Əməliyyat növü</th>
-                  <th>Komissiya faizi</th>
-                  <th>Qeyd</th>
-                  <th>Status</th>
-                  <th className="dg-th-actions">Əməliyyat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {posRows.map((row, index) => (
-                  <tr key={row.id} className={row.status === "inactive" ? "is-inactive" : ""}>
-                    <td className="dg-td-num">{index + 1}</td>
-                    <td>
-                      <input
-                        className="dg-input dg-input--table"
-                        value={row.terminal}
-                        onChange={(e) => patchPos(row.id, { terminal: e.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="dg-input dg-input--table"
-                        value={row.operationType}
-                        onChange={(e) => patchPos(row.id, { operationType: e.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="dg-input dg-input--table"
-                        value={row.commissionRate}
-                        onChange={(e) => patchPos(row.id, { commissionRate: e.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="dg-input dg-input--table"
-                        value={row.note}
-                        onChange={(e) => patchPos(row.id, { note: e.target.value })}
-                      />
-                    </td>
-                    <td>
-                      <StatusSelect value={row.status} onChange={(status) => patchPos(row.id, { status })} />
-                    </td>
-                    <td className="dg-td-actions">
-                      <DeleteButton
-                        onClick={() => onChange({ ...state, posFees: state.posFees.filter((r) => r.id !== row.id) })}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="dg-instructions-pos-wrap">
+            <h2 className="dg-instructions-pos-title">POS / KART KOMİSSİYALARI</h2>
+            {posSections.map((section) =>
+              section.rows.length === 0 ? null : (
+                <section key={section.terminal} className="dg-instructions-pos-section" aria-label={section.terminal}>
+                  <div className="dg-instructions-pos-section-head">
+                    <h3 className="dg-instructions-pos-section-title">{section.terminal}</h3>
+                    <button
+                      type="button"
+                      className="dg-btn dg-btn-secondary dg-btn--compact"
+                      onClick={() => addPosRow(section.terminal)}
+                    >
+                      Yeni sətir
+                    </button>
+                  </div>
+                  <div className="dg-instructions-table-wrap dg-table-wrap pg-grid-host">
+                    <table className="dg-table dg-table--sales dg-table--instructions dg-table--instructions-pos">
+                      <thead>
+                        <tr>
+                          <th className="dg-th-num">№</th>
+                          <th>Ödəniş növü</th>
+                          <th>Tutulan komissiya</th>
+                          <th>Status</th>
+                          <th className="dg-th-actions">Əməliyyat</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {section.rows.map((row, index) => (
+                          <tr key={row.id} className={row.status === "inactive" ? "is-inactive" : ""}>
+                            <td className="dg-td-num">{index + 1}</td>
+                            <td>
+                              <input
+                                className="dg-input dg-input--table"
+                                value={row.operationType}
+                                onChange={(e) => patchPos(row.id, { operationType: e.target.value })}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="dg-input dg-input--table"
+                                value={row.commissionRate}
+                                onChange={(e) => patchPos(row.id, { commissionRate: e.target.value })}
+                              />
+                            </td>
+                            <td>
+                              <StatusSelect
+                                value={row.status}
+                                onChange={(status) => patchPos(row.id, { status })}
+                              />
+                            </td>
+                            <td className="dg-td-actions">
+                              <DeleteButton
+                                onClick={() =>
+                                  onChange({ ...state, posFees: state.posFees.filter((r) => r.id !== row.id) })
+                                }
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ),
+            )}
           </div>
         )
       ) : null}
