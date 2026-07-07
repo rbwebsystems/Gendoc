@@ -23,6 +23,7 @@ import type {
   SavedProjectV2,
 } from "../types";
 import { normalizeCashReportState } from "./cashReport";
+import { normalizeInstructionsState } from "./instructions";
 import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT, defaultModulesForRole } from "./defaults";
 
 const WS_KEY_V3 = "docgen_workspace_v3";
@@ -118,7 +119,7 @@ const VALID_PERMISSION_MODULES = new Set<PermissionModuleId>([
   "storeOrders",
   "customerOrders",
   "priceCalculations",
-  "bakfonGuide",
+  "instructions",
   "cashReport",
   "workLeave",
 ]);
@@ -131,9 +132,11 @@ function normalizeAppUserRole(raw: unknown): AppUserRole {
 function normalizePermissionModules(raw: unknown, role: AppUserRole): PermissionModuleId[] {
   if (!Array.isArray(raw)) return defaultModulesForRole(role);
   const mods = raw
+    .map((m) => (m === "bakfonGuide" ? "instructions" : m))
     .filter((m) => typeof m === "string" && VALID_PERMISSION_MODULES.has(m as PermissionModuleId))
     .map((m) => m as PermissionModuleId);
-  return mods.length > 0 ? mods : defaultModulesForRole(role);
+  const unique = [...new Set(mods)];
+  return unique.length > 0 ? unique : defaultModulesForRole(role);
 }
 
 function normalizeSystemUsers(raw: unknown): SystemUserRecord[] {
@@ -503,6 +506,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
   const storeOrders = normalizeStoreOrders(w.storeOrders);
   const customerOrders = normalizeCustomerOrders(w.customerOrders);
   const cashReport = w.cashReport != null ? normalizeCashReportState(w.cashReport) : undefined;
+  const instructions = normalizeInstructionsState(w.instructions);
   const systemUsers = normalizeSystemUsers(w.systemUsers);
   const usersById = new Map(systemUsers.map((u) => [u.id, u]));
   const leaveRequests = normalizeLeaveRequests(w.leaveRequests, usersById);
@@ -535,6 +539,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     storeOrders,
     customerOrders,
     ...(cashReport ? { cashReport } : {}),
+    instructions,
     systemUsers,
     leaveRequests,
   };

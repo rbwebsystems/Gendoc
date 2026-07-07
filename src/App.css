@@ -2551,123 +2551,86 @@ textarea.dg-input {
   color: var(--win-text);
 }
 
-/* ——— Bakfon Təlimat ——— */
-.dg-bakfon-guide {
+/* ——— Təlimat modulu ——— */
+.dg-instructions {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  gap: 0.75rem;
 }
 
-.dg-bakfon-guide-scroll {
+.dg-instructions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.25rem;
+}
+
+.dg-instructions-toolbar-left,
+.dg-instructions-toolbar-right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dg-instructions-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.dg-instructions-tab {
+  border: 1px solid #c8cdd3;
+  background: #fff;
+  color: var(--win-text);
+  border-radius: 0.375rem;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dg-instructions-tab.is-active {
+  background: var(--accent, #2563eb);
+  border-color: var(--accent, #2563eb);
+  color: #fff;
+}
+
+.dg-instructions-search {
+  min-width: 12rem;
+}
+
+.dg-instructions-filter {
+  min-width: 7.5rem;
+}
+
+.dg-instructions-table-wrap {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  border: 1px solid #000;
-  border-radius: 0.375rem;
-  background: #fff;
 }
 
-.dg-table.dg-table--bakfon-guide {
+.dg-table.dg-table--instructions tbody tr.is-inactive td {
+  opacity: 0.62;
+}
+
+.dg-input.dg-input--table {
   width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 0.8125rem;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+  padding: 0.35rem 0.45rem;
 }
 
-.dg-table.dg-table--bakfon-guide th,
-.dg-table.dg-table--bakfon-guide td {
-  border: 1px solid #000;
-  vertical-align: top;
-}
-
-.dg-bakfon-guide-title {
-  background: #ff0000;
-  color: #fff;
-  font-weight: 700;
-  font-size: 1rem;
-  text-align: center;
-  padding: 0.5rem 0.75rem;
-}
-
-.dg-bakfon-guide-col-head {
-  background: #cfe2f3;
-  color: #000;
-  font-weight: 700;
-  text-align: center;
-  padding: 0.45rem 0.5rem;
-}
-
-.dg-bakfon-guide-retail,
-.dg-bakfon-guide-credit,
-.dg-bakfon-guide-post {
-  padding: 0.5rem 0.65rem;
-  line-height: 1.45;
-}
-
-.dg-bakfon-guide-retail {
-  width: 42%;
-}
-
-.dg-bakfon-guide-credit {
-  width: 18%;
-  text-align: center;
-}
-
-.dg-bakfon-guide-post {
-  width: 40%;
-}
-
-.dg-bakfon-guide-retail-title {
-  font-weight: 700;
-  margin-bottom: 0.35rem;
-}
-
-.dg-bakfon-guide-list {
-  margin: 0;
-  padding-left: 1.1rem;
-}
-
-.dg-bakfon-guide-list li {
-  margin-bottom: 0.15rem;
-}
-
-.dg-bakfon-guide-credit-term {
-  font-weight: 600;
-  margin-bottom: 0.35rem;
-}
-
-.dg-bakfon-guide-credit-rate {
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-.dg-bakfon-guide-bank {
-  font-weight: 700;
-  margin-bottom: 0.35rem;
-}
-
-.dg-bakfon-guide-rate {
-  color: #c00000;
-  margin-bottom: 0.15rem;
-}
-
-.dg-bakfon-guide-cashback {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.35rem;
-  font-weight: 600;
-}
-
-.dg-bakfon-guide-note {
-  margin-top: 0.5rem;
-  font-style: italic;
-  color: #333;
-}
-
-.dg-bakfon-guide-empty {
-  color: var(--win-text-muted);
+.dg-table.dg-table--instructions tbody tr:hover td .dg-input.dg-input--table,
+.dg-input.dg-input--table:focus {
+  border-color: #c8cdd3;
+  background: #fff;
 }
 
 /* ——— Kassa hesabatı ——— */

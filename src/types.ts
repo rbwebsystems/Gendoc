@@ -229,9 +229,60 @@ export type PermissionModuleId =
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"
-  | "bakfonGuide"
+  | "instructions"
   | "cashReport"
   | "workLeave";
+
+export type InstructionRowStatus = "active" | "inactive";
+
+export interface InstructionCashSaleRow {
+  id: string;
+  category: string;
+  condition: string;
+  priceRule: string;
+  rate: string;
+  status: InstructionRowStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InstructionCreditSaleRow {
+  id: string;
+  productGroup: string;
+  term: string;
+  creditRate: string;
+  status: InstructionRowStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InstructionCorporateSaleRow {
+  id: string;
+  customerType: string;
+  priceRule: string;
+  rate: string;
+  status: InstructionRowStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InstructionPosFeeRow {
+  id: string;
+  terminal: string;
+  operationType: string;
+  commissionRate: string;
+  note: string;
+  status: InstructionRowStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InstructionsState {
+  cashSales: InstructionCashSaleRow[];
+  creditSales: InstructionCreditSaleRow[];
+  corporateSales: InstructionCorporateSaleRow[];
+  posFees: InstructionPosFeeRow[];
+}
 
 /** Kassa hesabatı — hesab sətri */
 export interface CashReportRow {
@@ -322,6 +373,7 @@ export interface DocWorkspace {
   storeOrders?: StoreOrderRecord[];
   customerOrders?: CustomerOrderRecord[];
   cashReport?: CashReportState;
+  instructions?: InstructionsState;
   systemUsers?: SystemUserRecord[];
   leaveRequests?: LeaveRequestRecord[];
 }

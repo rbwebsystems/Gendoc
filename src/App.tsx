@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "./App.css";
 import "./rbsoft-theme.css";
-import { BakfonGuideModule } from "./components/BakfonGuideModule";
+import { InstructionsModule } from "./components/InstructionsModule";
 import {
   buildDeliveryActHtml,
   buildDeliveryActNoPriceHtml,
@@ -251,7 +251,7 @@ type SidebarModule =
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"
-  | "bakfonGuide"
+  | "instructions"
   | "cashReport"
   | "appUsers"
   | "systemPermissions"
@@ -613,7 +613,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
-  { id: "bakfonGuide", label: "Bakfon Təlimat" },
+  { id: "instructions", label: "Təlimat" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -632,7 +632,7 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "storeOrders",
   "customerOrders",
   "priceCalculations",
-  "bakfonGuide",
+  "instructions",
 ];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
@@ -644,7 +644,7 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
   priceCalculations: "Qiymət hesablanması — tezliklə",
-  bakfonGuide: "Qiymət, kredit və post faizləri üzrə təlimat",
+  instructions: "Qiymət və faiz qaydalarının idarə edilməsi",
   cashReport: "Nağd və kart hesablarının gündəlik balansı",
   appUsers: "Giriş hesablarının idarə edilməsi",
   systemPermissions: "Modul giriş icazələri",
@@ -910,16 +910,15 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
           />
         </svg>
       );
-    case "bakfonGuide":
+    case "instructions":
       return (
         <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
           <path
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M4 6h16M4 10h16M4 14h10M4 18h10"
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
           />
-          <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth="2" />
         </svg>
       );
     case "cashReport":
@@ -2231,8 +2230,8 @@ export default function App() {
     if (module === "priceCalculations") {
       return { title: "Qiymət hesablanması", sub: MODULE_TAGLINE.priceCalculations };
     }
-    if (module === "bakfonGuide") {
-      return { title: "Bakfon Təlimat", sub: MODULE_TAGLINE.bakfonGuide };
+    if (module === "instructions") {
+      return { title: "Təlimat", sub: MODULE_TAGLINE.instructions };
     }
     if (module === "cashReport") {
       return { title: "Kassa hesabatı", sub: MODULE_TAGLINE.cashReport };
@@ -7924,7 +7923,12 @@ export default function App() {
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
               {module === "priceCalculations" ? renderPriceCalculationsModule() : null}
-              {module === "bakfonGuide" ? <BakfonGuideModule /> : null}
+              {module === "instructions" ? (
+                <InstructionsModule
+                  state={workspace.instructions!}
+                  onChange={(instructions) => setWorkspace((w) => ({ ...w, instructions }))}
+                />
+              ) : null}
               {module === "cashReport" ? renderCashReportModule() : null}
               {module === "appUsers" ? renderAppUsersModule() : null}
               {module === "systemPermissions" ? renderSystemPermissionsModule() : null}
