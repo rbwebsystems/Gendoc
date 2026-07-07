@@ -22,7 +22,7 @@ import type {
   SavedCompanyRecord,
   SavedProjectV2,
 } from "../types";
-import { normalizeCashReportState } from "./cashReport";
+import { mergeCashReportOnSync, normalizeCashReportState } from "./cashReport";
 import { normalizeInstructionsState } from "./instructions";
 import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT, defaultModulesForRole } from "./defaults";
 
@@ -756,6 +756,8 @@ function workspaceLatestTouch(w: DocWorkspace): number {
   for (const s of ws.suppliers ?? []) bump(s.updatedAt);
   for (const o of ws.supplierOffers ?? []) bump(o.updatedAt);
   for (const f of ws.folders ?? []) bump(f.updatedAt);
+  for (const row of ws.cashReport?.rows ?? []) bump(row.updatedAt);
+  for (const entry of ws.cashReport?.history ?? []) bump(entry.savedAt);
   return t;
 }
 
@@ -768,17 +770,23 @@ export function pickPreferredWorkspace(
   const r = remote ? normalizeWorkspace(remote) : null;
   const lHas = l ? workspaceHasUserData(l) : false;
   const rHas = r ? workspaceHasUserData(r) : false;
-  if (lHas && !rHas) return l!;
-  if (rHas && !lHas) return r!;
-  if (lHas && rHas) return workspaceLatestTouch(l!) >= workspaceLatestTouch(r!) ? l! : r!;
-  if (l) return l;
-  if (r) return r;
-  return normalizeWorkspace({
-    version: 3,
-    settings: { seller: emptyCompany() },
-    companies: [],
-    projects: [],
-  });
+  let base: DocWorkspace;
+  if (lHas && !rHas) base = l!;
+  else if (rHas && !lHas) base = r!;
+  else if (lHas && rHas) base = workspaceLatestTouch(l!) >= workspaceLatestTouch(r!) ? l! : r!;
+  else if (l) base = l;
+  else if (r) base = r;
+  else {
+    base = normalizeWorkspace({
+      version: 3,
+      settings: { seller: emptyCompany() },
+      companies: [],
+      projects: [],
+    });
+  }
+
+  const mergedCash = mergeCashReportOnSync(l?.cashReport, r?.cashReport);
+  return mergedCash ? { ...base, cashReport: mergedCash } : base;
 }
 
 export function loadLocalWorkspaceBackup(): DocWorkspace | null {

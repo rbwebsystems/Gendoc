@@ -127,6 +127,38 @@ export function clearCashRowDraftKeys(drafts: Record<string, string>, rowId: str
   return next;
 }
 
+/** Remote sinxronizasiyadan sonra köhnə draft-ları təmizləyir */
+export function pruneCashSlotEdits(
+  rows: CashReportRow[],
+  drafts: Record<string, string>,
+): Record<string, string> {
+  if (Object.keys(drafts).length === 0) return drafts;
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  let changed = false;
+  const next = { ...drafts };
+  for (const key of Object.keys(next)) {
+    const sep = key.lastIndexOf(":");
+    if (sep < 0) {
+      delete next[key];
+      changed = true;
+      continue;
+    }
+    const rowId = key.slice(0, sep);
+    const slotIndex = Number(key.slice(sep + 1));
+    const row = rowById.get(rowId);
+    if (!row || !Number.isFinite(slotIndex) || slotIndex < 0 || slotIndex >= CASH_REPORT_SLOT_COUNT) {
+      delete next[key];
+      changed = true;
+      continue;
+    }
+    if (commitCashInput(next[key]) === (row.slots[slotIndex] ?? 0)) {
+      delete next[key];
+      changed = true;
+    }
+  }
+  return changed ? next : drafts;
+}
+
 export function mergeCashReportRowsByUpdatedAt(
   localRows: CashReportRow[],
   remoteRows: CashReportRow[],

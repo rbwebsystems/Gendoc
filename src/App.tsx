@@ -66,6 +66,7 @@ import {
   clearCashRowDraftKeys,
   mergeCashRowSlots,
   newCashReportRow,
+  pruneCashSlotEdits,
   rowPendingSum,
   totalCashBalanceWithDrafts,
   defaultCashReportRows,
@@ -1419,6 +1420,8 @@ export default function App() {
   const remoteReadyRef = useRef<boolean>(false);
   /** Kassa dəyişikliyi remote-a yazılmamışdırsa snapshot köhnə məlumatı geri qaytarmasın */
   const cashReportDirtyRef = useRef(false);
+  /** Remote/workspace sinxronizasiyasından sonra köhnə kassa draft-larını sıfırlamaq */
+  const cashExternalSyncRef = useRef(false);
   /** remoteReadyRef dəyişəndə debounced yazını yenidən işə salmaq üçün */
   const [remoteSyncEpoch, setRemoteSyncEpoch] = useState(0);
   const sessionModuleAppliedRef = useRef(false);
@@ -1732,6 +1735,7 @@ export default function App() {
           }
           if (!pendingLocalWriteRef.current) {
             lastSyncedJsonRef.current = workspaceFingerprint(resolved);
+            cashExternalSyncRef.current = true;
             setWorkspace(resolved);
           } else {
             const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, resolved.cashReport, {
@@ -1775,6 +1779,7 @@ export default function App() {
         lastSyncedJsonRef.current = json;
         pendingLocalWriteRef.current = false;
         cashReportDirtyRef.current = false;
+        cashExternalSyncRef.current = true;
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
         return;
@@ -1787,6 +1792,7 @@ export default function App() {
       lastSyncedJsonRef.current = json;
       remoteReadyRef.current = true;
       setRemoteSyncEpoch((e) => e + 1);
+      cashExternalSyncRef.current = true;
       setWorkspace(normalized);
     };
 
@@ -2300,6 +2306,17 @@ export default function App() {
       setCashSlotEdits({});
     }
   }, [module]);
+
+  useEffect(() => {
+    const rows = workspace.cashReport?.rows ?? [];
+    setCashSlotEdits((prev) => {
+      if (cashExternalSyncRef.current) {
+        cashExternalSyncRef.current = false;
+        return Object.keys(prev).length === 0 ? prev : {};
+      }
+      return pruneCashSlotEdits(rows, prev);
+    });
+  }, [workspace.cashReport?.rows, remoteSyncEpoch]);
 
   useEffect(() => {
     if (module !== "cashReport") return;
