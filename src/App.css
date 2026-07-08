@@ -3023,6 +3023,10 @@ textarea.dg-input {
   color: #dc2626;
 }
 
+.dg-cash-changelog-restore {
+  margin-top: 0.45rem;
+}
+
 @media (max-width: 900px) {
   .dg-table.dg-table--cash-report col.dg-cash-col-name {
     width: 7rem;

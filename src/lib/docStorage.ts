@@ -22,7 +22,7 @@ import type {
   SavedCompanyRecord,
   SavedProjectV2,
 } from "../types";
-import { mergeCashReportStates, normalizeCashReportState } from "./cashReport";
+import { resolveCashReportState, normalizeCashReportState } from "./cashReport";
 import { normalizeInstructionsState } from "./instructions";
 import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT, defaultModulesForRole } from "./defaults";
 
@@ -810,7 +810,7 @@ export function pickPreferredWorkspace(
     });
   }
 
-  const mergedCash = mergeCashReportStates(l?.cashReport, r?.cashReport);
+  const mergedCash = resolveCashReportState(l?.cashReport, r?.cashReport);
   return mergedCash ? { ...base, cashReport: mergedCash } : base;
 }
 

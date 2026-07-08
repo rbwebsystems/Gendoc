@@ -60,7 +60,9 @@ import {
   commitCashInput,
   appendCashReportHistory,
   mergeCashReportOnSync,
-  mergeCashReportStates,
+  resolveCashReportState,
+  applyCanonicalCashRestoreIfNeeded,
+  rowsFromCashSnapshot,
   formatCashAmount,
   cashAmountClassForInput,
   cashSlotDisplayValue,
@@ -1722,17 +1724,21 @@ export default function App() {
         const remoteNorm = remote ? normalizeWorkspace(remote) : null;
         const local = pickPreferredWorkspace(localMain, localBackup);
         const base = pickPreferredWorkspace(local, remote);
-        const mergedCash = mergeCashReportStates(
+        const mergedCash = resolveCashReportState(
           remoteNorm?.cashReport,
           liveCache?.cashReport,
           localMain?.cashReport,
           localBackup?.cashReport,
           base.cashReport,
         );
-        const merged = mergedCash ? { ...base, cashReport: mergedCash } : base;
+        const cashRestore = applyCanonicalCashRestoreIfNeeded(mergedCash);
+        const merged = cashRestore.state
+          ? { ...base, cashReport: cashRestore.state }
+          : base;
         const needsUpload =
           !remoteNorm ||
           !workspaceHasUserData(remoteNorm) ||
+          cashRestore.restored ||
           workspaceFingerprint(merged) !== workspaceFingerprint(remoteNorm);
 
         if (needsUpload) {
@@ -1742,6 +1748,7 @@ export default function App() {
 
         backupLocalWorkspace();
         clearLocalWorkspace();
+        if (cashRestore.restored) clearWorkspaceLiveCache();
 
         if (!cancelled) {
           remoteReadyRef.current = true;
@@ -1796,10 +1803,20 @@ export default function App() {
         return;
       }
       const normalizedBase = normalizeWorkspace(remoteWs);
-      const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, normalizedBase.cashReport, {
-        preferLocalRows: cashReportDirtyRef.current || pendingLocalWriteRef.current,
-      });
-      const normalized = mergedCash ? { ...normalizedBase, cashReport: mergedCash } : normalizedBase;
+      let cashReport = normalizedBase.cashReport;
+      let canonicalRestored = false;
+      if (!cashReportDirtyRef.current && !pendingLocalWriteRef.current && !remoteWriteInFlightRef.current) {
+        const resolved = resolveCashReportState(cashReport);
+        const restored = applyCanonicalCashRestoreIfNeeded(resolved);
+        cashReport = restored.state;
+        canonicalRestored = restored.restored;
+      } else {
+        const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, normalizedBase.cashReport, {
+          preferLocalRows: cashReportDirtyRef.current || pendingLocalWriteRef.current,
+        });
+        cashReport = mergedCash ?? cashReport;
+      }
+      const normalized = cashReport ? { ...normalizedBase, cashReport } : normalizedBase;
       const json = workspaceFingerprint(normalized);
       if (json === lastSyncedJsonRef.current) {
         remoteReadyRef.current = true;
@@ -1814,6 +1831,17 @@ export default function App() {
         setCashSlotEdits({});
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
+        return;
+      }
+      if (canonicalRestored) {
+        cashExternalSyncRef.current = true;
+        setCashSlotEdits({});
+        setWorkspace(normalized);
+        pendingLocalWriteRef.current = true;
+        cashReportDirtyRef.current = true;
+        remoteReadyRef.current = true;
+        setRemoteSyncEpoch((e) => e + 1);
+        window.setTimeout(() => void flushRemoteWrite(), 0);
         return;
       }
       if (pendingLocalWriteRef.current || remoteWriteInFlightRef.current || cashReportDirtyRef.current) {
@@ -2602,6 +2630,29 @@ export default function App() {
       });
     },
     [],
+  );
+
+  const restoreCashHistoryEntry = useCallback(
+    async (entry: CashReportSnapshot) => {
+      const ok = await askConfirm({
+        title: "Kassa bərpası",
+        message: `${new Date(entry.savedAt).toLocaleString("az-AZ")} tarixli vəziyyət bərpa olunacaq (balans: ${formatCashAmount(entry.balance)}). Davam edilsin?`,
+        confirmLabel: "Bərpa et",
+        cancelLabel: "Ləğv et",
+      });
+      if (!ok) return;
+      const rows = rowsFromCashSnapshot(entry);
+      setCashSlotEdits({});
+      patchCashReport(
+        (prev) => ({ ...prev, rows }),
+        `Tarixçədən bərpa: ${formatCashAmount(entry.balance)}`,
+      );
+      flash(setToast, "Kassa vəziyyəti bərpa olundu");
+      if (firebaseEnabled && authState.status === "signedIn") {
+        window.setTimeout(() => void flushRemoteWrite(), 0);
+      }
+    },
+    [askConfirm, patchCashReport, authState.status, flushRemoteWrite],
   );
 
   const askPrompt = useCallback(
@@ -7451,7 +7502,7 @@ export default function App() {
         >
           <div className="dg-modal-body">
             <h2 className="dg-modal-title">Kassa tarixçəsi</h2>
-            <p className="dg-modal-hint">Hər dəyişiklik avtomatik qeyd olunur.</p>
+            <p className="dg-modal-hint">Hər dəyişiklik avtomatik qeyd olunur. Bərpa etdikdə həmin anın cədvəli bütün istifadəçilər üçün yenilənir.</p>
             {cashReportHistory.length === 0 ? (
               <p className="dg-muted">Hələ dəyişiklik qeydi yoxdur.</p>
             ) : (
@@ -7470,6 +7521,13 @@ export default function App() {
                     <div className={`dg-cash-changelog-balance ${cashAmountClass(entry.balance)}`}>
                       {entry.balance === 0 ? "—" : `Balans: ${formatCashAmount(entry.balance)}`}
                     </div>
+                    <button
+                      type="button"
+                      className="dg-btn dg-btn-secondary dg-btn-sm dg-cash-changelog-restore"
+                      onClick={() => void restoreCashHistoryEntry(entry)}
+                    >
+                      Bərpa et
+                    </button>
                   </li>
                 ))}
               </ul>

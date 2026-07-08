@@ -316,6 +316,107 @@ export function defaultCashReportRows(): CashReportRow[] {
 
 export const CASH_REPORT_HISTORY_LIMIT = 100;
 
+/** Son düzgün kassa balansı (tarixçədən bərpa üçün) */
+export const CANONICAL_CASH_REPORT_BALANCE = 86152;
+
+export function mergeCashReportHistories(
+  ...histories: Array<CashReportSnapshot[] | undefined>
+): CashReportSnapshot[] {
+  const historyMap = new Map<string, CashReportSnapshot>();
+  for (const list of histories) {
+    for (const entry of list ?? []) historyMap.set(entry.id, entry);
+  }
+  return [...historyMap.values()]
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
+}
+
+export function findCashHistorySnapshotByBalance(
+  history: CashReportSnapshot[],
+  targetBalance: number,
+): CashReportSnapshot | null {
+  const target = Math.round(targetBalance);
+  const matches = history
+    .filter((entry) => Math.round(entry.balance) === target && (entry.rows?.length ?? 0) > 0)
+    .sort((a, b) => b.savedAt - a.savedAt);
+  return matches[0] ?? null;
+}
+
+/** Tarixçə anlık görüntüsündən cədvəl sətirlərini hazırlayır (pending sıfırlanır) */
+export function rowsFromCashSnapshot(snapshot: CashReportSnapshot): CashReportRow[] {
+  return dedupeCashReportRows(
+    normalizeCashReportRows(snapshot.rows).map((row) => {
+      const base = { ...row, slots: normalizeCashReportSlots(row.slots) };
+      return rowPendingSum(base) > 0 ? mergeCashRowSlots(base) : base;
+    }),
+  );
+}
+
+export function restoreCashReportToBalance(
+  state: CashReportState,
+  targetBalance: number,
+): CashReportState {
+  const snapshot = findCashHistorySnapshotByBalance(state.history ?? [], targetBalance);
+  if (!snapshot) return state;
+  return { ...state, rows: rowsFromCashSnapshot(snapshot) };
+}
+
+function cashReportRowsLatestTouch(rows: CashReportRow[]): number {
+  return rows.reduce((max, row) => Math.max(max, row.updatedAt || 0), 0);
+}
+
+/**
+ * Kassa vəziyyətini həll edir: əvvəlcə tarixçədən kanonik balansı bərpa edir,
+ * yoxdursa ən yeni sətir dəstini götürür (çoxlu mənbəni qarışdırmır).
+ */
+export function resolveCashReportState(
+  ...states: Array<CashReportState | undefined>
+): CashReportState | undefined {
+  const valid = states.filter((s): s is CashReportState =>
+    Boolean(s && ((s.rows?.length ?? 0) > 0 || (s.history?.length ?? 0) > 0)),
+  );
+  if (valid.length === 0) return undefined;
+
+  const history = mergeCashReportHistories(...valid.map((s) => s.history));
+  const canonical = findCashHistorySnapshotByBalance(history, CANONICAL_CASH_REPORT_BALANCE);
+  if (canonical) {
+    return { rows: rowsFromCashSnapshot(canonical), history };
+  }
+
+  let best = valid[0];
+  let bestTouch = cashReportRowsLatestTouch(best.rows ?? []);
+  for (const state of valid.slice(1)) {
+    const touch = cashReportRowsLatestTouch(state.rows ?? []);
+    if (touch > bestTouch) {
+      best = state;
+      bestTouch = touch;
+    }
+  }
+  return {
+    rows: dedupeCashReportRows(best.rows ?? []),
+    history,
+  };
+}
+
+/** Cari balans kanonikdən fərqlidirsə və tarixçədə varsa, avtomatik bərpa et */
+export function applyCanonicalCashRestoreIfNeeded(state: CashReportState | undefined): {
+  state: CashReportState | undefined;
+  restored: boolean;
+} {
+  if (!state) return { state, restored: false };
+  const current = Math.round(totalCashBalance(state.rows ?? []));
+  if (current === CANONICAL_CASH_REPORT_BALANCE) return { state, restored: false };
+
+  const snapshot = findCashHistorySnapshotByBalance(state.history ?? [], CANONICAL_CASH_REPORT_BALANCE);
+  if (!snapshot) return { state, restored: false };
+
+  const rows = rowsFromCashSnapshot(snapshot);
+  if (Math.round(totalCashBalance(rows)) !== CANONICAL_CASH_REPORT_BALANCE) {
+    return { state, restored: false };
+  }
+  return { state: { ...state, rows }, restored: true };
+}
+
 export function createCashHistoryEntry(
   rows: CashReportRow[],
   label: string,
