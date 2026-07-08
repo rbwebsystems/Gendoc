@@ -159,11 +159,78 @@ export function pruneCashSlotEdits(
   return changed ? next : drafts;
 }
 
+function cashRowNameKey(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function cloneCashRowForMerge(row: CashReportRow): CashReportRow {
+  return { ...row, slots: [...row.slots] as CashReportRow["slots"] };
+}
+
 /**
- * Sətir birləşdirməsi sadə "son yazan qalib gəlir" (last-write-wins) qaydası ilə işləyir —
- * hər sətir bütövlükdə ya lokaldan, ya da remote-dan götürülür (sütunları qarışdırmır),
- * beləliklə cəmlənmiş balans və köhnə pending sütunların hibrid vəziyyəti yaranmır.
+ * İki sətir versiyasını mühasibat məntiqinə uyğun birləşdirir.
+ * Cəmlənmiş (pending=0) vəziyyət köhnə pending-li versiyaya üstünlük verir;
+ * eyni balansda artıq cəmlənmiş sətir seçilir — üst-üstə düşmə və balans artımının qarşısı alınır.
  */
+export function reconcileCashRow(a: CashReportRow, b: CashReportRow): CashReportRow {
+  const aPending = rowPendingSum(a);
+  const bPending = rowPendingSum(b);
+  const aPosted = rowPostedBalance(a);
+  const bPosted = rowPostedBalance(b);
+  const aTotal = rowDisplayTotal(a);
+  const bTotal = rowDisplayTotal(b);
+
+  const withMeta = (row: CashReportRow, other: CashReportRow): CashReportRow => ({
+    ...cloneCashRowForMerge(row),
+    updatedAt: Math.max(row.updatedAt, other.updatedAt),
+  });
+
+  // Bir tərəf tam cəmlənib (pending=0), digərində köhnə pending qalıb
+  if (aPending === 0 && bPending > 0) {
+    if (aPosted >= bTotal) return withMeta(a, b);
+    if (aTotal === bTotal) return withMeta(a, b);
+  }
+  if (bPending === 0 && aPending > 0) {
+    if (bPosted >= aTotal) return withMeta(b, a);
+    if (aTotal === bTotal) return withMeta(b, a);
+  }
+
+  // Eyni ümumi balans — pending olmayan (cəmlənmiş) variant üstündür
+  if (aTotal === bTotal) {
+    if (aPending === 0 && bPending > 0) return withMeta(a, b);
+    if (bPending === 0 && aPending > 0) return withMeta(b, a);
+    return withMeta(a.updatedAt >= b.updatedAt ? a : b, a.updatedAt >= b.updatedAt ? b : a);
+  }
+
+  // Balans şişməsi: cəmlənmiş tərəf daha aşağı total göstərsə belə, posted artıq yüksəkdirsə onu saxla
+  if (aTotal > bTotal && aPending > 0 && bPending === 0 && bPosted >= aPosted) {
+    return withMeta(b, a);
+  }
+  if (bTotal > aTotal && bPending > 0 && aPending === 0 && aPosted >= bPosted) {
+    return withMeta(a, b);
+  }
+
+  return withMeta(a.updatedAt >= b.updatedAt ? a : b, a.updatedAt >= b.updatedAt ? b : a);
+}
+
+/** Eyni hesab adı ilə təkrarlanan sətirləri birləşdirir (müxtəlif ID-lərdən yaranan dublikatlar) */
+export function dedupeCashReportRows(rows: CashReportRow[]): CashReportRow[] {
+  const byName = new Map<string, CashReportRow>();
+  const extras: CashReportRow[] = [];
+
+  for (const row of rows) {
+    const key = cashRowNameKey(row.name);
+    if (!key) {
+      extras.push(row);
+      continue;
+    }
+    const existing = byName.get(key);
+    byName.set(key, existing ? reconcileCashRow(existing, row) : cloneCashRowForMerge(row));
+  }
+
+  return [...byName.values(), ...extras];
+}
+
 export function mergeCashReportRowsByUpdatedAt(
   localRows: CashReportRow[],
   remoteRows: CashReportRow[],
@@ -179,14 +246,44 @@ export function mergeCashReportRowsByUpdatedAt(
       continue;
     }
     usedRemoteIds.add(local.id);
-    merged.push(local.updatedAt >= remote.updatedAt ? local : remote);
+    merged.push(reconcileCashRow(local, remote));
   }
 
   for (const remote of remoteRows) {
     if (!usedRemoteIds.has(remote.id)) merged.push(remote);
   }
 
-  return merged;
+  return dedupeCashReportRows(merged);
+}
+
+/** Bir neçə mənbədən (remote, lokal, ehtiyat) kassa sətirlərini birləşdirir */
+export function mergeCashReportRowsFromSources(...sources: CashReportRow[][]): CashReportRow[] {
+  let merged: CashReportRow[] = [];
+  for (const rows of sources) {
+    if (!rows.length) continue;
+    merged = mergeCashReportRowsByUpdatedAt(merged, rows);
+  }
+  return dedupeCashReportRows(merged);
+}
+
+export function mergeCashReportStates(
+  ...states: Array<CashReportState | undefined>
+): CashReportState | undefined {
+  const valid = states.filter((s): s is CashReportState => Boolean(s?.rows?.length || s?.history?.length));
+  if (valid.length === 0) return undefined;
+
+  const rowSources = valid.map((s) => s.rows ?? []);
+  const rows = mergeCashReportRowsFromSources(...rowSources);
+
+  const historyMap = new Map<string, CashReportSnapshot>();
+  for (const state of valid) {
+    for (const entry of state.history ?? []) historyMap.set(entry.id, entry);
+  }
+  const history = [...historyMap.values()]
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
+
+  return { rows, history };
 }
 
 export function emptyCashReportState(): CashReportState {
@@ -348,7 +445,7 @@ export function normalizeCashReportHistory(raw: unknown): CashReportSnapshot[] {
 
 export function normalizeCashReportState(raw: unknown): CashReportState | undefined {
   if (!raw || typeof raw !== "object") return undefined;
-  const rows = normalizeCashReportRows((raw as { rows?: unknown }).rows);
+  const rows = dedupeCashReportRows(normalizeCashReportRows((raw as { rows?: unknown }).rows));
   const history = normalizeCashReportHistory((raw as { history?: unknown }).history);
   return { rows, history };
 }

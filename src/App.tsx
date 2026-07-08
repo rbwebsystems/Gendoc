@@ -60,6 +60,7 @@ import {
   commitCashInput,
   appendCashReportHistory,
   mergeCashReportOnSync,
+  mergeCashReportStates,
   formatCashAmount,
   cashAmountClassForInput,
   cashSlotDisplayValue,
@@ -1718,10 +1719,17 @@ export default function App() {
         const localMain = hasLocalWorkspace() ? loadWorkspaceLocal() : null;
         const localBackup = loadLocalWorkspaceBackup();
         const liveCache = loadWorkspaceLiveCache();
-        const local = pickPreferredWorkspace(pickPreferredWorkspace(localMain, localBackup), liveCache);
-        const merged = pickPreferredWorkspace(local, remote);
-
         const remoteNorm = remote ? normalizeWorkspace(remote) : null;
+        const local = pickPreferredWorkspace(localMain, localBackup);
+        const base = pickPreferredWorkspace(local, remote);
+        const mergedCash = mergeCashReportStates(
+          remoteNorm?.cashReport,
+          liveCache?.cashReport,
+          localMain?.cashReport,
+          localBackup?.cashReport,
+          base.cashReport,
+        );
+        const merged = mergedCash ? { ...base, cashReport: mergedCash } : base;
         const needsUpload =
           !remoteNorm ||
           !workspaceHasUserData(remoteNorm) ||
@@ -1879,6 +1887,16 @@ export default function App() {
     const id = window.setTimeout(() => saveWorkspaceLiveCache(workspace), 200);
     return () => window.clearTimeout(id);
   }, [workspace, authState]);
+
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      if (!firebaseEnabled || authState.status !== "signedIn") return;
+      if (!cashReportDirtyRef.current && !pendingLocalWriteRef.current) return;
+      saveWorkspaceLiveCache(workspaceRef.current);
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [authState.status]);
 
   // Reminder: vaxt çatanda bir dəfə səsli xəbərdarlıq et
   useEffect(() => {
@@ -2495,8 +2513,11 @@ export default function App() {
         },
       );
       flash(setToast, "Cəmləndi");
+      if (firebaseEnabled && authState.status === "signedIn") {
+        window.setTimeout(() => void flushRemoteWrite(), 0);
+      }
     },
-    [cashReportRows, cashSlotEdits, updateCashRow],
+    [cashReportRows, cashSlotEdits, updateCashRow, authState.status, flushRemoteWrite],
   );
 
   const undoCashReportRow = useCallback(
