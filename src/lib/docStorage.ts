@@ -22,12 +22,15 @@ import type {
   SavedCompanyRecord,
   SavedProjectV2,
 } from "../types";
-import { mergeCashReportOnSync, normalizeCashReportState } from "./cashReport";
+import { normalizeCashReportState } from "./cashReport";
 import { normalizeInstructionsState } from "./instructions";
 import { emptyCompany, emptyMeta, OFFICIAL_VAT_PERCENT, defaultModulesForRole } from "./defaults";
 
 const WS_KEY_V3 = "docgen_workspace_v3";
 const WS_KEY_V3_BACKUP = "docgen_workspace_v3_backup";
+/** Remote (Firebase) rejimində belə hər dəyişiklikdə yenilənən ehtiyat nüsxə —
+ * hard refresh zamanı hələ serverə çatmamış son dəyişiklikləri itirməmək üçün. */
+const WS_KEY_V3_LIVE_CACHE = "docgen_workspace_v3_live_cache";
 const WS_KEY_V2 = "docgen_workspace_v2";
 const LEGACY_KEY = "docgen_state_v1";
 
@@ -709,6 +712,27 @@ export function saveWorkspaceLocal(w: DocWorkspace): void {
   localStorage.setItem(WS_KEY_V3, JSON.stringify(w));
 }
 
+/** Remote yazı hələ təsdiqlənməmiş ola bilər — hard refresh üçün ehtiyat nüsxə saxla */
+export function saveWorkspaceLiveCache(w: DocWorkspace): void {
+  try {
+    localStorage.setItem(WS_KEY_V3_LIVE_CACHE, JSON.stringify(w));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function loadWorkspaceLiveCache(): DocWorkspace | null {
+  return readRawLocal(WS_KEY_V3_LIVE_CACHE);
+}
+
+export function clearWorkspaceLiveCache(): void {
+  try {
+    localStorage.removeItem(WS_KEY_V3_LIVE_CACHE);
+  } catch {
+    /* ignore */
+  }
+}
+
 function readRawLocal(key: string): DocWorkspace | null {
   try {
     const raw = localStorage.getItem(key);
@@ -739,6 +763,7 @@ export function workspaceHasUserData(w: DocWorkspace): boolean {
     (ws.customerOrders?.length ?? 0) > 0 ||
     (ws.systemUsers?.length ?? 0) > 0 ||
     (ws.leaveRequests?.length ?? 0) > 0 ||
+    (ws.cashReport?.rows?.length ?? 0) > 0 ||
     hasFolders ||
     hasSeller
   );
@@ -770,23 +795,17 @@ export function pickPreferredWorkspace(
   const r = remote ? normalizeWorkspace(remote) : null;
   const lHas = l ? workspaceHasUserData(l) : false;
   const rHas = r ? workspaceHasUserData(r) : false;
-  let base: DocWorkspace;
-  if (lHas && !rHas) base = l!;
-  else if (rHas && !lHas) base = r!;
-  else if (lHas && rHas) base = workspaceLatestTouch(l!) >= workspaceLatestTouch(r!) ? l! : r!;
-  else if (l) base = l;
-  else if (r) base = r;
-  else {
-    base = normalizeWorkspace({
-      version: 3,
-      settings: { seller: emptyCompany() },
-      companies: [],
-      projects: [],
-    });
-  }
-
-  const mergedCash = mergeCashReportOnSync(l?.cashReport, r?.cashReport);
-  return mergedCash ? { ...base, cashReport: mergedCash } : base;
+  if (lHas && !rHas) return l!;
+  if (rHas && !lHas) return r!;
+  if (lHas && rHas) return workspaceLatestTouch(l!) >= workspaceLatestTouch(r!) ? l! : r!;
+  if (l) return l;
+  if (r) return r;
+  return normalizeWorkspace({
+    version: 3,
+    settings: { seller: emptyCompany() },
+    companies: [],
+    projects: [],
+  });
 }
 
 export function loadLocalWorkspaceBackup(): DocWorkspace | null {

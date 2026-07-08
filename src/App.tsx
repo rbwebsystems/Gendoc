@@ -16,15 +16,18 @@ import {
 import {
   backupLocalWorkspace,
   clearLocalWorkspace,
+  clearWorkspaceLiveCache,
   hasLocalWorkspace,
   hasLocalWorkspaceBackup,
   loadLocalWorkspaceBackup,
+  loadWorkspaceLiveCache,
   loadWorkspaceLocal,
   normalizeCompany,
   normalizeProductRows,
   normalizeWorkspace,
   pickPreferredWorkspace,
   projectsUsingCompany,
+  saveWorkspaceLiveCache,
   saveWorkspaceLocal,
   sortProjectsByDate,
   workspaceHasUserData,
@@ -1714,7 +1717,8 @@ export default function App() {
 
         const localMain = hasLocalWorkspace() ? loadWorkspaceLocal() : null;
         const localBackup = loadLocalWorkspaceBackup();
-        const local = pickPreferredWorkspace(localMain, localBackup);
+        const liveCache = loadWorkspaceLiveCache();
+        const local = pickPreferredWorkspace(pickPreferredWorkspace(localMain, localBackup), liveCache);
         const merged = pickPreferredWorkspace(local, remote);
 
         const remoteNorm = remote ? normalizeWorkspace(remote) : null;
@@ -1842,10 +1846,13 @@ export default function App() {
       if (remoteWriteTimerRef.current != null) {
         window.clearTimeout(remoteWriteTimerRef.current);
       }
+      // Kassa dəyişiklikləri (Cəmlə, sil, geri al) refresh zamanı itməsin deyə tez yazılır;
+      // adi mətn sahələri üçün normal debounce saxlanılır.
+      const writeDelay = cashReportDirtyRef.current ? 120 : 600;
       remoteWriteTimerRef.current = window.setTimeout(() => {
         remoteWriteTimerRef.current = null;
         void flushRemoteWrite();
-      }, 600);
+      }, writeDelay);
 
       return () => {
         if (remoteWriteTimerRef.current != null) {
@@ -1863,6 +1870,15 @@ export default function App() {
     // signedOut / loading — yazma (istifadəçilər arası qarışıqlıq olmasın)
     return;
   }, [workspace, authState, flushRemoteWrite, remoteSyncEpoch]);
+
+  // 3b) Remote rejimdə hər dəyişiklikdə lokal ehtiyat nüsxəni yenilə — hard refresh zamanı
+  // Firestore-a hələ çatmamış son dəyişikliyin itməməsi üçün (yalnız oxuma zamanı istifadə olunur)
+  useEffect(() => {
+    if (!firebaseEnabled || authState.status !== "signedIn") return;
+    if (!workspaceSyncReadyRef.current) return;
+    const id = window.setTimeout(() => saveWorkspaceLiveCache(workspace), 200);
+    return () => window.clearTimeout(id);
+  }, [workspace, authState]);
 
   // Reminder: vaxt çatanda bir dəfə səsli xəbərdarlıq et
   useEffect(() => {
@@ -2341,12 +2357,15 @@ export default function App() {
 
   useEffect(() => {
     if (module !== "cashReport") return;
+    // Remote-lu sessiyada həqiqi məlumat gəlməmiş defolt sətirlər yaratma —
+    // əks halda yeni təsadüfi ID-li sətirlər sonradan gələn real sətirlərlə üst-üstə düşüb ikiləşə bilər.
+    if (firebaseEnabled && authState.status === "signedIn" && !cashReportHydrated) return;
     if ((workspace.cashReport?.rows?.length ?? 0) > 0) return;
     setWorkspace((w) => ({
       ...w,
       cashReport: { rows: defaultCashReportRows(), history: w.cashReport?.history ?? [] },
     }));
-  }, [module, workspace.cashReport?.rows?.length]);
+  }, [module, workspace.cashReport?.rows?.length, authState.status, cashReportHydrated]);
 
   useEffect(() => {
     const rows = workspace.cashReport?.rows;
@@ -6876,6 +6895,7 @@ export default function App() {
       await signOut(auth);
       // Lokal nüsxə qarışmasın deyə təmizləyirik (remote artıq əsas mənbədi)
       clearLocalWorkspace();
+      clearWorkspaceLiveCache();
       // Ekrana boş workspace göstər
       setWorkspace(
         normalizeWorkspace({

@@ -159,45 +159,11 @@ export function pruneCashSlotEdits(
   return changed ? next : drafts;
 }
 
-/** Eyni sətirdə cəmlənmiş balans + köhnə pending sütunların üst-üstə düşməsinin qarşısını alır */
-export function pickBetterCashRow(local: CashReportRow, remote: CashReportRow): CashReportRow {
-  const localPosted = rowPostedBalance(local);
-  const remotePosted = rowPostedBalance(remote);
-  const localPending = rowPendingSum(local);
-  const remotePending = rowPendingSum(remote);
-  const localTotal = rowDisplayTotal(local);
-  const remoteTotal = rowDisplayTotal(remote);
-
-  if (localPending > 0 && remotePending === 0 && localPosted === remotePosted && remotePosted === remoteTotal) {
-    return {
-      ...remote,
-      slots: [...remote.slots] as CashReportRow["slots"],
-      updatedAt: Math.max(local.updatedAt, remote.updatedAt),
-    };
-  }
-
-  if (
-    localTotal === remoteTotal &&
-    localPending > 0 &&
-    remotePending === 0 &&
-    remote.updatedAt >= local.updatedAt - 5_000
-  ) {
-    return {
-      ...remote,
-      slots: [...remote.slots] as CashReportRow["slots"],
-      updatedAt: Math.max(local.updatedAt, remote.updatedAt),
-    };
-  }
-
-  if (localPending > 0 && remotePending === 0 && localPosted >= remoteTotal && localTotal > remoteTotal) {
-    const slots = [...local.slots] as CashReportRow["slots"];
-    for (let i = 1; i < CASH_REPORT_SLOT_COUNT; i += 1) slots[i] = 0;
-    return { ...local, slots, updatedAt: Math.max(local.updatedAt, remote.updatedAt) };
-  }
-
-  return local.updatedAt >= remote.updatedAt ? local : remote;
-}
-
+/**
+ * Sətir birləşdirməsi sadə "son yazan qalib gəlir" (last-write-wins) qaydası ilə işləyir —
+ * hər sətir bütövlükdə ya lokaldan, ya da remote-dan götürülür (sütunları qarışdırmır),
+ * beləliklə cəmlənmiş balans və köhnə pending sütunların hibrid vəziyyəti yaranmır.
+ */
 export function mergeCashReportRowsByUpdatedAt(
   localRows: CashReportRow[],
   remoteRows: CashReportRow[],
@@ -213,7 +179,7 @@ export function mergeCashReportRowsByUpdatedAt(
       continue;
     }
     usedRemoteIds.add(local.id);
-    merged.push(pickBetterCashRow(local, remote));
+    merged.push(local.updatedAt >= remote.updatedAt ? local : remote);
   }
 
   for (const remote of remoteRows) {
