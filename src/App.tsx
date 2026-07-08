@@ -61,7 +61,6 @@ import {
   appendCashReportHistory,
   mergeCashReportOnSync,
   resolveCashReportState,
-  applyCanonicalCashRestoreIfNeeded,
   rowsFromCashSnapshot,
   formatCashAmount,
   cashAmountClassForInput,
@@ -1723,22 +1722,31 @@ export default function App() {
         const liveCache = loadWorkspaceLiveCache();
         const remoteNorm = remote ? normalizeWorkspace(remote) : null;
         const local = pickPreferredWorkspace(localMain, localBackup);
+        // Org workspace: Firestore kassa əsas mənbədir.
+        // liveCache yalnız hard refresh zamanı serverə hələ çatmamış daha təzə dəyişiklik üçün.
         const base = pickPreferredWorkspace(local, remote);
-        const mergedCash = resolveCashReportState(
-          remoteNorm?.cashReport,
-          liveCache?.cashReport,
-          localMain?.cashReport,
-          localBackup?.cashReport,
-          base.cashReport,
-        );
-        const cashRestore = applyCanonicalCashRestoreIfNeeded(mergedCash);
-        const merged = cashRestore.state
-          ? { ...base, cashReport: cashRestore.state }
-          : base;
+        const remoteCash = remoteNorm?.cashReport;
+        const liveCash = liveCache?.cashReport;
+        const remoteTouch =
+          (remoteCash?.rows ?? []).reduce((m, r) => Math.max(m, r.updatedAt || 0), 0);
+        const liveTouch =
+          (liveCash?.rows ?? []).reduce((m, r) => Math.max(m, r.updatedAt || 0), 0);
+        const useLiveOverRemote =
+          (remoteCash?.rows?.length ?? 0) > 0 &&
+          (liveCash?.rows?.length ?? 0) > 0 &&
+          liveTouch > remoteTouch + 2_000;
+
+        let cashReport =
+          (remoteCash?.rows?.length ?? 0) > 0
+            ? useLiveOverRemote
+              ? resolveCashReportState(liveCash, remoteCash)
+              : resolveCashReportState(remoteCash)
+            : resolveCashReportState(liveCash, localMain?.cashReport, localBackup?.cashReport);
+
+        const merged = cashReport ? { ...base, cashReport } : base;
         const needsUpload =
           !remoteNorm ||
           !workspaceHasUserData(remoteNorm) ||
-          cashRestore.restored ||
           workspaceFingerprint(merged) !== workspaceFingerprint(remoteNorm);
 
         if (needsUpload) {
@@ -1748,16 +1756,21 @@ export default function App() {
 
         backupLocalWorkspace();
         clearLocalWorkspace();
-        if (cashRestore.restored) clearWorkspaceLiveCache();
+        // Serverə uğurla yazıldıqdan/oxuduqdan sonra köhnə live cache-i sil
+        if ((remoteCash?.rows?.length ?? 0) > 0 && !useLiveOverRemote) {
+          clearWorkspaceLiveCache();
+        } else if (needsUpload) {
+          clearWorkspaceLiveCache();
+        }
 
         if (!cancelled) {
           remoteReadyRef.current = true;
           let resolved = merged;
           if (cashReportDirtyRef.current) {
-            const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, merged.cashReport, {
+            const mergedCashKeep = mergeCashReportOnSync(workspaceRef.current.cashReport, merged.cashReport, {
               preferLocalRows: true,
             });
-            if (mergedCash) resolved = { ...merged, cashReport: mergedCash };
+            if (mergedCashKeep) resolved = { ...merged, cashReport: mergedCashKeep };
           }
           if (!pendingLocalWriteRef.current) {
             lastSyncedJsonRef.current = workspaceFingerprint(resolved);
@@ -1765,11 +1778,11 @@ export default function App() {
             setCashSlotEdits({});
             setWorkspace(resolved);
           } else {
-            const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, resolved.cashReport, {
+            const mergedCashKeep = mergeCashReportOnSync(workspaceRef.current.cashReport, resolved.cashReport, {
               preferLocalRows: true,
             });
-            if (mergedCash) {
-              const withLocalCash = { ...workspaceRef.current, cashReport: mergedCash };
+            if (mergedCashKeep) {
+              const withLocalCash = { ...workspaceRef.current, cashReport: mergedCashKeep };
               cashExternalSyncRef.current = true;
               setCashSlotEdits({});
               setWorkspace(withLocalCash);
@@ -1803,16 +1816,11 @@ export default function App() {
         return;
       }
       const normalizedBase = normalizeWorkspace(remoteWs);
+      // Firestore snapshot — kassa üçün remote mənbədir (lokal dirty deyilsə)
       let cashReport = normalizedBase.cashReport;
-      let canonicalRestored = false;
-      if (!cashReportDirtyRef.current && !pendingLocalWriteRef.current && !remoteWriteInFlightRef.current) {
-        const resolved = resolveCashReportState(cashReport);
-        const restored = applyCanonicalCashRestoreIfNeeded(resolved);
-        cashReport = restored.state;
-        canonicalRestored = restored.restored;
-      } else {
+      if (cashReportDirtyRef.current || pendingLocalWriteRef.current || remoteWriteInFlightRef.current) {
         const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, normalizedBase.cashReport, {
-          preferLocalRows: cashReportDirtyRef.current || pendingLocalWriteRef.current,
+          preferLocalRows: true,
         });
         cashReport = mergedCash ?? cashReport;
       }
@@ -1831,17 +1839,6 @@ export default function App() {
         setCashSlotEdits({});
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
-        return;
-      }
-      if (canonicalRestored) {
-        cashExternalSyncRef.current = true;
-        setCashSlotEdits({});
-        setWorkspace(normalized);
-        pendingLocalWriteRef.current = true;
-        cashReportDirtyRef.current = true;
-        remoteReadyRef.current = true;
-        setRemoteSyncEpoch((e) => e + 1);
-        window.setTimeout(() => void flushRemoteWrite(), 0);
         return;
       }
       if (pendingLocalWriteRef.current || remoteWriteInFlightRef.current || cashReportDirtyRef.current) {

@@ -810,7 +810,7 @@ export function pickPreferredWorkspace(
     });
   }
 
-  const mergedCash = resolveCashReportState(l?.cashReport, r?.cashReport);
+  const mergedCash = resolveCashReportState(r?.cashReport, l?.cashReport);
   return mergedCash ? { ...base, cashReport: mergedCash } : base;
 }
 
