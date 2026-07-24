@@ -90,15 +90,52 @@ function DeleteButton(props: { onClick: () => void; disabled?: boolean }) {
   );
 }
 
-function EditButton(props: { editing: boolean; onClick: () => void }) {
+function CreditRateActionButtons(props: {
+  editing: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <button
-      type="button"
-      className={`dg-btn dg-btn--compact ${props.editing ? "dg-btn-primary" : "dg-btn-secondary"}`}
-      onClick={props.onClick}
-    >
-      {props.editing ? "Hazır" : "Redaktə"}
-    </button>
+    <div className="dg-icon-row dg-instructions-rate-actions">
+      <button
+        type="button"
+        className={`dg-icon-btn ${props.editing ? "dg-icon-btn--primary" : ""}`}
+        onClick={props.onEdit}
+        title={props.editing ? "Hazır" : "Redaktə"}
+        aria-label={props.editing ? "Hazır" : "Redaktə"}
+      >
+        {props.editing ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+            <path
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
+            />
+          </svg>
+        )}
+      </button>
+      <button
+        type="button"
+        className="dg-icon-btn dg-icon-btn--danger"
+        onClick={props.onDelete}
+        title="Sil"
+        aria-label="Sil"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 6h18M8 6V4h8v2m-1 0v14a2 2 0 01-2 2H9a2 2 0 01-2-2V6h10z"
+          />
+        </svg>
+      </button>
+    </div>
   );
 }
 
@@ -655,23 +692,22 @@ export function InstructionsModule({ state, onChange }: Props) {
                         />
                       </td>
                       <td className="dg-td-actions">
-                        <div className="dg-icon-row">
-                          <EditButton editing={editing} onClick={() => toggleCreditRateEdit(row.id)} />
-                          <DeleteButton
-                            onClick={() => {
-                              setEditingCreditRateIds((prev) => {
-                                if (!prev[row.id]) return prev;
-                                const next = { ...prev };
-                                delete next[row.id];
-                                return next;
-                              });
-                              onChange({
-                                ...state,
-                                creditRates: (state.creditRates ?? []).filter((r) => r.id !== row.id),
-                              });
-                            }}
-                          />
-                        </div>
+                        <CreditRateActionButtons
+                          editing={editing}
+                          onEdit={() => toggleCreditRateEdit(row.id)}
+                          onDelete={() => {
+                            setEditingCreditRateIds((prev) => {
+                              if (!prev[row.id]) return prev;
+                              const next = { ...prev };
+                              delete next[row.id];
+                              return next;
+                            });
+                            onChange({
+                              ...state,
+                              creditRates: (state.creditRates ?? []).filter((r) => r.id !== row.id),
+                            });
+                          }}
+                        />
                       </td>
                     </tr>
                   );
