@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type {
   InstructionCashSaleRow,
   InstructionCorporateSaleRow,
+  InstructionCreditRateRow,
   InstructionCreditSaleRow,
   InstructionPosFeeRow,
   InstructionRowStatus,
@@ -10,13 +11,14 @@ import type {
 import {
   newInstructionCashSaleRow,
   newInstructionCorporateSaleRow,
+  newInstructionCreditRateRow,
   newInstructionCreditSaleRow,
   newInstructionPosFeeRow,
   normalizePosTerminal,
   POS_TERMINAL_ORDER,
 } from "../lib/instructions";
 
-type InstructionTab = "cash" | "credit" | "corporate" | "pos";
+type InstructionTab = "cash" | "credit" | "corporate" | "pos" | "creditRates";
 type StatusFilter = "all" | InstructionRowStatus;
 
 const TABS: { id: InstructionTab; label: string }[] = [
@@ -24,6 +26,7 @@ const TABS: { id: InstructionTab; label: string }[] = [
   { id: "credit", label: "Kredit satış" },
   { id: "corporate", label: "Korporativ satış" },
   { id: "pos", label: "POS / Kart komissiyaları" },
+  { id: "creditRates", label: "Kredit faizləri" },
 ];
 
 const STATUS_OPTIONS: { value: InstructionRowStatus; label: string }[] = [
@@ -119,6 +122,15 @@ export function InstructionsModule({ state, onChange }: Props) {
     });
   };
 
+  const patchCreditRate = (id: string, patch: Partial<InstructionCreditRateRow>) => {
+    onChange({
+      ...state,
+      creditRates: (state.creditRates ?? []).map((row) =>
+        row.id === id ? { ...row, ...patch, updatedAt: Date.now() } : row,
+      ),
+    });
+  };
+
   const cashRows = useMemo(
     () =>
       state.cashSales.filter(
@@ -157,6 +169,18 @@ export function InstructionsModule({ state, onChange }: Props) {
           matchesSearch([row.terminal, row.operationType, row.commissionRate, row.note], search),
       ),
     [state.posFees, search, statusFilter],
+  );
+
+  const creditRateRows = useMemo(
+    () =>
+      (state.creditRates ?? [])
+        .filter(
+          (row) =>
+            matchesStatus(row.status, statusFilter) &&
+            matchesSearch([row.label, String(row.months), String(row.percent)], search),
+        )
+        .sort((a, b) => a.months - b.months || a.label.localeCompare(b.label, "az")),
+    [state.creditRates, search, statusFilter],
   );
 
   const posSections = useMemo(() => {
@@ -200,6 +224,13 @@ export function InstructionsModule({ state, onChange }: Props) {
     }
     if (tab === "corporate") {
       onChange({ ...state, corporateSales: [...state.corporateSales, newInstructionCorporateSaleRow()] });
+      return;
+    }
+    if (tab === "creditRates") {
+      onChange({
+        ...state,
+        creditRates: [...(state.creditRates ?? []), newInstructionCreditRateRow()],
+      });
     }
   };
 
@@ -519,6 +550,82 @@ export function InstructionsModule({ state, onChange }: Props) {
                 </section>
               ),
             )}
+          </div>
+        )
+      ) : null}
+
+      {tab === "creditRates" ? (
+        creditRateRows.length === 0 ? (
+          renderEmpty("Kredit faiz sətri tapılmadı")
+        ) : (
+          <div className="dg-instructions-table-wrap dg-table-wrap pg-grid-host">
+            <table className="dg-table dg-table--sales dg-table--instructions">
+              <thead>
+                <tr>
+                  <th className="dg-th-num">№</th>
+                  <th>Müddət</th>
+                  <th>Ay sayı</th>
+                  <th>Faiz (%)</th>
+                  <th>Status</th>
+                  <th className="dg-th-actions">Əməliyyat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {creditRateRows.map((row, index) => (
+                  <tr key={row.id} className={row.status === "inactive" ? "is-inactive" : ""}>
+                    <td className="dg-td-num">{index + 1}</td>
+                    <td>
+                      <input
+                        className="dg-input dg-input--table"
+                        value={row.label}
+                        onChange={(e) => patchCreditRate(row.id, { label: e.target.value })}
+                        placeholder="məs. 12 ay"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="dg-input dg-input--table"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={row.months}
+                        onChange={(e) =>
+                          patchCreditRate(row.id, { months: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="dg-input dg-input--table"
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        value={row.percent}
+                        onChange={(e) =>
+                          patchCreditRate(row.id, { percent: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <StatusSelect
+                        value={row.status}
+                        onChange={(status) => patchCreditRate(row.id, { status })}
+                      />
+                    </td>
+                    <td className="dg-td-actions">
+                      <DeleteButton
+                        onClick={() =>
+                          onChange({
+                            ...state,
+                            creditRates: (state.creditRates ?? []).filter((r) => r.id !== row.id),
+                          })
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )
       ) : null}

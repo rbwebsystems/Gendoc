@@ -277,11 +277,26 @@ export interface InstructionPosFeeRow {
   updatedAt: number;
 }
 
+/** Qiymət hesablanmasında istifadə olunan kredit faizləri (aylara görə) */
+export interface InstructionCreditRateRow {
+  id: string;
+  /** Göstərilən müddət adı, məs. «0–6 ay», «12 ay» */
+  label: string;
+  /** Aylıq ödəniş üçün ay sayı */
+  months: number;
+  /** Kredit faizi (%) */
+  percent: number;
+  status: InstructionRowStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface InstructionsState {
   cashSales: InstructionCashSaleRow[];
   creditSales: InstructionCreditSaleRow[];
   corporateSales: InstructionCorporateSaleRow[];
   posFees: InstructionPosFeeRow[];
+  creditRates: InstructionCreditRateRow[];
 }
 
 /** Kassa hesabatı — hesab sətri */
