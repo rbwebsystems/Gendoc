@@ -2628,6 +2628,19 @@ textarea.dg-input {
   opacity: 0.62;
 }
 
+.dg-table.dg-table--instructions tbody tr.is-locked .dg-input.dg-input--table:disabled {
+  color: var(--win-text);
+  opacity: 1;
+  cursor: default;
+  -webkit-text-fill-color: var(--win-text);
+}
+
+.dg-table.dg-table--instructions .dg-td-actions .dg-icon-row {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .dg-input.dg-input--table {
   width: 100%;
   min-width: 0;

@@ -58,11 +58,13 @@ function matchesStatus(status: InstructionRowStatus, filter: StatusFilter): bool
 function StatusSelect(props: {
   value: InstructionRowStatus;
   onChange: (value: InstructionRowStatus) => void;
+  disabled?: boolean;
 }) {
   return (
     <select
       className="dg-input dg-input--table"
       value={props.value}
+      disabled={props.disabled}
       onChange={(e) => props.onChange(e.target.value as InstructionRowStatus)}
       aria-label="Status"
     >
@@ -75,10 +77,27 @@ function StatusSelect(props: {
   );
 }
 
-function DeleteButton(props: { onClick: () => void }) {
+function DeleteButton(props: { onClick: () => void; disabled?: boolean }) {
   return (
-    <button type="button" className="dg-btn dg-btn-danger dg-btn--compact" onClick={props.onClick}>
+    <button
+      type="button"
+      className="dg-btn dg-btn-danger dg-btn--compact"
+      onClick={props.onClick}
+      disabled={props.disabled}
+    >
       Sil
+    </button>
+  );
+}
+
+function EditButton(props: { editing: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`dg-btn dg-btn--compact ${props.editing ? "dg-btn-primary" : "dg-btn-secondary"}`}
+      onClick={props.onClick}
+    >
+      {props.editing ? "Hazır" : "Redaktə"}
     </button>
   );
 }
@@ -87,6 +106,18 @@ export function InstructionsModule({ state, onChange }: Props) {
   const [tab, setTab] = useState<InstructionTab>("cash");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [editingCreditRateIds, setEditingCreditRateIds] = useState<Record<string, true>>({});
+
+  const toggleCreditRateEdit = (id: string) => {
+    setEditingCreditRateIds((prev) => {
+      if (prev[id]) {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      }
+      return { ...prev, [id]: true };
+    });
+  };
 
   const patchCash = (id: string, patch: Partial<InstructionCashSaleRow>) => {
     onChange({
@@ -227,10 +258,12 @@ export function InstructionsModule({ state, onChange }: Props) {
       return;
     }
     if (tab === "creditRates") {
+      const row = newInstructionCreditRateRow();
       onChange({
         ...state,
-        creditRates: [...(state.creditRates ?? []), newInstructionCreditRateRow()],
+        creditRates: [...(state.creditRates ?? []), row],
       });
+      setEditingCreditRateIds((prev) => ({ ...prev, [row.id]: true }));
     }
   };
 
@@ -571,59 +604,78 @@ export function InstructionsModule({ state, onChange }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {creditRateRows.map((row, index) => (
-                  <tr key={row.id} className={row.status === "inactive" ? "is-inactive" : ""}>
-                    <td className="dg-td-num">{index + 1}</td>
-                    <td>
-                      <input
-                        className="dg-input dg-input--table"
-                        value={row.label}
-                        onChange={(e) => patchCreditRate(row.id, { label: e.target.value })}
-                        placeholder="məs. 12 ay"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="dg-input dg-input--table"
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={row.months}
-                        onChange={(e) =>
-                          patchCreditRate(row.id, { months: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="dg-input dg-input--table"
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={row.percent}
-                        onChange={(e) =>
-                          patchCreditRate(row.id, { percent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </td>
-                    <td>
-                      <StatusSelect
-                        value={row.status}
-                        onChange={(status) => patchCreditRate(row.id, { status })}
-                      />
-                    </td>
-                    <td className="dg-td-actions">
-                      <DeleteButton
-                        onClick={() =>
-                          onChange({
-                            ...state,
-                            creditRates: (state.creditRates ?? []).filter((r) => r.id !== row.id),
-                          })
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
+                {creditRateRows.map((row, index) => {
+                  const editing = Boolean(editingCreditRateIds[row.id]);
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`${row.status === "inactive" ? "is-inactive" : ""}${editing ? "" : " is-locked"}`}
+                    >
+                      <td className="dg-td-num">{index + 1}</td>
+                      <td>
+                        <input
+                          className="dg-input dg-input--table"
+                          value={row.label}
+                          disabled={!editing}
+                          onChange={(e) => patchCreditRate(row.id, { label: e.target.value })}
+                          placeholder="məs. 12 ay"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="dg-input dg-input--table"
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={row.months}
+                          disabled={!editing}
+                          onChange={(e) =>
+                            patchCreditRate(row.id, { months: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="dg-input dg-input--table"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={row.percent}
+                          disabled={!editing}
+                          onChange={(e) =>
+                            patchCreditRate(row.id, { percent: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </td>
+                      <td>
+                        <StatusSelect
+                          value={row.status}
+                          disabled={!editing}
+                          onChange={(status) => patchCreditRate(row.id, { status })}
+                        />
+                      </td>
+                      <td className="dg-td-actions">
+                        <div className="dg-icon-row">
+                          <EditButton editing={editing} onClick={() => toggleCreditRateEdit(row.id)} />
+                          <DeleteButton
+                            onClick={() => {
+                              setEditingCreditRateIds((prev) => {
+                                if (!prev[row.id]) return prev;
+                                const next = { ...prev };
+                                delete next[row.id];
+                                return next;
+                              });
+                              onChange({
+                                ...state,
+                                creditRates: (state.creditRates ?? []).filter((r) => r.id !== row.id),
+                              });
+                            }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
