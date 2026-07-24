@@ -43,10 +43,24 @@ function applyPercent(cents: number, percent: number): number {
   return Math.round(cents * (1 + percent / 100));
 }
 
+/** Qiyməti həmişə yuxarıya, 9 ilə bitən ən yaxın məbləğə yuvarlaqlaşdırır (məs. 101 → 109). */
 export function roundPriceToNineEnding(amountAzn: number): number {
   if (!Number.isFinite(amountAzn) || amountAzn <= 0) return 0;
-  const roundedToTen = Math.round(amountAzn / 10) * 10;
-  return Math.max(9, roundedToTen - 1);
+  const n = Math.ceil(amountAzn - 1e-9);
+  const rem = n % 10;
+  if (rem === 9) return n;
+  return rem === 0 ? n + 9 : n + (9 - rem);
+}
+
+function creditPricesFromCash(cashPrice: number): Record<PriceCalcCreditKey, number> {
+  return PRICE_CALC_CREDIT_PERIODS.reduce(
+    (acc, period) => {
+      const priceBaseCents = applyPercent(toCents(cashPrice), period.percent);
+      acc[period.key] = roundPriceToNineEnding(fromCents(priceBaseCents));
+      return acc;
+    },
+    { ...ZERO_CREDITS },
+  );
 }
 
 function resolveCashPercent(productType: PriceCalcProductType, costAzn: number): number {
@@ -69,14 +83,18 @@ export function calculatePricePlan(productType: PriceCalcProductType, costAznRaw
   const cashBaseCents = applyPercent(costCents, cashPercent);
   const cashPrice = roundPriceToNineEnding(fromCents(cashBaseCents));
 
-  const creditPrices = PRICE_CALC_CREDIT_PERIODS.reduce(
-    (acc, period) => {
-      const priceBaseCents = applyPercent(toCents(cashPrice), period.percent);
-      acc[period.key] = roundPriceToNineEnding(fromCents(priceBaseCents));
-      return acc;
-    },
-    { ...ZERO_CREDITS },
-  );
+  return { cashPrice, creditPrices: creditPricesFromCash(cashPrice) };
+}
 
-  return { cashPrice, creditPrices };
+/**
+ * Bilinən nağd satış qiymətindən kredit qiymətlərini hesablayır.
+ * Nağd qiymət olduğu kimi qalır; 0–6 ay faizsiz; digər aylar mövcud faizlə + yuxarı yuvarlaq.
+ */
+export function calculatePricePlanFromSalePrice(salePriceRaw: number): PriceCalculationResult {
+  if (!Number.isFinite(salePriceRaw) || salePriceRaw <= 0) {
+    return { cashPrice: 0, creditPrices: { ...ZERO_CREDITS } };
+  }
+
+  const cashPrice = fromCents(toCents(salePriceRaw));
+  return { cashPrice, creditPrices: creditPricesFromCash(cashPrice) };
 }

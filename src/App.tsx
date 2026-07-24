@@ -144,6 +144,7 @@ import {
 } from "./lib/workspaceSync";
 import {
   calculatePricePlan,
+  calculatePricePlanFromSalePrice,
   PRICE_CALC_CREDIT_PERIODS,
   PRICE_CALC_PRODUCT_OPTIONS,
   type PriceCalcProductType,
@@ -1466,6 +1467,7 @@ export default function App() {
   const [customerOrderMode, setCustomerOrderMode] = useState<OrderFormMode>("list");
   const [priceCalcProductType, setPriceCalcProductType] = useState<PriceCalcProductType>("mobileNew");
   const [priceCalcCostInput, setPriceCalcCostInput] = useState("");
+  const [priceCalcSaleInput, setPriceCalcSaleInput] = useState("");
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
   const [cashSlotEdits, setCashSlotEdits] = useState<Record<string, string>>({});
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
@@ -2368,10 +2370,15 @@ export default function App() {
     return Number.isFinite(raw) ? raw : 0;
   }, [priceCalcCostInput]);
 
-  const priceCalcResult = useMemo(
-    () => calculatePricePlan(priceCalcProductType, priceCalcCostValue),
-    [priceCalcProductType, priceCalcCostValue],
-  );
+  const priceCalcSaleValue = useMemo(() => {
+    const raw = Number(priceCalcSaleInput.replace(",", "."));
+    return Number.isFinite(raw) ? raw : 0;
+  }, [priceCalcSaleInput]);
+
+  const priceCalcResult = useMemo(() => {
+    if (priceCalcSaleValue > 0) return calculatePricePlanFromSalePrice(priceCalcSaleValue);
+    return calculatePricePlan(priceCalcProductType, priceCalcCostValue);
+  }, [priceCalcProductType, priceCalcCostValue, priceCalcSaleValue]);
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
   const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
@@ -5829,13 +5836,31 @@ export default function App() {
                 min="0"
                 step="0.01"
                 value={priceCalcCostInput}
-                onChange={(e) => setPriceCalcCostInput(e.target.value)}
+                onChange={(e) => {
+                  setPriceCalcCostInput(e.target.value);
+                  if (e.target.value.trim()) setPriceCalcSaleInput("");
+                }}
+                placeholder="0.00"
+              />
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Satış qiyməti (AZN)</span>
+              <input
+                className="dg-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={priceCalcSaleInput}
+                onChange={(e) => {
+                  setPriceCalcSaleInput(e.target.value);
+                  if (e.target.value.trim()) setPriceCalcCostInput("");
+                }}
                 placeholder="0.00"
               />
             </label>
           </div>
           <p className="dg-muted" style={{ marginTop: "0.75rem" }}>
-            Məhsul növü və maya dəyəri dəyişdikcə nəticələr avtomatik yenilənir.
+            Maya və ya satış qiyməti yazıldıqca nəticələr avtomatik yenilənir. Satış qiymətində nağd olduğu kimi qalır, kreditlər faizlə hesablanır.
           </p>
         </section>
 
