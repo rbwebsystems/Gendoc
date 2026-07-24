@@ -1,5 +1,3 @@
-import type { InstructionCreditRateRow } from "../types";
-
 export type PriceCalcProductType = "mobileNew" | "mobileUsed" | "homeOffice";
 
 export const PRICE_CALC_PRODUCT_OPTIONS: { value: PriceCalcProductType; label: string }[] = [
@@ -8,27 +6,22 @@ export const PRICE_CALC_PRODUCT_OPTIONS: { value: PriceCalcProductType; label: s
   { value: "homeOffice", label: "Məişət və ofis avadanlığı" },
 ];
 
-/** Defolt kredit müddətləri / faizləri (Təlimat → Kredit faizləri ilə eyni) */
-export const DEFAULT_PRICE_CALC_CREDIT_RATES: Omit<
-  InstructionCreditRateRow,
-  "id" | "createdAt" | "updatedAt" | "status"
->[] = [
-  { label: "0–6 ay", months: 6, percent: 0 },
-  { label: "9 ay", months: 9, percent: 5 },
-  { label: "12 ay", months: 12, percent: 10 },
-  { label: "15 ay", months: 15, percent: 12.5 },
-  { label: "18 ay", months: 18, percent: 15 },
-  { label: "24 ay", months: 24, percent: 20 },
-];
+export const PRICE_CALC_CREDIT_PERIODS = [
+  { key: "m0to6", label: "0–6 ay", percent: 0, months: 6 },
+  { key: "m9", label: "9 ay", percent: 5, months: 9 },
+  { key: "m12", label: "12 ay", percent: 10, months: 12 },
+  { key: "m15", label: "15 ay", percent: 12.5, months: 15 },
+  { key: "m18", label: "18 ay", percent: 15, months: 18 },
+  { key: "m24", label: "24 ay", percent: 20, months: 24 },
+] as const;
 
-export type PriceCalcCreditPeriod = {
-  id: string;
+export type PriceCalcCreditKey = (typeof PRICE_CALC_CREDIT_PERIODS)[number]["key"];
+
+export type PriceCalcCreditLine = {
+  key: PriceCalcCreditKey;
   label: string;
   months: number;
   percent: number;
-};
-
-export type PriceCalcCreditLine = PriceCalcCreditPeriod & {
   total: number;
   monthly: number;
 };
@@ -64,42 +57,32 @@ export function monthlyCreditPayment(totalPrice: number, months: number): number
   return fromCents(Math.round(toCents(totalPrice) / months));
 }
 
-/** Aktiv kredit faizlərini qiymət hesablaması üçün hazırlayır; boşdursa defolt. */
-export function resolvePriceCalcCreditPeriods(
-  rates: InstructionCreditRateRow[] | undefined,
-): PriceCalcCreditPeriod[] {
-  const active = (rates ?? [])
-    .filter((row) => row.status !== "inactive" && Number.isFinite(row.months) && row.months > 0)
-    .map((row) => ({
-      id: row.id,
-      label: row.label.trim() || `${row.months} ay`,
-      months: Math.round(row.months),
-      percent: Number.isFinite(row.percent) ? row.percent : 0,
-    }))
-    .sort((a, b) => a.months - b.months || a.label.localeCompare(b.label, "az"));
-
-  if (active.length > 0) return active;
-
-  return DEFAULT_PRICE_CALC_CREDIT_RATES.map((row, index) => ({
-    id: `default-${row.months}-${index}`,
-    label: row.label,
-    months: row.months,
-    percent: row.percent,
-  }));
-}
-
 /** 9 ay və yuxarı kredit qiymətləri yuvarlaqlaşmır; ondan aşağı (məs. 0–6) yuvarlaqlaşır. */
-function creditLinesFromCash(cashPrice: number, periods: PriceCalcCreditPeriod[]): PriceCalcCreditLine[] {
-  return periods.map((period) => {
+function creditLinesFromCash(cashPrice: number): PriceCalcCreditLine[] {
+  return PRICE_CALC_CREDIT_PERIODS.map((period) => {
     const priceBaseCents = applyPercent(toCents(cashPrice), period.percent);
     const raw = fromCents(priceBaseCents);
     const total = period.months < 9 ? roundPriceToNineEnding(raw) : raw;
     return {
-      ...period,
+      key: period.key,
+      label: period.label,
+      months: period.months,
+      percent: period.percent,
       total,
       monthly: monthlyCreditPayment(total, period.months),
     };
   });
+}
+
+function emptyCreditLines(): PriceCalcCreditLine[] {
+  return PRICE_CALC_CREDIT_PERIODS.map((period) => ({
+    key: period.key,
+    label: period.label,
+    months: period.months,
+    percent: period.percent,
+    total: 0,
+    monthly: 0,
+  }));
 }
 
 function resolveCashPercent(productType: PriceCalcProductType, costAzn: number): number {
@@ -114,11 +97,9 @@ function resolveCashPercent(productType: PriceCalcProductType, costAzn: number):
 export function calculatePricePlan(
   productType: PriceCalcProductType,
   costAznRaw: number,
-  rates?: InstructionCreditRateRow[],
 ): PriceCalculationResult {
-  const periods = resolvePriceCalcCreditPeriods(rates);
   if (!Number.isFinite(costAznRaw) || costAznRaw <= 0) {
-    return { cashPrice: 0, creditLines: periods.map((p) => ({ ...p, total: 0, monthly: 0 })) };
+    return { cashPrice: 0, creditLines: emptyCreditLines() };
   }
 
   const costCents = toCents(costAznRaw);
@@ -127,22 +108,18 @@ export function calculatePricePlan(
   const cashBaseCents = applyPercent(costCents, cashPercent);
   const cashPrice = roundPriceToNineEnding(fromCents(cashBaseCents));
 
-  return { cashPrice, creditLines: creditLinesFromCash(cashPrice, periods) };
+  return { cashPrice, creditLines: creditLinesFromCash(cashPrice) };
 }
 
 /**
  * Bilinən nağd satış qiymətindən kredit qiymətlərini hesablayır.
- * Nağd qiymət olduğu kimi qalır; faizlər Təlimat → Kredit faizlərindən götürülür.
+ * Nağd qiymət olduğu kimi qalır; faizlər sabit kredit cədvəlindən götürülür.
  */
-export function calculatePricePlanFromSalePrice(
-  salePriceRaw: number,
-  rates?: InstructionCreditRateRow[],
-): PriceCalculationResult {
-  const periods = resolvePriceCalcCreditPeriods(rates);
+export function calculatePricePlanFromSalePrice(salePriceRaw: number): PriceCalculationResult {
   if (!Number.isFinite(salePriceRaw) || salePriceRaw <= 0) {
-    return { cashPrice: 0, creditLines: periods.map((p) => ({ ...p, total: 0, monthly: 0 })) };
+    return { cashPrice: 0, creditLines: emptyCreditLines() };
   }
 
   const cashPrice = fromCents(toCents(salePriceRaw));
-  return { cashPrice, creditLines: creditLinesFromCash(cashPrice, periods) };
+  return { cashPrice, creditLines: creditLinesFromCash(cashPrice) };
 }

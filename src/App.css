@@ -2628,51 +2628,6 @@ textarea.dg-input {
   opacity: 0.62;
 }
 
-.dg-table.dg-table--instructions tbody tr.is-locked .dg-input.dg-input--table:disabled {
-  color: var(--win-text);
-  opacity: 1;
-  cursor: default;
-  -webkit-text-fill-color: var(--win-text);
-}
-
-.dg-table.dg-table--instructions .dg-td-actions .dg-icon-row {
-  justify-content: center;
-  flex-wrap: nowrap;
-  gap: 0.25rem;
-}
-
-.dg-instructions-rate-actions .dg-icon-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-}
-
-.dg-instructions-rate-actions .dg-icon-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.dg-instructions-rate-actions .dg-icon-btn--primary {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: rgba(37, 99, 235, 0.35);
-  color: #1d4ed8;
-}
-
-.dg-instructions-rate-actions .dg-icon-btn--danger {
-  color: #b91c1c;
-}
-
-.dg-instructions-rate-actions .dg-icon-btn--danger:hover {
-  background: rgba(185, 28, 28, 0.1);
-  border-color: rgba(185, 28, 28, 0.35);
-}
-
-.dg-table.dg-table--instructions tbody td.dg-td-actions {
-  width: 5.5rem;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
 .dg-input.dg-input--table {
   width: 100%;
   min-width: 0;

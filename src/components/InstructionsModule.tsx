@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type {
   InstructionCashSaleRow,
   InstructionCorporateSaleRow,
-  InstructionCreditRateRow,
   InstructionCreditSaleRow,
   InstructionPosFeeRow,
   InstructionRowStatus,
@@ -11,14 +10,13 @@ import type {
 import {
   newInstructionCashSaleRow,
   newInstructionCorporateSaleRow,
-  newInstructionCreditRateRow,
   newInstructionCreditSaleRow,
   newInstructionPosFeeRow,
   normalizePosTerminal,
   POS_TERMINAL_ORDER,
 } from "../lib/instructions";
 
-type InstructionTab = "cash" | "credit" | "corporate" | "pos" | "creditRates";
+type InstructionTab = "cash" | "credit" | "corporate" | "pos";
 type StatusFilter = "all" | InstructionRowStatus;
 
 const TABS: { id: InstructionTab; label: string }[] = [
@@ -26,7 +24,6 @@ const TABS: { id: InstructionTab; label: string }[] = [
   { id: "credit", label: "Kredit satış" },
   { id: "corporate", label: "Korporativ satış" },
   { id: "pos", label: "POS / Kart komissiyaları" },
-  { id: "creditRates", label: "Kredit faizləri" },
 ];
 
 const STATUS_OPTIONS: { value: InstructionRowStatus; label: string }[] = [
@@ -58,13 +55,11 @@ function matchesStatus(status: InstructionRowStatus, filter: StatusFilter): bool
 function StatusSelect(props: {
   value: InstructionRowStatus;
   onChange: (value: InstructionRowStatus) => void;
-  disabled?: boolean;
 }) {
   return (
     <select
       className="dg-input dg-input--table"
       value={props.value}
-      disabled={props.disabled}
       onChange={(e) => props.onChange(e.target.value as InstructionRowStatus)}
       aria-label="Status"
     >
@@ -77,65 +72,11 @@ function StatusSelect(props: {
   );
 }
 
-function DeleteButton(props: { onClick: () => void; disabled?: boolean }) {
+function DeleteButton(props: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className="dg-btn dg-btn-danger dg-btn--compact"
-      onClick={props.onClick}
-      disabled={props.disabled}
-    >
+    <button type="button" className="dg-btn dg-btn-danger dg-btn--compact" onClick={props.onClick}>
       Sil
     </button>
-  );
-}
-
-function CreditRateActionButtons(props: {
-  editing: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div className="dg-icon-row dg-instructions-rate-actions">
-      <button
-        type="button"
-        className={`dg-icon-btn ${props.editing ? "dg-icon-btn--primary" : ""}`}
-        onClick={props.onEdit}
-        title={props.editing ? "Hazır" : "Redaktə"}
-        aria-label={props.editing ? "Hazır" : "Redaktə"}
-      >
-        {props.editing ? (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
-            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
-            <path
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"
-            />
-          </svg>
-        )}
-      </button>
-      <button
-        type="button"
-        className="dg-icon-btn dg-icon-btn--danger"
-        onClick={props.onDelete}
-        title="Sil"
-        aria-label="Sil"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
-          <path
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3 6h18M8 6V4h8v2m-1 0v14a2 2 0 01-2 2H9a2 2 0 01-2-2V6h10z"
-          />
-        </svg>
-      </button>
-    </div>
   );
 }
 
@@ -143,18 +84,6 @@ export function InstructionsModule({ state, onChange }: Props) {
   const [tab, setTab] = useState<InstructionTab>("cash");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
-  const [editingCreditRateIds, setEditingCreditRateIds] = useState<Record<string, true>>({});
-
-  const toggleCreditRateEdit = (id: string) => {
-    setEditingCreditRateIds((prev) => {
-      if (prev[id]) {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      }
-      return { ...prev, [id]: true };
-    });
-  };
 
   const patchCash = (id: string, patch: Partial<InstructionCashSaleRow>) => {
     onChange({
@@ -187,15 +116,6 @@ export function InstructionsModule({ state, onChange }: Props) {
     onChange({
       ...state,
       posFees: state.posFees.map((row) => (row.id === id ? { ...row, ...patch, updatedAt: Date.now() } : row)),
-    });
-  };
-
-  const patchCreditRate = (id: string, patch: Partial<InstructionCreditRateRow>) => {
-    onChange({
-      ...state,
-      creditRates: (state.creditRates ?? []).map((row) =>
-        row.id === id ? { ...row, ...patch, updatedAt: Date.now() } : row,
-      ),
     });
   };
 
@@ -239,34 +159,6 @@ export function InstructionsModule({ state, onChange }: Props) {
     [state.posFees, search, statusFilter],
   );
 
-  const creditRateRows = useMemo(() => {
-    const filtered = (state.creditRates ?? []).filter(
-      (row) =>
-        matchesStatus(row.status, statusFilter) &&
-        matchesSearch([row.label, String(row.months), String(row.percent)], search),
-    );
-    // Redaktə zamanı sıralama fokusun başqa sətirə keçməsinə səbəb olur —
-    // yalnız kilidli siyahını ay sırasına görə düzürük.
-    const anyEditing = Object.keys(editingCreditRateIds).length > 0;
-    if (anyEditing) return filtered;
-    return [...filtered].sort((a, b) => a.months - b.months || a.label.localeCompare(b.label, "az"));
-  }, [state.creditRates, search, statusFilter, editingCreditRateIds]);
-
-  const lockCreditRateRow = (id: string) => {
-    setEditingCreditRateIds((prev) => {
-      if (!prev[id]) return prev;
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-    onChange({
-      ...state,
-      creditRates: [...(state.creditRates ?? [])].sort(
-        (a, b) => a.months - b.months || a.label.localeCompare(b.label, "az"),
-      ),
-    });
-  };
-
   const posSections = useMemo(() => {
     const grouped = new Map<string, InstructionPosFeeRow[]>();
     for (const terminal of POS_TERMINAL_ORDER) grouped.set(terminal, []);
@@ -308,15 +200,6 @@ export function InstructionsModule({ state, onChange }: Props) {
     }
     if (tab === "corporate") {
       onChange({ ...state, corporateSales: [...state.corporateSales, newInstructionCorporateSaleRow()] });
-      return;
-    }
-    if (tab === "creditRates") {
-      const row = newInstructionCreditRateRow();
-      onChange({
-        ...state,
-        creditRates: [...(state.creditRates ?? []), row],
-      });
-      setEditingCreditRateIds((prev) => ({ ...prev, [row.id]: true }));
     }
   };
 
@@ -636,103 +519,6 @@ export function InstructionsModule({ state, onChange }: Props) {
                 </section>
               ),
             )}
-          </div>
-        )
-      ) : null}
-
-      {tab === "creditRates" ? (
-        creditRateRows.length === 0 ? (
-          renderEmpty("Kredit faiz sətri tapılmadı")
-        ) : (
-          <div className="dg-instructions-table-wrap dg-table-wrap pg-grid-host">
-            <table className="dg-table dg-table--sales dg-table--instructions">
-              <thead>
-                <tr>
-                  <th className="dg-th-num">№</th>
-                  <th>Müddət</th>
-                  <th>Ay sayı</th>
-                  <th>Faiz (%)</th>
-                  <th>Status</th>
-                  <th className="dg-th-actions">Əməliyyat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {creditRateRows.map((row, index) => {
-                  const editing = Boolean(editingCreditRateIds[row.id]);
-                  return (
-                    <tr
-                      key={row.id}
-                      className={`${row.status === "inactive" ? "is-inactive" : ""}${editing ? "" : " is-locked"}`}
-                    >
-                      <td className="dg-td-num">{index + 1}</td>
-                      <td>
-                        <input
-                          className="dg-input dg-input--table"
-                          value={row.label}
-                          disabled={!editing}
-                          onChange={(e) => patchCreditRate(row.id, { label: e.target.value })}
-                          placeholder="məs. 12 ay"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="dg-input dg-input--table"
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={row.months}
-                          disabled={!editing}
-                          onChange={(e) =>
-                            patchCreditRate(row.id, { months: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="dg-input dg-input--table"
-                          type="number"
-                          min="0"
-                          step="0.1"
-                          value={row.percent}
-                          disabled={!editing}
-                          onChange={(e) =>
-                            patchCreditRate(row.id, { percent: Number(e.target.value) || 0 })
-                          }
-                        />
-                      </td>
-                      <td>
-                        <StatusSelect
-                          value={row.status}
-                          disabled={!editing}
-                          onChange={(status) => patchCreditRate(row.id, { status })}
-                        />
-                      </td>
-                      <td className="dg-td-actions">
-                        <CreditRateActionButtons
-                          editing={editing}
-                          onEdit={() => {
-                            if (editing) lockCreditRateRow(row.id);
-                            else toggleCreditRateEdit(row.id);
-                          }}
-                          onDelete={() => {
-                            setEditingCreditRateIds((prev) => {
-                              if (!prev[row.id]) return prev;
-                              const next = { ...prev };
-                              delete next[row.id];
-                              return next;
-                            });
-                            onChange({
-                              ...state,
-                              creditRates: (state.creditRates ?? []).filter((r) => r.id !== row.id),
-                            });
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
         )
       ) : null}

@@ -1,13 +1,11 @@
 import type {
   InstructionCashSaleRow,
   InstructionCorporateSaleRow,
-  InstructionCreditRateRow,
   InstructionCreditSaleRow,
   InstructionPosFeeRow,
   InstructionRowStatus,
   InstructionsState,
 } from "../types";
-import { DEFAULT_PRICE_CALC_CREDIT_RATES } from "./priceCalculation";
 
 function nowRow() {
   return Date.now();
@@ -128,32 +126,6 @@ export function newInstructionPosFeeRow(partial?: Partial<InstructionPosFeeRow>)
     updatedAt: now,
     ...partial,
   };
-}
-
-export function newInstructionCreditRateRow(
-  partial?: Partial<InstructionCreditRateRow>,
-): InstructionCreditRateRow {
-  const now = nowRow();
-  return {
-    id: crypto.randomUUID(),
-    label: "",
-    months: 12,
-    percent: 0,
-    status: "active",
-    createdAt: now,
-    updatedAt: now,
-    ...partial,
-  };
-}
-
-export function defaultCreditRateRows(): InstructionCreditRateRow[] {
-  return DEFAULT_PRICE_CALC_CREDIT_RATES.map((row) =>
-    newInstructionCreditRateRow({
-      label: row.label,
-      months: row.months,
-      percent: row.percent,
-    }),
-  );
 }
 
 export function defaultInstructionsState(): InstructionsState {
@@ -277,14 +249,13 @@ export function defaultInstructionsState(): InstructionsState {
         commissionRate: "əlavə 2%",
       }),
     ],
-    creditRates: defaultCreditRateRows(),
   };
 }
 
 export function normalizeInstructionsState(raw: unknown | undefined): InstructionsState {
   if (raw === undefined) return defaultInstructionsState();
   if (!raw || typeof raw !== "object") {
-    return { cashSales: [], creditSales: [], corporateSales: [], posFees: [], creditRates: [] };
+    return { cashSales: [], creditSales: [], corporateSales: [], posFees: [] };
   }
 
   const w = raw as Record<string, unknown>;
@@ -334,32 +305,5 @@ export function normalizeInstructionsState(raw: unknown | undefined): Instructio
     })
     .filter((row): row is InstructionPosFeeRow => row != null);
 
-  const creditRatesRaw = Array.isArray(w.creditRates) ? w.creditRates : [];
-  const creditRates = creditRatesRaw
-    .map((row) => {
-      const monthsRaw = (row as { months?: unknown }).months;
-      const percentRaw = (row as { percent?: unknown }).percent;
-      const months =
-        typeof monthsRaw === "number" && Number.isFinite(monthsRaw)
-          ? monthsRaw
-          : Number(monthsRaw) || 0;
-      const percent =
-        typeof percentRaw === "number" && Number.isFinite(percentRaw)
-          ? percentRaw
-          : Number(String(percentRaw).replace("%", "").replace(",", ".")) || 0;
-      return baseRow<InstructionCreditRateRow>(row, {
-        label: str((row as { label?: unknown }).label),
-        months,
-        percent,
-      });
-    })
-    .filter((row): row is InstructionCreditRateRow => row != null);
-
-  return {
-    cashSales,
-    creditSales,
-    corporateSales,
-    posFees,
-    creditRates: creditRates.length > 0 ? creditRates : defaultCreditRateRows(),
-  };
+  return { cashSales, creditSales, corporateSales, posFees };
 }

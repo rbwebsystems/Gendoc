@@ -2375,10 +2375,9 @@ export default function App() {
   }, [priceCalcSaleInput]);
 
   const priceCalcResult = useMemo(() => {
-    const rates = workspace.instructions?.creditRates;
-    if (priceCalcSaleValue > 0) return calculatePricePlanFromSalePrice(priceCalcSaleValue, rates);
-    return calculatePricePlan(priceCalcProductType, priceCalcCostValue, rates);
-  }, [priceCalcProductType, priceCalcCostValue, priceCalcSaleValue, workspace.instructions?.creditRates]);
+    if (priceCalcSaleValue > 0) return calculatePricePlanFromSalePrice(priceCalcSaleValue);
+    return calculatePricePlan(priceCalcProductType, priceCalcCostValue);
+  }, [priceCalcProductType, priceCalcCostValue, priceCalcSaleValue]);
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
   const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
@@ -5876,7 +5875,7 @@ export default function App() {
           <h3 className="dg-panel-section-title dg-panel-section-title--sub">Kredit qiymətləri</h3>
           <div className="dg-pricecalc-card-grid">
             {priceCalcResult.creditLines.map((line) => (
-              <article key={line.id} className="dg-pricecalc-card" aria-label={`${line.label} kredit kartı`}>
+              <article key={line.key} className="dg-pricecalc-card" aria-label={`${line.label} kredit kartı`}>
                 <div className="dg-pricecalc-card-label">{line.label}</div>
                 <div className="dg-pricecalc-card-value">{formatMoney(line.total)}</div>
                 <div className="dg-pricecalc-card-monthly">
