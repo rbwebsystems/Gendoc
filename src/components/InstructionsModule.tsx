@@ -239,17 +239,33 @@ export function InstructionsModule({ state, onChange }: Props) {
     [state.posFees, search, statusFilter],
   );
 
-  const creditRateRows = useMemo(
-    () =>
-      (state.creditRates ?? [])
-        .filter(
-          (row) =>
-            matchesStatus(row.status, statusFilter) &&
-            matchesSearch([row.label, String(row.months), String(row.percent)], search),
-        )
-        .sort((a, b) => a.months - b.months || a.label.localeCompare(b.label, "az")),
-    [state.creditRates, search, statusFilter],
-  );
+  const creditRateRows = useMemo(() => {
+    const filtered = (state.creditRates ?? []).filter(
+      (row) =>
+        matchesStatus(row.status, statusFilter) &&
+        matchesSearch([row.label, String(row.months), String(row.percent)], search),
+    );
+    // Redaktə zamanı sıralama fokusun başqa sətirə keçməsinə səbəb olur —
+    // yalnız kilidli siyahını ay sırasına görə düzürük.
+    const anyEditing = Object.keys(editingCreditRateIds).length > 0;
+    if (anyEditing) return filtered;
+    return [...filtered].sort((a, b) => a.months - b.months || a.label.localeCompare(b.label, "az"));
+  }, [state.creditRates, search, statusFilter, editingCreditRateIds]);
+
+  const lockCreditRateRow = (id: string) => {
+    setEditingCreditRateIds((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    onChange({
+      ...state,
+      creditRates: [...(state.creditRates ?? [])].sort(
+        (a, b) => a.months - b.months || a.label.localeCompare(b.label, "az"),
+      ),
+    });
+  };
 
   const posSections = useMemo(() => {
     const grouped = new Map<string, InstructionPosFeeRow[]>();
@@ -694,7 +710,10 @@ export function InstructionsModule({ state, onChange }: Props) {
                       <td className="dg-td-actions">
                         <CreditRateActionButtons
                           editing={editing}
-                          onEdit={() => toggleCreditRateEdit(row.id)}
+                          onEdit={() => {
+                            if (editing) lockCreditRateRow(row.id);
+                            else toggleCreditRateEdit(row.id);
+                          }}
                           onDelete={() => {
                             setEditingCreditRateIds((prev) => {
                               if (!prev[row.id]) return prev;
