@@ -145,6 +145,7 @@ import {
 import {
   calculatePricePlan,
   calculatePricePlanFromSalePrice,
+  monthlyCreditPayment,
   PRICE_CALC_CREDIT_PERIODS,
   PRICE_CALC_PRODUCT_OPTIONS,
   type PriceCalcProductType,
@@ -5875,12 +5876,19 @@ export default function App() {
 
           <h3 className="dg-panel-section-title dg-panel-section-title--sub">Kredit qiymətləri</h3>
           <div className="dg-pricecalc-card-grid">
-            {PRICE_CALC_CREDIT_PERIODS.map((period) => (
-              <article key={period.key} className="dg-pricecalc-card" aria-label={`${period.label} kredit kartı`}>
-                <div className="dg-pricecalc-card-label">{period.label}</div>
-                <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.creditPrices[period.key])}</div>
-              </article>
-            ))}
+            {PRICE_CALC_CREDIT_PERIODS.map((period) => {
+              const total = priceCalcResult.creditPrices[period.key];
+              const monthly = monthlyCreditPayment(total, period.months);
+              return (
+                <article key={period.key} className="dg-pricecalc-card" aria-label={`${period.label} kredit kartı`}>
+                  <div className="dg-pricecalc-card-label">{period.label}</div>
+                  <div className="dg-pricecalc-card-value">{formatMoney(total)}</div>
+                  <div className="dg-pricecalc-card-monthly">
+                    Aylıq: {monthly > 0 ? formatMoney(monthly) : "—"}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
       </div>
