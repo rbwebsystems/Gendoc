@@ -1671,6 +1671,16 @@ dialog.dg-modal[open] {
   gap: 1.5rem;
 }
 
+.dg-form-page--pricecalc {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.dg-form-page--pricecalc .dg-form-page-body {
+  flex: 1;
+}
+
 .dg-form-page-empty {
   margin: 0;
 }
@@ -2517,6 +2527,27 @@ textarea.dg-input {
   font-weight: 600;
   line-height: 1.35;
   color: var(--win-text-secondary);
+}
+
+.dg-pricecalc-notes {
+  margin-top: auto;
+  padding: 1.25rem 0 0.5rem;
+}
+
+.dg-pricecalc-notes-list {
+  margin: 0;
+  padding-left: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  color: #dc2626;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.dg-pricecalc-notes-list li::marker {
+  color: #dc2626;
 }
 
 @media (max-width: 640px) {

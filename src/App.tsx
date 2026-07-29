@@ -5808,7 +5808,7 @@ export default function App() {
   };
 
   const renderPriceCalculationsModule = () => (
-    <div className="dg-form-page pg-panel" aria-label="Qiymət hesablanması">
+    <div className="dg-form-page pg-panel dg-form-page--pricecalc" aria-label="Qiymət hesablanması">
       <div className="dg-form-page-body">
         <section className="dg-form-inner-panel">
           <h2 className="dg-panel-section-title">Hesablama girişləri</h2>
@@ -5884,6 +5884,20 @@ export default function App() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section className="dg-pricecalc-notes" aria-label="Kredit qeydləri">
+          <ol className="dg-pricecalc-notes-list">
+            <li>
+              Müştərinin kredit öhdəliyi 5000 AZN-i keçdiyi halda kreditin rəsmiləşdirilməsi rəhbərliyin icazəsi və təsdiqi əsasında rəsmiləşdirilməlidir.
+            </li>
+            <li>
+              Azpulmat, Manato və buna bənzər boktlarda krediti olan və ya istifadə etmiş müştərilərə kredit verilmir. İstisna hallarda rəhbərliyin təsdiqi ilə verilə bilər.
+            </li>
+            <li>
+              Müştərinin baş əlaqəsi şirkət əməkdaşı olan kredit mütəxəssisidirsə müştərinin analizi və yoxlanılması digər kredit mütəxəssisi tərəfindən həyata keçiriləcək və sənədlər də digər kredit mütəxəssisi tərəfindən imzalanacaq. Həmin müştərinin ödəniş məsuliyyətini yoxlama aparan və imza atan kredit mütəxəssisinindir.
+            </li>
+          </ol>
         </section>
       </div>
     </div>
@@ -8079,7 +8093,7 @@ export default function App() {
               </div>
             </header>
 
-            <main className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}`}>
+            <main className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}${module === "priceCalculations" ? " rb-content--pricecalc" : ""}`}>
               {toast ? (
                 <div className={`dg-toast ${toast.kind === "error" ? "dg-toast--error" : "dg-toast--success"}`} role="status">
                   {toast.msg}

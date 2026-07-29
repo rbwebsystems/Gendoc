@@ -556,6 +556,11 @@
   overflow: hidden;
 }
 
+.rb-content.rb-content--pricecalc {
+  display: flex;
+  flex-direction: column;
+}
+
 .rb-sidebar-backdrop {
   display: none;
 }
