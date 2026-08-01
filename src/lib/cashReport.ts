@@ -247,7 +247,9 @@ export function mergeCashReportStates(
   for (const state of valid) {
     for (const entry of state.history ?? []) historyMap.set(entry.id, entry);
   }
-  const history = [...historyMap.values()].sort((a, b) => b.savedAt - a.savedAt);
+  const history = [...historyMap.values()]
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
 
   return { rows, history };
 }
@@ -280,8 +282,8 @@ export function defaultCashReportRows(): CashReportRow[] {
   });
 }
 
-/** @deprecated Tarixçə artıq kəsilmir — geriyə uyğunluq üçün saxlanılır */
-export const CASH_REPORT_HISTORY_LIMIT = Number.POSITIVE_INFINITY;
+/** Workspace Firestore sənəd limitini aşmasın deyə saxlanılan maksimum snapshot sayı. */
+export const CASH_REPORT_HISTORY_LIMIT = 100;
 
 export function mergeCashReportHistories(
   ...histories: Array<CashReportSnapshot[] | undefined>
@@ -290,7 +292,9 @@ export function mergeCashReportHistories(
   for (const list of histories) {
     for (const entry of list ?? []) historyMap.set(entry.id, entry);
   }
-  return [...historyMap.values()].sort((a, b) => b.savedAt - a.savedAt);
+  return [...historyMap.values()]
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
 }
 
 /** Tarixçə anlık görüntüsündən cədvəl sətirlərini hazırlayır */
@@ -356,7 +360,7 @@ export function appendCashReportHistory(
   label: string,
   authorName: string,
 ): CashReportSnapshot[] {
-  return [createCashHistoryEntry(rows, label, authorName), ...history];
+  return [createCashHistoryEntry(rows, label, authorName), ...history].slice(0, CASH_REPORT_HISTORY_LIMIT);
 }
 
 /** Remote sinxronizasiyasında sətir və tarixçəni birləşdirir */
@@ -379,7 +383,9 @@ export function mergeCashReportOnSync(
   const historyMap = new Map<string, CashReportSnapshot>();
   for (const entry of remote.history ?? []) historyMap.set(entry.id, entry);
   for (const entry of local.history ?? []) historyMap.set(entry.id, entry);
-  const history = [...historyMap.values()].sort((a, b) => b.savedAt - a.savedAt);
+  const history = [...historyMap.values()]
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
 
   return { rows, history };
 }
@@ -454,7 +460,8 @@ export function normalizeCashReportHistory(raw: unknown): CashReportSnapshot[] {
         rows,
       };
     })
-    .sort((a, b) => b.savedAt - a.savedAt);
+    .sort((a, b) => b.savedAt - a.savedAt)
+    .slice(0, CASH_REPORT_HISTORY_LIMIT);
 }
 
 export function normalizeCashReportState(raw: unknown): CashReportState | undefined {
