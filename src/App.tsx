@@ -1486,6 +1486,7 @@ export default function App() {
   const [priceCalcProductType, setPriceCalcProductType] = useState<PriceCalcProductType>("mobileNew");
   const [priceCalcCostInput, setPriceCalcCostInput] = useState("");
   const [priceCalcSaleInput, setPriceCalcSaleInput] = useState("");
+  const [priceCalcInitialPaymentInput, setPriceCalcInitialPaymentInput] = useState("");
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
   const [cashSlotEdits, setCashSlotEdits] = useState<Record<string, string>>({});
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
@@ -2428,10 +2429,17 @@ export default function App() {
     return Number.isFinite(raw) ? raw : 0;
   }, [priceCalcSaleInput]);
 
+  const priceCalcInitialPaymentValue = useMemo(() => {
+    const raw = Number(priceCalcInitialPaymentInput.replace(",", "."));
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  }, [priceCalcInitialPaymentInput]);
+
   const priceCalcResult = useMemo(() => {
-    if (priceCalcSaleValue > 0) return calculatePricePlanFromSalePrice(priceCalcSaleValue);
-    return calculatePricePlan(priceCalcProductType, priceCalcCostValue);
-  }, [priceCalcProductType, priceCalcCostValue, priceCalcSaleValue]);
+    if (priceCalcSaleValue > 0) {
+      return calculatePricePlanFromSalePrice(priceCalcSaleValue, priceCalcInitialPaymentValue);
+    }
+    return calculatePricePlan(priceCalcProductType, priceCalcCostValue, priceCalcInitialPaymentValue);
+  }, [priceCalcProductType, priceCalcCostValue, priceCalcSaleValue, priceCalcInitialPaymentValue]);
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
   const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
@@ -5911,9 +5919,21 @@ export default function App() {
                 placeholder="0.00"
               />
             </label>
+            <label className="dg-field">
+              <span className="dg-label">İlkin ödəniş (AZN)</span>
+              <input
+                className="dg-input"
+                type="number"
+                min="0"
+                step="0.01"
+                value={priceCalcInitialPaymentInput}
+                onChange={(e) => setPriceCalcInitialPaymentInput(e.target.value)}
+                placeholder="0.00"
+              />
+            </label>
           </div>
           <p className="dg-muted" style={{ marginTop: "0.75rem" }}>
-            Maya və ya satış qiyməti yazıldıqca nəticələr avtomatik yenilənir. Satış qiymətində nağd olduğu kimi qalır, kreditlər faizlə hesablanır.
+            Maya və ya satış qiyməti yazıldıqca nəticələr avtomatik yenilənir. İlkin ödəniş nağd satış qiymətindən çıxılır və kredit faizi qalan məbləğə tətbiq olunur.
           </p>
         </section>
 
@@ -5924,13 +5944,17 @@ export default function App() {
               <div className="dg-pricecalc-card-label">Nağd satış qiyməti</div>
               <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.cashPrice)}</div>
             </article>
+            <article className="dg-pricecalc-card" aria-label="Kredit üçün qalan məbləğ kartı">
+              <div className="dg-pricecalc-card-label">Kredit üçün qalan məbləğ</div>
+              <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.financedAmount)}</div>
+            </article>
           </div>
 
           <h3 className="dg-panel-section-title dg-panel-section-title--sub">Kredit qiymətləri</h3>
           <div className="dg-pricecalc-card-grid">
             {priceCalcResult.creditLines.map((line) => (
               <article key={line.key} className="dg-pricecalc-card" aria-label={`${line.label} kredit kartı`}>
-                <div className="dg-pricecalc-card-label">{line.label}</div>
+                <div className="dg-pricecalc-card-label">{line.label} ({line.percent}%)</div>
                 <div className="dg-pricecalc-card-value">{formatMoney(line.total)}</div>
                 <div className="dg-pricecalc-card-monthly">
                   Aylıq: {line.monthly > 0 ? formatMoney(line.monthly) : "—"}

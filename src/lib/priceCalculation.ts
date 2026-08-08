@@ -8,11 +8,11 @@ export const PRICE_CALC_PRODUCT_OPTIONS: { value: PriceCalcProductType; label: s
 
 export const PRICE_CALC_CREDIT_PERIODS = [
   { key: "m0to6", label: "0–6 ay", percent: 0, months: 6 },
-  { key: "m9", label: "9 ay", percent: 5, months: 9 },
-  { key: "m12", label: "12 ay", percent: 10, months: 12 },
-  { key: "m15", label: "15 ay", percent: 12.5, months: 15 },
-  { key: "m18", label: "18 ay", percent: 15, months: 18 },
-  { key: "m24", label: "24 ay", percent: 20, months: 24 },
+  { key: "m9", label: "9 ay", percent: 6, months: 9 },
+  { key: "m12", label: "12 ay", percent: 11, months: 12 },
+  { key: "m15", label: "15 ay", percent: 13.5, months: 15 },
+  { key: "m18", label: "18 ay", percent: 16, months: 18 },
+  { key: "m24", label: "24 ay", percent: 21, months: 24 },
 ] as const;
 
 export type PriceCalcCreditKey = (typeof PRICE_CALC_CREDIT_PERIODS)[number]["key"];
@@ -28,6 +28,7 @@ export type PriceCalcCreditLine = {
 
 export type PriceCalculationResult = {
   cashPrice: number;
+  financedAmount: number;
   creditLines: PriceCalcCreditLine[];
 };
 
@@ -57,12 +58,21 @@ export function monthlyCreditPayment(totalPrice: number, months: number): number
   return fromCents(Math.round(toCents(totalPrice) / months));
 }
 
-/** 9 ay və yuxarı kredit qiymətləri yuvarlaqlaşmır; ondan aşağı (məs. 0–6) yuvarlaqlaşır. */
-function creditLinesFromCash(cashPrice: number): PriceCalcCreditLine[] {
+function financedAmountFromCash(cashPrice: number, initialPaymentRaw: number): number {
+  const cashCents = toCents(cashPrice);
+  const initialPaymentCents = Number.isFinite(initialPaymentRaw)
+    ? Math.max(0, toCents(initialPaymentRaw))
+    : 0;
+  return fromCents(Math.max(0, cashCents - initialPaymentCents));
+}
+
+/** İlkin ödənişsiz köhnə 0–6 ay yuvarlaqlaşdırması qorunur; ilkin ödəniş olduqda 0% qalıq dəyişmir. */
+function creditLinesFromCash(cashPrice: number, initialPayment: number): PriceCalcCreditLine[] {
+  const financedAmount = financedAmountFromCash(cashPrice, initialPayment);
   return PRICE_CALC_CREDIT_PERIODS.map((period) => {
-    const priceBaseCents = applyPercent(toCents(cashPrice), period.percent);
+    const priceBaseCents = applyPercent(toCents(financedAmount), period.percent);
     const raw = fromCents(priceBaseCents);
-    const total = period.months < 9 ? roundPriceToNineEnding(raw) : raw;
+    const total = period.months < 9 && initialPayment <= 0 ? roundPriceToNineEnding(raw) : raw;
     return {
       key: period.key,
       label: period.label,
@@ -97,9 +107,10 @@ function resolveCashPercent(productType: PriceCalcProductType, costAzn: number):
 export function calculatePricePlan(
   productType: PriceCalcProductType,
   costAznRaw: number,
+  initialPaymentRaw = 0,
 ): PriceCalculationResult {
   if (!Number.isFinite(costAznRaw) || costAznRaw <= 0) {
-    return { cashPrice: 0, creditLines: emptyCreditLines() };
+    return { cashPrice: 0, financedAmount: 0, creditLines: emptyCreditLines() };
   }
 
   const costCents = toCents(costAznRaw);
@@ -108,18 +119,23 @@ export function calculatePricePlan(
   const cashBaseCents = applyPercent(costCents, cashPercent);
   const cashPrice = roundPriceToNineEnding(fromCents(cashBaseCents));
 
-  return { cashPrice, creditLines: creditLinesFromCash(cashPrice) };
+  const financedAmount = financedAmountFromCash(cashPrice, initialPaymentRaw);
+  return { cashPrice, financedAmount, creditLines: creditLinesFromCash(cashPrice, initialPaymentRaw) };
 }
 
 /**
  * Bilinən nağd satış qiymətindən kredit qiymətlərini hesablayır.
  * Nağd qiymət olduğu kimi qalır; faizlər sabit kredit cədvəlindən götürülür.
  */
-export function calculatePricePlanFromSalePrice(salePriceRaw: number): PriceCalculationResult {
+export function calculatePricePlanFromSalePrice(
+  salePriceRaw: number,
+  initialPaymentRaw = 0,
+): PriceCalculationResult {
   if (!Number.isFinite(salePriceRaw) || salePriceRaw <= 0) {
-    return { cashPrice: 0, creditLines: emptyCreditLines() };
+    return { cashPrice: 0, financedAmount: 0, creditLines: emptyCreditLines() };
   }
 
   const cashPrice = fromCents(toCents(salePriceRaw));
-  return { cashPrice, creditLines: creditLinesFromCash(cashPrice) };
+  const financedAmount = financedAmountFromCash(cashPrice, initialPaymentRaw);
+  return { cashPrice, financedAmount, creditLines: creditLinesFromCash(cashPrice, initialPaymentRaw) };
 }
