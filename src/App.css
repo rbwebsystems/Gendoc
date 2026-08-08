@@ -3188,6 +3188,14 @@ textarea.dg-input {
   margin-top: 0.45rem;
 }
 
+.rb-list-search-hidden {
+  display: none !important;
+}
+
+.rb-list-search-empty {
+  margin-bottom: 1rem;
+}
+
 @media (max-width: 900px) {
   .dg-table.dg-table--cash-report col.dg-cash-col-name {
     width: 7rem;

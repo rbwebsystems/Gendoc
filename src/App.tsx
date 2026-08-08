@@ -1456,6 +1456,8 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navSearch, setNavSearch] = useState("");
   const navSearchRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLElement>(null);
+  const [listSearchStats, setListSearchStats] = useState({ candidates: 0, matches: 0 });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const [projectProductSearch, setProjectProductSearch] = useState("");
@@ -2222,16 +2224,13 @@ export default function App() {
   }, [activeUsers]);
 
   const filteredMainNavIds = useMemo(() => {
-    const q = navSearch.trim().toLowerCase();
     return SIDEBAR_MAIN_IDS.filter((id) => {
       if (moduleAccessSet && !moduleAccessSet.has(id as PermissionModuleId)) return false;
-      const label = SIDEBAR_MODULES.find((m) => m.id === id)?.label ?? "";
-      return !q || label.toLowerCase().includes(q);
+      return true;
     });
-  }, [navSearch, moduleAccessSet]);
+  }, [moduleAccessSet]);
 
   const filteredSystemNavIds = useMemo(() => {
-    const q = navSearch.trim().toLowerCase();
     return SIDEBAR_SYSTEM_IDS.filter((id) => {
       if (id === "settings" && moduleAccessSet) return false;
       if (id === "systemPermissions" && !canManageSystemUsers) return false;
@@ -2240,10 +2239,45 @@ export default function App() {
         const allowed = canReviewLeave || !moduleAccessSet || moduleAccessSet.has("workLeave");
         if (!allowed) return false;
       }
-      const label = SIDEBAR_MODULES.find((m) => m.id === id)?.label ?? "";
-      return !q || label.toLowerCase().includes(q);
+      return true;
     });
-  }, [navSearch, canManageSystemUsers, canManageUsers, canReviewLeave, moduleAccessSet]);
+  }, [canManageSystemUsers, canManageUsers, canReviewLeave, moduleAccessSet]);
+
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root) return;
+
+    const query = navSearch.trim().toLocaleLowerCase("az-AZ");
+    const candidates = Array.from(
+      new Set(
+        root.querySelectorAll<HTMLElement>(
+          "tbody > tr, [role='listitem'], .dg-folder-tile",
+        ),
+      ),
+    );
+    let matches = 0;
+
+    for (const candidate of candidates) {
+      const searchable = candidate.cloneNode(true) as HTMLElement;
+      searchable
+        .querySelectorAll("button, .dg-td-actions, .dg-labels-row-actions")
+        .forEach((element) => element.remove());
+      const text = (searchable.textContent ?? "").toLocaleLowerCase("az-AZ");
+      const matched = !query || text.includes(query);
+      candidate.classList.toggle("rb-list-search-hidden", !matched);
+      if (matched) matches += 1;
+    }
+
+    setListSearchStats((current) =>
+      current.candidates === candidates.length && current.matches === matches
+        ? current
+        : { candidates: candidates.length, matches },
+    );
+  });
+
+  useEffect(() => {
+    setNavSearch("");
+  }, [module]);
 
   useEffect(() => {
     if (authState.status !== "signedIn") {
@@ -8086,10 +8120,10 @@ export default function App() {
                     <input
                       ref={navSearchRef}
                       type="search"
-                      placeholder="Modullarda süzgəc..."
+                      placeholder="Siyahıda axtar..."
                       value={navSearch}
                       onChange={(e) => setNavSearch(e.target.value)}
-                      aria-label="Modullarda süzgəc"
+                      aria-label="Cari siyahıda axtarış"
                     />
                   </div>
                   {module === "cashReport" ? (
@@ -8113,10 +8147,17 @@ export default function App() {
               </div>
             </header>
 
-            <main className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}${module === "priceCalculations" ? " rb-content--pricecalc" : ""}`}>
+            <main ref={contentRef} className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}${module === "priceCalculations" ? " rb-content--pricecalc" : ""}`}>
               {toast ? (
                 <div className={`dg-toast ${toast.kind === "error" ? "dg-toast--error" : "dg-toast--success"}`} role="status">
                   {toast.msg}
+                </div>
+              ) : null}
+
+              {navSearch.trim() && listSearchStats.candidates > 0 && listSearchStats.matches === 0 ? (
+                <div className="dg-empty-state-card rb-list-search-empty" role="status">
+                  <div className="dg-empty-state-title">Uyğun nəticə tapılmadı</div>
+                  <div className="dg-empty-state-desc">Axtarış sözünü dəyişib yenidən yoxlayın.</div>
                 </div>
               ) : null}
 
