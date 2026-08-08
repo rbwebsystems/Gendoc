@@ -622,7 +622,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
   { id: "instructions", label: "Təlimat" },
-  { id: "labels", label: "Etiket" },
+  { id: "labels", label: "Outlet" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -2338,7 +2338,7 @@ export default function App() {
       return { title: "Təlimat", sub: MODULE_TAGLINE.instructions };
     }
     if (module === "labels") {
-      return { title: "Etiket", sub: MODULE_TAGLINE.labels };
+      return { title: "Outlet", sub: MODULE_TAGLINE.labels };
     }
     if (module === "cashReport") {
       return { title: "Kassa hesabatı", sub: MODULE_TAGLINE.cashReport };

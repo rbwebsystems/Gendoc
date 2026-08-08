@@ -80,7 +80,7 @@ export const PERMISSION_MODULE_OPTIONS: { id: PermissionModuleId; label: string 
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
   { id: "instructions", label: "Təlimat" },
-  { id: "labels", label: "Etiket" },
+  { id: "labels", label: "Outlet" },
   { id: "cashReport", label: "Kassa hesabatı" },
   { id: "workLeave", label: "İş icazələri" },
 ];

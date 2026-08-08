@@ -291,7 +291,7 @@ export function LabelsModule({ products, onSave }: LabelsModuleProps) {
   };
 
   return (
-    <div className="dg-form-page pg-panel dg-labels-module" aria-label="Etiket məhsul siyahısı">
+    <div className="dg-form-page pg-panel dg-labels-module" aria-label="Outlet məhsul siyahısı">
       <div className="dg-labels-toolbar">
         <div>
           <h2 className="dg-labels-title">Məhsul siyahısı</h2>
