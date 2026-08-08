@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import "./App.css";
 import "./rbsoft-theme.css";
 import { InstructionsModule } from "./components/InstructionsModule";
+import { LabelsModule } from "./components/LabelsModule";
 import {
   buildDeliveryActHtml,
   buildDeliveryActNoPriceHtml,
@@ -258,6 +259,7 @@ type SidebarModule =
   | "customerOrders"
   | "priceCalculations"
   | "instructions"
+  | "labels"
   | "cashReport"
   | "appUsers"
   | "systemPermissions"
@@ -620,6 +622,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
   { id: "instructions", label: "Təlimat" },
+  { id: "labels", label: "Etiket" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -639,6 +642,7 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "customerOrders",
   "priceCalculations",
   "instructions",
+  "labels",
 ];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
@@ -651,6 +655,7 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
   priceCalculations: "Qiymət hesablanması — tezliklə",
   instructions: "Qiymət və faiz qaydalarının idarə edilməsi",
+  labels: "Məhsul, say və satış qiymətlərinin siyahısı",
   cashReport: "Nağd və kart hesablarının gündəlik balansı",
   appUsers: "Giriş hesablarının idarə edilməsi",
   systemPermissions: "Modul giriş icazələri",
@@ -925,6 +930,18 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
             strokeLinejoin="round"
             d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
           />
+        </svg>
+      );
+    case "labels":
+      return (
+        <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"
+          />
+          <circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none" />
         </svg>
       );
     case "cashReport":
@@ -2319,6 +2336,9 @@ export default function App() {
     }
     if (module === "instructions") {
       return { title: "Təlimat", sub: MODULE_TAGLINE.instructions };
+    }
+    if (module === "labels") {
+      return { title: "Etiket", sub: MODULE_TAGLINE.labels };
     }
     if (module === "cashReport") {
       return { title: "Kassa hesabatı", sub: MODULE_TAGLINE.cashReport };
@@ -7922,7 +7942,7 @@ export default function App() {
                   <button
                     key={m.id}
                     type="button"
-                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}`}
+                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
                     onClick={() => switchSidebarModule(m.id)}
                   >
                     <span className="rb-menu-icon">
@@ -7942,7 +7962,7 @@ export default function App() {
                   <button
                     key={m.id}
                     type="button"
-                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}`}
+                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
                     onClick={() => switchSidebarModule(m.id)}
                   >
                     <span className="rb-menu-icon">
@@ -8112,6 +8132,12 @@ export default function App() {
                 <InstructionsModule
                   state={workspace.instructions!}
                   onChange={(instructions) => setWorkspace((w) => ({ ...w, instructions }))}
+                />
+              ) : null}
+              {module === "labels" ? (
+                <LabelsModule
+                  products={workspace.labelProducts ?? []}
+                  onSave={(labelProducts) => setWorkspace((current) => ({ ...current, labelProducts }))}
                 />
               ) : null}
               {module === "cashReport" ? renderCashReportModule() : null}

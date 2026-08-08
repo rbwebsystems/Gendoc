@@ -7,6 +7,7 @@ import type {
   SupplierOfferRow,
   StoreOrderRecord,
   CustomerOrderRecord,
+  LabelProductRecord,
   SystemUserRecord,
   LeaveRequestRecord,
   PermissionModuleId,
@@ -123,6 +124,7 @@ const VALID_PERMISSION_MODULES = new Set<PermissionModuleId>([
   "customerOrders",
   "priceCalculations",
   "instructions",
+  "labels",
   "cashReport",
   "workLeave",
 ]);
@@ -508,6 +510,27 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
 
   const storeOrders = normalizeStoreOrders(w.storeOrders);
   const customerOrders = normalizeCustomerOrders(w.customerOrders);
+  const labelProductsRaw = Array.isArray(w.labelProducts) ? w.labelProducts : [];
+  const labelProducts: LabelProductRecord[] = labelProductsRaw
+    .filter((row) => row && typeof (row as { id?: unknown }).id === "string")
+    .map((row) => ({
+      id: String((row as { id: string }).id),
+      name:
+        typeof (row as { name?: unknown }).name === "string"
+          ? String((row as { name: string }).name).trim()
+          : "",
+      qty: Math.max(0, Number((row as { qty?: unknown }).qty) || 0),
+      salePrice: Math.max(0, Number((row as { salePrice?: unknown }).salePrice) || 0),
+      createdAt:
+        typeof (row as { createdAt?: unknown }).createdAt === "number"
+          ? Number((row as { createdAt: number }).createdAt)
+          : Date.now(),
+      updatedAt:
+        typeof (row as { updatedAt?: unknown }).updatedAt === "number"
+          ? Number((row as { updatedAt: number }).updatedAt)
+          : Date.now(),
+    }))
+    .filter((row) => row.name.length > 0 && row.qty > 0);
   const cashReport = w.cashReport != null ? normalizeCashReportState(w.cashReport) : undefined;
   const instructions = normalizeInstructionsState(w.instructions);
   const systemUsers = normalizeSystemUsers(w.systemUsers);
@@ -541,6 +564,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     supplierOffers,
     storeOrders,
     customerOrders,
+    labelProducts,
     ...(cashReport ? { cashReport } : {}),
     instructions,
     systemUsers,
@@ -761,6 +785,7 @@ export function workspaceHasUserData(w: DocWorkspace): boolean {
     (ws.supplierOffers?.length ?? 0) > 0 ||
     (ws.storeOrders?.length ?? 0) > 0 ||
     (ws.customerOrders?.length ?? 0) > 0 ||
+    (ws.labelProducts?.length ?? 0) > 0 ||
     (ws.systemUsers?.length ?? 0) > 0 ||
     (ws.leaveRequests?.length ?? 0) > 0 ||
     (ws.cashReport?.rows?.length ?? 0) > 0 ||
@@ -780,6 +805,7 @@ function workspaceLatestTouch(w: DocWorkspace): number {
   for (const n of ws.notes ?? []) bump(n.updatedAt);
   for (const s of ws.suppliers ?? []) bump(s.updatedAt);
   for (const o of ws.supplierOffers ?? []) bump(o.updatedAt);
+  for (const row of ws.labelProducts ?? []) bump(row.updatedAt);
   for (const f of ws.folders ?? []) bump(f.updatedAt);
   for (const row of ws.cashReport?.rows ?? []) bump(row.updatedAt);
   for (const entry of ws.cashReport?.history ?? []) bump(entry.savedAt);

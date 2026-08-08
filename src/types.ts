@@ -215,6 +215,16 @@ export interface CustomerOrderRecord {
   updatedAt: number;
 }
 
+/** Etiket modulu üçün sadə məhsul siyahısı sətri. */
+export interface LabelProductRecord {
+  id: string;
+  name: string;
+  qty: number;
+  salePrice: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type LeaveRequestStatus = "pending" | "approved" | "rejected";
 
 export type AppUserRole = "employee" | "director" | "admin";
@@ -230,6 +240,7 @@ export type PermissionModuleId =
   | "customerOrders"
   | "priceCalculations"
   | "instructions"
+  | "labels"
   | "cashReport"
   | "workLeave";
 
@@ -372,6 +383,7 @@ export interface DocWorkspace {
   supplierQuotes?: SupplierQuoteRecord[];
   storeOrders?: StoreOrderRecord[];
   customerOrders?: CustomerOrderRecord[];
+  labelProducts?: LabelProductRecord[];
   cashReport?: CashReportState;
   instructions?: InstructionsState;
   systemUsers?: SystemUserRecord[];
