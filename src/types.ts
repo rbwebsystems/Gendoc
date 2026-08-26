@@ -241,7 +241,6 @@ export type PermissionModuleId =
   | "priceCalculations"
   | "instructions"
   | "labels"
-  | "labelDesigner"
   | "cashReport"
   | "workLeave";
 

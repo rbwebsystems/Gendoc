@@ -5,7 +5,6 @@ import "./App.css";
 import "./rbsoft-theme.css";
 import { InstructionsModule } from "./components/InstructionsModule";
 import { LabelsModule } from "./components/LabelsModule";
-import { LabelDesignerModule } from "./components/LabelDesignerModule";
 import {
   buildDeliveryActHtml,
   buildDeliveryActNoPriceHtml,
@@ -261,7 +260,6 @@ type SidebarModule =
   | "priceCalculations"
   | "instructions"
   | "labels"
-  | "labelDesigner"
   | "cashReport"
   | "appUsers"
   | "systemPermissions"
@@ -625,7 +623,6 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "priceCalculations", label: "Qiymət hesablanması" },
   { id: "instructions", label: "Təlimat" },
   { id: "labels", label: "Outlet" },
-  { id: "labelDesigner", label: "Etiket hazırlama" },
   { id: "appUsers", label: "İstifadəçilər" },
   { id: "systemPermissions", label: "Sistem icazələri" },
   { id: "workLeave", label: "İş icazələri" },
@@ -646,7 +643,6 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "priceCalculations",
   "instructions",
   "labels",
-  "labelDesigner",
 ];
 
 const MODULE_TAGLINE: Record<SidebarModule, string> = {
@@ -660,7 +656,6 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   priceCalculations: "Qiymət hesablanması — tezliklə",
   instructions: "Qiymət və faiz qaydalarının idarə edilməsi",
   labels: "Məhsul, say və satış qiymətlərinin siyahısı",
-  labelDesigner: "Məhsul məlumatlarından ölçülü qiymət etiketi hazırlayın",
   cashReport: "Nağd və kart hesablarının gündəlik balansı",
   appUsers: "Giriş hesablarının idarə edilməsi",
   systemPermissions: "Modul giriş icazələri",
@@ -938,7 +933,6 @@ function SidebarNavIcon(props: { mod: SidebarModule }) {
         </svg>
       );
     case "labels":
-    case "labelDesigner":
       return (
         <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
           <path
@@ -2380,9 +2374,6 @@ export default function App() {
     }
     if (module === "labels") {
       return { title: "Outlet", sub: MODULE_TAGLINE.labels };
-    }
-    if (module === "labelDesigner") {
-      return { title: "Etiket hazırlama", sub: MODULE_TAGLINE.labelDesigner };
     }
     if (module === "cashReport") {
       return { title: "Kassa hesabatı", sub: MODULE_TAGLINE.cashReport };
@@ -8214,7 +8205,6 @@ export default function App() {
                   onSave={(labelProducts) => setWorkspace((current) => ({ ...current, labelProducts }))}
                 />
               ) : null}
-              {module === "labelDesigner" ? <LabelDesignerModule /> : null}
               {module === "cashReport" ? renderCashReportModule() : null}
               {module === "appUsers" ? renderAppUsersModule() : null}
               {module === "systemPermissions" ? renderSystemPermissionsModule() : null}
