@@ -151,10 +151,8 @@ export function pruneCashSlotEdits(
       changed = true;
       continue;
     }
-    if (commitCashInput(next[key]) === (row.slots[slotIndex] ?? 0)) {
-      delete next[key];
-      changed = true;
-    }
+    // Keep active text (including "-" and decimal separators) until blur.
+    // Matching a snapshot's numeric value is not proof that editing is done.
   }
   return changed ? next : drafts;
 }

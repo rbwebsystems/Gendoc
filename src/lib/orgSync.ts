@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  runTransaction,
   serverTimestamp,
   setDoc,
   type Unsubscribe,
@@ -20,6 +21,7 @@ import {
 import type { DocWorkspace, SystemUserRecord } from "../types";
 import type { AppUserRole, PermissionModuleId } from "../types";
 import { defaultModulesForRole } from "./defaults";
+import { rebaseCashReport } from "./cashSync";
 
 export const ORG_ID = "default";
 const SCHEMA_VERSION = 3;
@@ -238,7 +240,28 @@ export async function fetchOrgWorkspaceOnce(): Promise<DocWorkspace | null> {
   return (data?.workspace ?? null) as DocWorkspace | null;
 }
 
-export async function writeOrgWorkspace(workspace: DocWorkspace): Promise<void> {
+export async function writeOrgWorkspace(
+  workspace: DocWorkspace,
+  cashBase?: DocWorkspace["cashReport"],
+): Promise<DocWorkspace> {
+  if (cashBase) {
+    const ref = orgWorkspaceRef();
+    return runTransaction(db!, async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      const remote = snapshot.data()?.workspace as DocWorkspace | undefined;
+      const payload = prepareWorkspaceForFirestore({
+        ...workspace,
+        cashReport: rebaseCashReport(cashBase, workspace.cashReport, remote?.cashReport),
+      });
+      assertFirestorePayloadSize(payload);
+      transaction.set(ref, {
+        workspace: payload,
+        schemaVersion: SCHEMA_VERSION,
+        updatedAt: serverTimestamp(),
+      });
+      return payload;
+    });
+  }
   const workspacePayload = prepareWorkspaceForFirestore(workspace);
   assertFirestorePayloadSize(workspacePayload);
   await setDoc(
@@ -250,6 +273,7 @@ export async function writeOrgWorkspace(workspace: DocWorkspace): Promise<void> 
     },
     { merge: false },
   );
+  return workspacePayload;
 }
 
 /** Developer-in köhnə şəxsi workspace-indən org workspace-ə köçürmə. */

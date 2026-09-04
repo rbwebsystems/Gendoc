@@ -5,6 +5,7 @@ import "./App.css";
 import "./rbsoft-theme.css";
 import { InstructionsModule } from "./components/InstructionsModule";
 import { LabelsModule } from "./components/LabelsModule";
+import { rebaseCashReport } from "./lib/cashSync";
 import {
   buildDeliveryActHtml,
   buildDeliveryActNoPriceHtml,
@@ -1431,8 +1432,8 @@ export default function App() {
   workspaceRef.current = workspace;
   // Remote ilə yerli arasında "echo" yazıların qarşısını almaq üçün son sinxronlaşmış JSON
   const lastSyncedJsonRef = useRef<string>("");
-  /** Serverə göndərilmiş, snapshot ilə təsdiqlənməyi gözləyən yazı */
-  const lastWrittenJsonRef = useRef<string>("");
+  /** Kassa dəyişikliklərinin hesablandığı son təsdiqlənmiş server versiyası. */
+  const syncedCashRef = useRef<DocWorkspace["cashReport"]>();
   // Yerli dəyişiklik remote-a yazılmamışdırsa snapshot köhnə məlumatı geri qaytarmasın
   const pendingLocalWriteRef = useRef(false);
   const remoteWriteTimerRef = useRef<number | null>(null);
@@ -1442,8 +1443,6 @@ export default function App() {
   const remoteReadyRef = useRef<boolean>(false);
   /** Kassa dəyişikliyi remote-a yazılmamışdırsa snapshot köhnə məlumatı geri qaytarmasın */
   const cashReportDirtyRef = useRef(false);
-  /** Remote/workspace sinxronizasiyasından sonra köhnə kassa draft-larını sıfırlamaq */
-  const cashExternalSyncRef = useRef(false);
   /** İlk workspace bootstrap bitənə qədər snapshot tətbiq etmə */
   const workspaceSyncReadyRef = useRef(!firebaseEnabled);
   const [cashReportHydrated, setCashReportHydrated] = useState(!firebaseEnabled);
@@ -1599,7 +1598,7 @@ export default function App() {
         setForcePasswordChange(false);
         remoteReadyRef.current = false;
         lastSyncedJsonRef.current = "";
-        lastWrittenJsonRef.current = "";
+        syncedCashRef.current = undefined;
         pendingLocalWriteRef.current = false;
         cashReportDirtyRef.current = false;
         workspaceSyncReadyRef.current = !firebaseEnabled;
@@ -1691,14 +1690,25 @@ export default function App() {
 
       pendingLocalWriteRef.current = true;
       remoteWriteInFlightRef.current = true;
+      let succeeded = false;
 
       try {
-        if (firebaseEnabled) {
-          await writeOrgWorkspace(payload);
-        } else {
-          await writeWorkspace(uid, payload);
-        }
-        lastWrittenJsonRef.current = json;
+        const saved = firebaseEnabled
+          ? await writeOrgWorkspace(payload, syncedCashRef.current ?? { rows: [], history: [] })
+          : (await writeWorkspace(uid, payload), payload);
+        const current = workspaceRef.current;
+        const rebased = {
+          ...current,
+          cashReport: rebaseCashReport(payload.cashReport, current.cashReport, saved.cashReport),
+        };
+        syncedCashRef.current = saved.cashReport;
+        lastSyncedJsonRef.current = workspaceFingerprint(saved);
+        const stillPending = workspaceFingerprint(rebased) !== lastSyncedJsonRef.current;
+        pendingLocalWriteRef.current = stillPending;
+        cashReportDirtyRef.current = stillPending;
+        workspaceRef.current = rebased;
+        setWorkspace(rebased);
+        succeeded = true;
         if (remoteWriteRetryTimerRef.current != null) {
           window.clearTimeout(remoteWriteRetryTimerRef.current);
           remoteWriteRetryTimerRef.current = null;
@@ -1720,6 +1730,7 @@ export default function App() {
         }
       } finally {
         remoteWriteInFlightRef.current = false;
+        if (succeeded) setRemoteSyncEpoch((epoch) => epoch + 1);
       }
     },
     [authState],
@@ -1764,14 +1775,14 @@ export default function App() {
               : resolveCashReportState(remoteCash)
             : resolveCashReportState(liveCash, localMain?.cashReport, localBackup?.cashReport);
 
-        const merged = cashReport ? { ...base, cashReport } : base;
+        let merged = cashReport ? { ...base, cashReport } : base;
         const needsUpload =
           !remoteNorm ||
           !workspaceHasUserData(remoteNorm) ||
           workspaceFingerprint(merged) !== workspaceFingerprint(remoteNorm);
 
         if (needsUpload) {
-          if (firebaseEnabled) await writeOrgWorkspace(merged);
+          if (firebaseEnabled) merged = await writeOrgWorkspace(merged, remoteCash ?? { rows: [], history: [] });
           else await writeWorkspace(uid, merged);
         }
 
@@ -1795,8 +1806,7 @@ export default function App() {
           }
           if (!pendingLocalWriteRef.current) {
             lastSyncedJsonRef.current = workspaceFingerprint(resolved);
-            cashExternalSyncRef.current = true;
-            setCashSlotEdits({});
+            syncedCashRef.current = resolved.cashReport;
             setWorkspace(resolved);
           } else {
             const mergedCashKeep = mergeCashReportOnSync(workspaceRef.current.cashReport, resolved.cashReport, {
@@ -1804,8 +1814,7 @@ export default function App() {
             });
             if (mergedCashKeep) {
               const withLocalCash = { ...workspaceRef.current, cashReport: mergedCashKeep };
-              cashExternalSyncRef.current = true;
-              setCashSlotEdits({});
+              syncedCashRef.current = merged.cashReport;
               setWorkspace(withLocalCash);
             }
           }
@@ -1836,42 +1845,24 @@ export default function App() {
         remoteReadyRef.current = true;
         return;
       }
-      const normalizedBase = normalizeWorkspace(remoteWs);
-      // Firestore snapshot — kassa üçün remote mənbədir (lokal dirty deyilsə)
-      let cashReport = normalizedBase.cashReport;
-      if (cashReportDirtyRef.current || pendingLocalWriteRef.current || remoteWriteInFlightRef.current) {
-        const mergedCash = mergeCashReportOnSync(workspaceRef.current.cashReport, normalizedBase.cashReport, {
-          preferLocalRows: true,
-        });
-        cashReport = mergedCash ?? cashReport;
+      // Transaction completion acknowledges the exact saved version. A snapshot
+      // must never acknowledge a newer local edit or clear an active input.
+      if (pendingLocalWriteRef.current || remoteWriteInFlightRef.current || cashReportDirtyRef.current) {
+        remoteReadyRef.current = true;
+        return;
       }
-      const normalized = cashReport ? { ...normalizedBase, cashReport } : normalizedBase;
+      const normalized = normalizeWorkspace(remoteWs);
       const json = workspaceFingerprint(normalized);
       if (json === lastSyncedJsonRef.current) {
         remoteReadyRef.current = true;
         setRemoteSyncEpoch((e) => e + 1);
         return;
       }
-      if (json === lastWrittenJsonRef.current) {
-        lastSyncedJsonRef.current = json;
-        pendingLocalWriteRef.current = false;
-        cashReportDirtyRef.current = false;
-        cashExternalSyncRef.current = true;
-        setCashSlotEdits({});
-        remoteReadyRef.current = true;
-        setRemoteSyncEpoch((e) => e + 1);
-        return;
-      }
-      if (pendingLocalWriteRef.current || remoteWriteInFlightRef.current || cashReportDirtyRef.current) {
-        remoteReadyRef.current = true;
-        setRemoteSyncEpoch((e) => e + 1);
-        return;
-      }
       lastSyncedJsonRef.current = json;
+      syncedCashRef.current = normalized.cashReport;
       remoteReadyRef.current = true;
       setRemoteSyncEpoch((e) => e + 1);
-      cashExternalSyncRef.current = true;
-      setCashSlotEdits({});
+      workspaceRef.current = normalized;
       setWorkspace(normalized);
     };
 
@@ -1893,6 +1884,10 @@ export default function App() {
     if (firebaseEnabled && authState.status === "signedIn") {
       if (!remoteReadyRef.current) return; // hələ ilk snapshot gəlməyib
       if (json === lastSyncedJsonRef.current) {
+        if (!remoteWriteInFlightRef.current) {
+          pendingLocalWriteRef.current = false;
+          cashReportDirtyRef.current = false;
+        }
         return;
       }
 
@@ -2458,10 +2453,6 @@ export default function App() {
   useEffect(() => {
     const rows = workspace.cashReport?.rows ?? [];
     setCashSlotEdits((prev) => {
-      if (cashExternalSyncRef.current) {
-        cashExternalSyncRef.current = false;
-        return Object.keys(prev).length === 0 ? prev : {};
-      }
       return pruneCashSlotEdits(rows, prev);
     });
   }, [workspace.cashReport?.rows, remoteSyncEpoch]);
@@ -2520,7 +2511,8 @@ export default function App() {
       if (firebaseEnabled && authState.status === "signedIn") {
         pendingLocalWriteRef.current = true;
       }
-      setWorkspace((w) => {
+      const w = workspaceRef.current;
+      const nextWorkspace = (() => {
         const prev = {
           rows: w.cashReport?.rows ?? [],
           history: w.cashReport?.history ?? [],
@@ -2536,7 +2528,9 @@ export default function App() {
             )
           : (patched.history ?? prev.history);
         return { ...w, cashReport: { rows, history } };
-      });
+      })();
+      workspaceRef.current = nextWorkspace;
+      setWorkspace(nextWorkspace);
     },
     [cashHistoryAuthorName, authState.status],
   );
@@ -2781,6 +2775,7 @@ export default function App() {
     if (firebaseEnabled && authState.status === "signedIn") {
       try {
         await writeOrgWorkspace(merged);
+        syncedCashRef.current = merged.cashReport;
         lastSyncedJsonRef.current = workspaceFingerprint(merged);
         pendingLocalWriteRef.current = false;
         remoteReadyRef.current = true;
@@ -6059,8 +6054,8 @@ export default function App() {
                             if (!isPartialCashInput(raw)) return;
                             setCashSlotEdits((prev) => ({ ...prev, [slotKey]: raw }));
                           }}
-                          onBlur={() => {
-                            const raw = cashSlotEdits[slotKey] ?? (value === 0 ? "" : String(value));
+                          onBlur={(event) => {
+                            const raw = event.currentTarget.value;
                             const next = commitCashInput(raw);
                             const committed =
                               workspaceRef.current.cashReport?.rows.find((r) => r.id === row.id)?.slots[slotIndex] ??
