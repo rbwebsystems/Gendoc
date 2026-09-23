@@ -150,6 +150,8 @@ import {
   PRICE_CALC_PRODUCT_OPTIONS,
   type PriceCalcProductType,
 } from "./lib/priceCalculation";
+import { calculateCreditAssessment, type CreditAssessmentResult, type CreditRisk } from "./lib/creditAssessment";
+import { remoteWriteDelayMs } from "./lib/syncTiming";
 
 async function downloadPdfFromHtml(html: string, filename: string): Promise<void> {
   const iframe = document.createElement("iframe");
@@ -1439,6 +1441,8 @@ export default function App() {
   const remoteWriteTimerRef = useRef<number | null>(null);
   const remoteWriteRetryTimerRef = useRef<number | null>(null);
   const remoteWriteInFlightRef = useRef(false);
+  /** İlk növbəyə alınan lokal dəyişikliyin vaxtı; davamlı yazıda maksimum gecikməni məhdudlaşdırır. */
+  const remoteWriteQueuedAtRef = useRef<number | null>(null);
   // İlk snapshot gəlmədən yazmaq olmaz (yoxsa migration ilə yaza bilərik)
   const remoteReadyRef = useRef<boolean>(false);
   /** Kassa dəyişikliyi remote-a yazılmamışdırsa snapshot köhnə məlumatı geri qaytarmasın */
@@ -1486,6 +1490,21 @@ export default function App() {
   const [priceCalcCostInput, setPriceCalcCostInput] = useState("");
   const [priceCalcSaleInput, setPriceCalcSaleInput] = useState("");
   const [priceCalcInitialPaymentInput, setPriceCalcInitialPaymentInput] = useState("");
+  const [priceCalcTab, setPriceCalcTab] = useState<"price" | "credit">("price");
+  const [creditAssessmentDraft, setCreditAssessmentDraft] = useState({
+    price: "",
+    months: "",
+    risk: "" as "" | CreditRisk,
+    salary: "",
+    obligations: "",
+    extraIncomeEnabled: false,
+    extraIncomeType: "",
+    extraIncome: "",
+    manualDownEnabled: false,
+    manualDownPayment: "",
+  });
+  const [creditAssessmentResult, setCreditAssessmentResult] = useState<CreditAssessmentResult | null>(null);
+  const [creditAssessmentError, setCreditAssessmentError] = useState("");
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
   const [cashSlotEdits, setCashSlotEdits] = useState<Record<string, string>>({});
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
@@ -1601,6 +1620,7 @@ export default function App() {
         syncedCashRef.current = undefined;
         pendingLocalWriteRef.current = false;
         cashReportDirtyRef.current = false;
+        remoteWriteQueuedAtRef.current = null;
         workspaceSyncReadyRef.current = !firebaseEnabled;
         setCashReportHydrated(!firebaseEnabled);
         if (remoteWriteTimerRef.current != null) {
@@ -1688,6 +1708,7 @@ export default function App() {
       // workspaceRef köhnə ola bilər — pending-i burada sıfırlama (snapshot geri qaytarmasın)
       if (json === lastSyncedJsonRef.current) return;
 
+      remoteWriteQueuedAtRef.current = null;
       pendingLocalWriteRef.current = true;
       remoteWriteInFlightRef.current = true;
       let succeeded = false;
@@ -1884,6 +1905,7 @@ export default function App() {
     if (firebaseEnabled && authState.status === "signedIn") {
       if (!remoteReadyRef.current) return; // hələ ilk snapshot gəlməyib
       if (json === lastSyncedJsonRef.current) {
+        remoteWriteQueuedAtRef.current = null;
         if (!remoteWriteInFlightRef.current) {
           pendingLocalWriteRef.current = false;
           cashReportDirtyRef.current = false;
@@ -1892,12 +1914,15 @@ export default function App() {
       }
 
       pendingLocalWriteRef.current = true;
+      const now = Date.now();
+      const queuedAt = remoteWriteQueuedAtRef.current ?? now;
+      remoteWriteQueuedAtRef.current = queuedAt;
       if (remoteWriteTimerRef.current != null) {
         window.clearTimeout(remoteWriteTimerRef.current);
       }
-      // Kassa dəyişiklikləri (Cəmlə, sil, geri al) refresh zamanı itməsin deyə tez yazılır;
-      // adi mətn sahələri üçün normal debounce saxlanılır.
-      const writeDelay = cashReportDirtyRef.current ? 120 : 600;
+      // Qısa debounce sürətli ardıcıl dəyişiklikləri birləşdirir. Maksimum gecikmə
+      // həddi davamlı yazının realtime sinxronu sonsuzadək təxirə salmasına mane olur.
+      const writeDelay = remoteWriteDelayMs({ cashDirty: cashReportDirtyRef.current, queuedAt, now });
       remoteWriteTimerRef.current = window.setTimeout(() => {
         remoteWriteTimerRef.current = null;
         void flushRemoteWrite();
@@ -5864,9 +5889,156 @@ export default function App() {
     );
   };
 
+  const runCreditAssessment = () => {
+    const draft = creditAssessmentDraft;
+    const missing: string[] = [];
+    if (!(Number(draft.price) > 0)) missing.push("məhsul dəyəri");
+    if (!(Number(draft.months) > 0)) missing.push("müddət");
+    if (!draft.risk) missing.push("risk qrupu");
+    if (draft.salary.trim() === "" || Number(draft.salary) < 0) missing.push("aylıq əməkhaqqı");
+    if (draft.obligations.trim() === "" || Number(draft.obligations) < 0) missing.push("digər öhdəliklər");
+    if (draft.extraIncomeEnabled && (!draft.extraIncomeType || !(Number(draft.extraIncome) > 0))) {
+      missing.push("əlavə gəlir məlumatları");
+    }
+    if (draft.manualDownEnabled && (draft.manualDownPayment.trim() === "" || Number(draft.manualDownPayment) < 0)) {
+      missing.push("ilkin ödəniş");
+    }
+    if (missing.length > 0) {
+      setCreditAssessmentError(`Düzgün daxil edin: ${missing.join(", ")}.`);
+      setCreditAssessmentResult(null);
+      return;
+    }
+    setCreditAssessmentError("");
+    setCreditAssessmentResult(
+      calculateCreditAssessment({
+        price: Number(draft.price),
+        months: Number(draft.months),
+        risk: draft.risk as CreditRisk,
+        salary: Number(draft.salary),
+        obligations: Number(draft.obligations),
+        extraIncome: draft.extraIncomeEnabled ? Number(draft.extraIncome) : 0,
+        manualDownPayment: draft.manualDownEnabled ? Number(draft.manualDownPayment) : null,
+      }),
+    );
+  };
+
+  const renderCreditAssessment = () => {
+    const draft = creditAssessmentDraft;
+    const patch = (next: Partial<typeof draft>) => setCreditAssessmentDraft((current) => ({ ...current, ...next }));
+    return (
+      <>
+        <section className="dg-form-inner-panel" aria-label="Kredit uyğunluğu girişləri">
+          <h2 className="dg-panel-section-title">Kredit məlumatları</h2>
+          <div className="dg-form-meta-grid dg-credit-assessment-grid">
+            <label className="dg-field">
+              <span className="dg-label">Məhsul dəyəri (AZN)</span>
+              <input className="dg-input" type="number" min="0" step="0.01" value={draft.price} onChange={(e) => patch({ price: e.target.value })} />
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Müddət (ay)</span>
+              <select className="dg-input" value={draft.months} onChange={(e) => patch({ months: e.target.value })}>
+                <option value="">Seçin…</option>
+                {[3, 6, 9, 12, 15, 18].map((month) => <option key={month} value={month}>{month} ay</option>)}
+              </select>
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Risk qrupu</span>
+              <select className="dg-input" value={draft.risk} onChange={(e) => patch({ risk: e.target.value as "" | CreditRisk })}>
+                <option value="">Seçin…</option>
+                <option value="low">Aşağı risk (A)</option>
+                <option value="med">Orta risk (B)</option>
+                <option value="high">Yüksək risk (C)</option>
+              </select>
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Aylıq əməkhaqqı (AZN)</span>
+              <input className="dg-input" type="number" min="0" step="1" value={draft.salary} onChange={(e) => patch({ salary: e.target.value })} />
+            </label>
+            <label className="dg-field">
+              <span className="dg-label">Digər öhdəliklər (AZN)</span>
+              <input className="dg-input" type="number" min="0" step="1" value={draft.obligations} onChange={(e) => patch({ obligations: e.target.value })} />
+            </label>
+          </div>
+
+          <div className="dg-credit-options">
+            <label className="dg-credit-check">
+              <input type="checkbox" checked={draft.manualDownEnabled} onChange={(e) => patch({ manualDownEnabled: e.target.checked, manualDownPayment: e.target.checked ? draft.manualDownPayment : "" })} />
+              <span>İlkin ödənişi manual daxil et</span>
+            </label>
+            {draft.manualDownEnabled ? (
+              <label className="dg-field">
+                <span className="dg-label">İlkin ödəniş (AZN)</span>
+                <input className="dg-input" type="number" min="0" step="0.01" value={draft.manualDownPayment} onChange={(e) => patch({ manualDownPayment: e.target.value })} />
+              </label>
+            ) : null}
+
+            <label className="dg-credit-check">
+              <input type="checkbox" checked={draft.extraIncomeEnabled} onChange={(e) => patch({ extraIncomeEnabled: e.target.checked, extraIncomeType: e.target.checked ? draft.extraIncomeType : "", extraIncome: e.target.checked ? draft.extraIncome : "" })} />
+              <span>Əlavə gəlir var</span>
+            </label>
+            {draft.extraIncomeEnabled ? (
+              <div className="dg-credit-extra-fields">
+                <label className="dg-field">
+                  <span className="dg-label">Əlavə gəlir növü</span>
+                  <select className="dg-input" value={draft.extraIncomeType} onChange={(e) => patch({ extraIncomeType: e.target.value })}>
+                    <option value="">Seçin…</option>
+                    <option value="benefit">Müavinət</option><option value="bonus">Bonus</option>
+                    <option value="rent">Kirayə gəliri</option><option value="freelance">Freelance</option>
+                    <option value="parttime">Müvəqqəti əlavə iş</option>
+                  </select>
+                </label>
+                <label className="dg-field">
+                  <span className="dg-label">Əlavə gəlir məbləği (AZN)</span>
+                  <input className="dg-input" type="number" min="0" step="1" value={draft.extraIncome} onChange={(e) => patch({ extraIncome: e.target.value })} />
+                </label>
+              </div>
+            ) : null}
+          </div>
+
+          {creditAssessmentError ? <div className="dg-labels-error" role="alert">{creditAssessmentError}</div> : null}
+          <div className="dg-form-footer-actions dg-credit-actions">
+            <button type="button" className="dg-btn dg-btn-secondary" onClick={() => {
+              setCreditAssessmentDraft({ price: "", months: "", risk: "", salary: "", obligations: "", extraIncomeEnabled: false, extraIncomeType: "", extraIncome: "", manualDownEnabled: false, manualDownPayment: "" });
+              setCreditAssessmentResult(null); setCreditAssessmentError("");
+            }}>Sıfırla</button>
+            <button type="button" className="dg-btn dg-btn-primary" onClick={runCreditAssessment}>Hesabla</button>
+          </div>
+        </section>
+
+        {creditAssessmentResult ? (
+          <section className="dg-form-inner-panel dg-credit-results" aria-label="Kredit uyğunluğu nəticəsi">
+            <h2 className="dg-panel-section-title">Nəticə</h2>
+            {creditAssessmentResult.obligationWarning ? (
+              <div className="dg-credit-warning" role="status">Diqqət: digər öhdəliklər ümumi gəlirin 50%-ni keçir.</div>
+            ) : null}
+            <div className="dg-pricecalc-card-grid">
+              <article className="dg-pricecalc-card"><div className="dg-pricecalc-card-label">İlkin ödəniş</div><div className="dg-pricecalc-card-value">{formatMoney(creditAssessmentResult.downPayment)}</div><div className="dg-pricecalc-card-monthly">{(creditAssessmentResult.downPaymentPercent * 100).toFixed(0)}%</div></article>
+              <article className="dg-pricecalc-card"><div className="dg-pricecalc-card-label">Kredit məbləği</div><div className="dg-pricecalc-card-value">{formatMoney(creditAssessmentResult.principal)}</div></article>
+              <article className="dg-pricecalc-card"><div className="dg-pricecalc-card-label">Aylıq ödəniş</div><div className="dg-pricecalc-card-value">{formatMoney(creditAssessmentResult.monthlyPayment)}</div><div className="dg-pricecalc-card-monthly">Uyğundur</div></article>
+              <article className="dg-pricecalc-card"><div className="dg-pricecalc-card-label">Maksimum aylıq (DSR 40%)</div><div className="dg-pricecalc-card-value">{formatMoney(creditAssessmentResult.maxMonthlyPayment)}</div><div className="dg-pricecalc-card-monthly">Net gəlir: {formatMoney(creditAssessmentResult.netIncome)}</div></article>
+            </div>
+            {creditAssessmentResult.autoAdjusted ? <p className="dg-credit-adjusted">İlkin ödəniş aylıq ödənişi DSR 40% həddinə uyğunlaşdırmaq üçün avtomatik artırıldı.</p> : null}
+            <h3 className="dg-panel-section-title dg-panel-section-title--sub">Ödəniş cədvəli</h3>
+            <div className="dg-table-wrap">
+              <table className="dg-table dg-credit-schedule"><thead><tr><th>№</th><th>Aylıq ödəniş</th><th>Qalıq borc</th></tr></thead>
+                <tbody>{creditAssessmentResult.schedule.map((row) => <tr key={row.paymentNo}><td>{row.paymentNo}</td><td>{formatMoney(row.payment)}</td><td>{formatMoney(row.remaining)}</td></tr>)}</tbody>
+              </table>
+            </div>
+          </section>
+        ) : null}
+      </>
+    );
+  };
+
   const renderPriceCalculationsModule = () => (
     <div className="dg-form-page pg-panel dg-form-page--pricecalc" aria-label="Qiymət hesablanması">
       <div className="dg-form-page-body">
+        <div className="dg-pricecalc-tabs" role="tablist" aria-label="Qiymət hesablanması bölmələri">
+          <button type="button" role="tab" aria-selected={priceCalcTab === "price"} className={`dg-pricecalc-tab${priceCalcTab === "price" ? " is-active" : ""}`} onClick={() => setPriceCalcTab("price")}>Qiymət hesablanması</button>
+          <button type="button" role="tab" aria-selected={priceCalcTab === "credit"} className={`dg-pricecalc-tab${priceCalcTab === "credit" ? " is-active" : ""}`} onClick={() => setPriceCalcTab("credit")}>Kredit uyğunluğu</button>
+        </div>
+        {priceCalcTab === "price" ? (
+          <>
         <section className="dg-form-inner-panel">
           <h2 className="dg-panel-section-title">Hesablama girişləri</h2>
           <div className="dg-form-meta-grid">
@@ -5972,6 +6144,8 @@ export default function App() {
             </li>
           </ol>
         </section>
+          </>
+        ) : renderCreditAssessment()}
       </div>
     </div>
   );

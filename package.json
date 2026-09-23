@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "test:cash-sync": "node --test tests/cash-sync.test.mjs",
+    "test:credit-assessment": "node --test tests/credit-assessment.test.mjs",
+    "test:sync-timing": "node --test tests/sync-timing.test.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",

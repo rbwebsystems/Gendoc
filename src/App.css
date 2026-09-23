@@ -2575,6 +2575,110 @@ textarea.dg-input {
   width: 100%;
 }
 
+.dg-pricecalc-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  padding: 0.3rem;
+  border: 1px solid var(--win-border);
+  border-radius: var(--win-radius-lg);
+  background: color-mix(in srgb, var(--win-surface) 88%, var(--win-border) 12%);
+}
+
+.dg-pricecalc-tab {
+  border: 0;
+  border-radius: calc(var(--win-radius-lg) - 3px);
+  background: transparent;
+  color: var(--win-text-secondary);
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.dg-pricecalc-tab:hover {
+  color: var(--win-text);
+  background: color-mix(in srgb, var(--win-surface) 78%, var(--win-border) 22%);
+}
+
+.dg-pricecalc-tab.is-active {
+  color: #fff;
+  background: #b91c1c;
+  box-shadow: 0 2px 7px color-mix(in srgb, #7f1d1d 28%, transparent);
+}
+
+.dg-credit-assessment-grid {
+  margin-top: 0.75rem;
+}
+
+.dg-credit-options {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--win-border);
+}
+
+.dg-credit-check {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  color: var(--win-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dg-credit-check input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #b91c1c;
+}
+
+.dg-credit-extra-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  max-width: 40rem;
+}
+
+.dg-credit-actions {
+  margin-top: 1rem;
+}
+
+.dg-credit-results {
+  margin-top: 1rem;
+}
+
+.dg-credit-warning,
+.dg-credit-adjusted {
+  margin: 0.75rem 0;
+  border-radius: var(--win-radius-lg);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.dg-credit-warning {
+  border: 1px solid #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.dg-credit-adjusted {
+  border: 1px solid #93c5fd;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.dg-credit-schedule th:not(:first-child),
+.dg-credit-schedule td:not(:first-child) {
+  text-align: right;
+}
+
 .dg-pricecalc-card {
   position: relative;
   border: 1px solid color-mix(in srgb, var(--win-border) 88%, #ef4444 12%);
@@ -2671,6 +2775,15 @@ textarea.dg-input {
 }
 
 @media (max-width: 640px) {
+  .dg-pricecalc-tabs {
+    display: grid;
+    width: 100%;
+  }
+
+  .dg-credit-extra-fields {
+    grid-template-columns: 1fr;
+  }
+
   .dg-pricecalc-card-grid {
     grid-template-columns: 1fr;
   }
