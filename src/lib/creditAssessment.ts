@@ -22,7 +22,6 @@ export type CreditAssessmentResult = {
   obligationRatio: number;
   obligationWarning: boolean;
   autoAdjusted: boolean;
-  schedule: Array<{ paymentNo: number; payment: number; remaining: number }>;
 };
 
 const BASE_DOWN_PAYMENT: Record<CreditRisk, number> = { low: 0.2, med: 0.3, high: 0.5 };
@@ -76,11 +75,6 @@ export function calculateCreditAssessment(input: CreditAssessmentInput): CreditA
     autoAdjusted = true;
   }
 
-  const schedule = Array.from({ length: months }, (_, index) => ({
-    paymentNo: index + 1,
-    payment: monthlyPayment,
-    remaining: Math.max(0, principal - monthlyPayment * (index + 1)),
-  }));
   const obligationRatio = totalIncome > 0 ? obligations / totalIncome : obligations > 0 ? Infinity : 0;
 
   return {
@@ -95,6 +89,5 @@ export function calculateCreditAssessment(input: CreditAssessmentInput): CreditA
     obligationRatio,
     obligationWarning: obligationRatio > MAX_OBLIGATION_SHARE,
     autoAdjusted,
-    schedule,
   };
 }

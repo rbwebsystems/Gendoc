@@ -2674,9 +2674,49 @@ textarea.dg-input {
   color: #1e40af;
 }
 
-.dg-credit-schedule th:not(:first-child),
-.dg-credit-schedule td:not(:first-child) {
-  text-align: right;
+.dg-credit-risk-info {
+  margin-top: 1rem;
+}
+
+.dg-credit-risk-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin-top: 0.75rem;
+}
+
+.dg-credit-risk-card {
+  border: 1px solid var(--win-border);
+  border-left-width: 4px;
+  border-radius: var(--win-radius-lg);
+  background: var(--win-surface);
+  padding: 0.9rem 1rem;
+}
+
+.dg-credit-risk-card h3 {
+  margin: 0 0 0.45rem;
+  color: var(--win-text);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.dg-credit-risk-card p {
+  margin: 0;
+  color: var(--win-text-secondary);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.dg-credit-risk-card--low {
+  border-left-color: #16a34a;
+}
+
+.dg-credit-risk-card--medium {
+  border-left-color: #d97706;
+}
+
+.dg-credit-risk-card--high {
+  border-left-color: #dc2626;
 }
 
 .dg-pricecalc-card {
@@ -2781,6 +2821,10 @@ textarea.dg-input {
   }
 
   .dg-credit-extra-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .dg-credit-risk-grid {
     grid-template-columns: 1fr;
   }
 

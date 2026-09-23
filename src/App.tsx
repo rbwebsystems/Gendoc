@@ -6018,14 +6018,26 @@ export default function App() {
               <article className="dg-pricecalc-card"><div className="dg-pricecalc-card-label">Maksimum aylıq (DSR 40%)</div><div className="dg-pricecalc-card-value">{formatMoney(creditAssessmentResult.maxMonthlyPayment)}</div><div className="dg-pricecalc-card-monthly">Net gəlir: {formatMoney(creditAssessmentResult.netIncome)}</div></article>
             </div>
             {creditAssessmentResult.autoAdjusted ? <p className="dg-credit-adjusted">İlkin ödəniş aylıq ödənişi DSR 40% həddinə uyğunlaşdırmaq üçün avtomatik artırıldı.</p> : null}
-            <h3 className="dg-panel-section-title dg-panel-section-title--sub">Ödəniş cədvəli</h3>
-            <div className="dg-table-wrap">
-              <table className="dg-table dg-credit-schedule"><thead><tr><th>№</th><th>Aylıq ödəniş</th><th>Qalıq borc</th></tr></thead>
-                <tbody>{creditAssessmentResult.schedule.map((row) => <tr key={row.paymentNo}><td>{row.paymentNo}</td><td>{formatMoney(row.payment)}</td><td>{formatMoney(row.remaining)}</td></tr>)}</tbody>
-              </table>
-            </div>
           </section>
         ) : null}
+
+        <section className="dg-form-inner-panel dg-credit-risk-info" aria-label="Risk kateqoriyaları">
+          <h2 className="dg-panel-section-title">Risk kateqoriyaları</h2>
+          <div className="dg-credit-risk-grid">
+            <article className="dg-credit-risk-card dg-credit-risk-card--low">
+              <h3>A) Risksiz və ya aşağı riskli peşələr</h3>
+              <p>Dövlət qulluqçuları (nazirlik, dövlət idarəsi, polis, hərbçi, müəllim, həkim və s.), böyük şirkətlərdə rəsmi müqavilə ilə çalışanlar, bank əməkdaşları və maliyyə sektorunda çalışanlardır.</p>
+            </article>
+            <article className="dg-credit-risk-card dg-credit-risk-card--medium">
+              <h3>B) Orta riskli peşələr</h3>
+              <p>Rəsmi müqaviləli özəl sektor əməkdaşları, qeydiyyatlı kiçik biznes sahibləri, müvəqqəti müqaviləlilər.</p>
+            </article>
+            <article className="dg-credit-risk-card dg-credit-risk-card--high">
+              <h3>C) Yüksək riskli peşələr</h3>
+              <p>Qeyri-rəsmi işləyənlər, tələbələr (öz gəliri olmayanlar), işsizlər və sosial müavinət alanlar.</p>
+            </article>
+          </div>
+        </section>
       </>
     );
   };

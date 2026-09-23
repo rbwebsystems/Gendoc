@@ -73,16 +73,3 @@ test("extra income participates in income ratio and monthly limit", () => {
   assert.ok(withExtra.maxMonthlyPayment > withoutExtra.maxMonthlyPayment);
   assert.ok(withExtra.downPayment < withoutExtra.downPayment);
 });
-
-test("equal-payment schedule reaches a zero balance", () => {
-  const result = calculateCreditAssessment({
-    price: 900,
-    months: 9,
-    risk: "high",
-    salary: 1500,
-    obligations: 100,
-  });
-  assert.equal(result.schedule.length, 9);
-  assert.equal(result.schedule.at(-1).remaining, 0);
-  assert.ok(result.schedule.every((row) => row.payment === result.monthlyPayment));
-});
