@@ -9,7 +9,7 @@ import type {
 } from "../types";
 import { BAKFON_EQUIPMENT } from "./bakfonEquipment";
 
-export const TELCON_BAKFON_IMPORT_KEY = "telcon-tlc-2209-26-equipment-v3-turnstiles";
+export const TELCON_BAKFON_IMPORT_KEY = "telcon-tlc-2209-26-equipment-v4-turnstiles";
 export const TELCON_BAKFON_OFFER_ID = "offer-telcon-tlc-2209-26";
 
 const SUPPLIER_ID = "supplier-telcon-mmc";
@@ -31,11 +31,7 @@ const TELCON_PRICES = new Map<string, TelconPrice>([
   ["Pro Series Access Controller", { price: 245.76, offeredProduct: "Hikvision Pro Series Access Contoller / DS-K2624X(P)" }],
   ["Single Door Magnetic Lock > 280KG", { price: 32.56, offeredProduct: "Hikvision Value Magnetic Locks / DS-K4H255S" }],
   ["Single Door Magnetic Lock Bracket", { price: 16.28, offeredProduct: "Hikvision Bracket for DS-K4H255S / DS-K4H255-LZ" }],
-  // DS-K3B211LX-LR/Pg bir sol və bir sağ tumbadan ibarət komplektdir.
-  // PDF-dəki 2 600 AZN komplekt qiyməti iki əsas siyahı sətrinə bərabər bölünür.
-  ["Turniket Left Flap Barrier", { price: 1300, offeredProduct: "Hikvision DS-K3B211LX-LR/Pg (sol hissə, LR komplektinin 1/2-si)" }],
   ["Turniket Midlle Flap Barrier", { price: 1940, offeredProduct: "Hikvision DS-K3B211LX-M/Pg" }],
-  ["Turniket Right Flap Barrier", { price: 1300, offeredProduct: "Hikvision DS-K3B211LX-LR/Pg (sağ hissə, LR komplektinin 1/2-si)" }],
   ["4 MP Motorized Varifocal 2.8 ~ 12 mm Bullet Network Camera for Perimeter Protection", { price: 332.87, offeredProduct: "DS-2CD2643G2-IZS(2.8-12mm)" }],
   ["Junction box for Bullet Camera", { price: 1.6, offeredProduct: "Kamera montaj qutusu böyük" }],
   ["Monitor 27”", { price: 209.69, offeredProduct: "Hikvision 27 inch FHD 100Hz IPS Monitor / DS-D5027F3-2P2" }],
@@ -75,6 +71,17 @@ function importedOfferRows(): SupplierOfferRow[] {
     };
   });
 
+  const turnstileLeftRightRow: SupplierOfferRow = {
+    id: `${TELCON_BAKFON_IMPORT_KEY}-extra-turniket-left-right`,
+    supplierName: "TELCON MMC",
+    name: "Turniket Left/Right Flap Barrier",
+    replacementName: "Hikvision DS-K3B211LX-LR/Pg",
+    purchasePrice: 2600,
+    purchasePriceSource: "ex",
+    qty: 2,
+    unit: "ədəd",
+    salePrice: 0,
+  };
   const turnstileGlassRow: SupplierOfferRow = {
     id: `${TELCON_BAKFON_IMPORT_KEY}-extra-turniket-glass`,
     supplierName: "TELCON MMC",
@@ -87,7 +94,7 @@ function importedOfferRows(): SupplierOfferRow[] {
     salePrice: 0,
   };
 
-  return [...equipmentRows, turnstileGlassRow];
+  return [...equipmentRows, turnstileLeftRightRow, turnstileGlassRow];
 }
 
 function importedBakfonCompanyProfile(): CompanyProfile {
@@ -104,7 +111,7 @@ function importedOffer(companyId: string, existing?: SupplierOfferRecord): Suppl
     companyId,
     offerDate: "2026-09-24",
     rows: importedOfferRows(),
-    note: "Avadanliq_siyahisi_novlere_gore.xlsx faylının «Siyahı» sheet-indəki 110 sətir və TELCON təklifində ayrıca olan 1 turniket şüşə qanad sətri daxil edilib. TELCON TLC-2209/26 təklifinin bütün 33 mövqeyi uyğunlaşdırılıb. DS-K3B211LX-LR/Pg bir sol və bir sağ hissədən ibarət komplekt olduğuna görə 2 600 AZN komplekt qiyməti sol və sağ sətirlərə 1 300 AZN olaraq bölünüb; beləliklə təklifin ümumi məbləği dəyişməyib. Çatdırılma: 45-65 iş günü, DDP Bakı. Ödəniş: 100% əvvəlcədən. Zəmanət: 1 il. Təklif 10 gün qüvvədədir.",
+    note: "Avadanliq_siyahisi_novlere_gore.xlsx faylının «Siyahı» sheet-indəki 110 sətir daxil edilib. TELCON TLC-2209/26 təklifində ayrıca göstərilən Turniket Left/Right Flap Barrier və turniket üçün şüşə qapı ayrıca sətirlər kimi əlavə olunub; Turniket Middle Flap Barrier isə əsas siyahıdakı uyğun sətirdə qiymətləndirilib. Təklifin bütün 33 mövqeyi mənbədəki miqdar və qiymətlərlə saxlanılıb. Çatdırılma: 45-65 iş günü, DDP Bakı. Ödəniş: 100% əvvəlcədən. Zəmanət: 1 il. Təklif 10 gün qüvvədədir.",
     createdAt: existing?.createdAt ?? IMPORTED_AT,
     updatedAt: IMPORTED_AT,
   };
