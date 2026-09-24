@@ -543,6 +543,13 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
       if (typeof ts === "number" && Number.isFinite(ts)) leaveReviewSeenAt[uid] = ts;
     }
   }
+  const dataImportsRaw = w.settings?.dataImports;
+  const dataImports: Record<string, boolean> = {};
+  if (dataImportsRaw && typeof dataImportsRaw === "object") {
+    for (const [key, imported] of Object.entries(dataImportsRaw)) {
+      if (imported === true) dataImports[key] = true;
+    }
+  }
 
   return {
     version: 3,
@@ -555,6 +562,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         quote: Number(w.settings?.docSeq?.quote) > 0 ? Number(w.settings?.docSeq?.quote) : 1,
       },
       ...(Object.keys(leaveReviewSeenAt).length > 0 ? { leaveReviewSeenAt } : {}),
+      ...(Object.keys(dataImports).length > 0 ? { dataImports } : {}),
     },
     companies,
     projects,

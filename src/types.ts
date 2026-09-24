@@ -372,6 +372,8 @@ export interface DocWorkspace {
     };
     /** Direktor/admin: son baxılan iş icazəsi bildirişi vaxtı (uid → timestamp) */
     leaveReviewSeenAt?: Record<string, number>;
+    /** Tətbiqə daxil edilmiş birdəfəlik məlumat paketləri */
+    dataImports?: Record<string, boolean>;
   };
   companies: SavedCompanyRecord[];
   projects: ProjectRecord[];

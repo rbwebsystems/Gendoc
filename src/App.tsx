@@ -152,6 +152,7 @@ import {
 } from "./lib/priceCalculation";
 import { calculateCreditAssessment, type CreditAssessmentResult, type CreditRisk } from "./lib/creditAssessment";
 import { remoteWriteDelayMs } from "./lib/syncTiming";
+import { applyBundledSupplierOfferImports } from "./lib/bundledSupplierOffers";
 
 async function downloadPdfFromHtml(html: string, filename: string): Promise<void> {
   const iframe = document.createElement("iframe");
@@ -1963,6 +1964,15 @@ export default function App() {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [authState.status]);
+
+  // Paketə daxil edilmiş təklifləri uyğun şirkət tapıldıqda yalnız bir dəfə əlavə et.
+  useEffect(() => {
+    if (!workspaceSyncReadyRef.current) return;
+    const imported = applyBundledSupplierOfferImports(workspace);
+    if (imported === workspace) return;
+    workspaceRef.current = imported;
+    setWorkspace(imported);
+  }, [workspace, remoteSyncEpoch]);
 
   // Reminder: vaxt çatanda bir dəfə səsli xəbərdarlıq et
   useEffect(() => {
