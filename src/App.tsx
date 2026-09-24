@@ -1145,6 +1145,7 @@ type OfferRowDraft = {
   /** Son redaktə olunan alış sahəsi — faiz hesabı üçün */
   purchasePriceSource: "ex" | "inc";
   qty: string;
+  unit: string;
   marginPercent: string;
   salePrice: string;
   saleManual: boolean;
@@ -1209,6 +1210,7 @@ function emptyOfferRow(): OfferRowDraft {
     purchasePriceWithVat: "",
     purchasePriceSource: "ex",
     qty: "1",
+    unit: "ədəd",
     marginPercent: "",
     salePrice: "",
     saleManual: false,
@@ -1383,7 +1385,7 @@ function buildOfferProductRows(
     out.push({
       id: crypto.randomUUID(),
       name,
-      unit: "ədəd",
+      unit: r.unit?.trim() || "ədəd",
       qty: r.qty,
       unitPrice,
     });
@@ -1405,7 +1407,7 @@ function buildOfferProductRowsFromDraft(
     out.push({
       id: crypto.randomUUID(),
       name,
-      unit: "ədəd",
+      unit: row.unit.trim() || "ədəd",
       qty,
       unitPrice,
     });
@@ -4444,7 +4446,6 @@ export default function App() {
     if (
       !supplierName ||
       (!name && !replacementName) ||
-      (!hasEx && !hasInc) ||
       !Number.isFinite(qty) ||
       qty <= 0
     )
@@ -4455,6 +4456,7 @@ export default function App() {
       name,
       purchasePrice: hasEx ? purchasePrice : 0,
       qty,
+      unit: r.unit.trim() || "ədəd",
       salePrice: Number.isFinite(salePrice) && salePrice > 0 ? salePrice : 0,
       purchasePriceSource: r.purchasePriceSource,
     };
@@ -4476,6 +4478,7 @@ export default function App() {
       r.purchasePriceSource ??
       ((r.purchasePriceWithVat ?? 0) > 0 && r.purchasePrice <= 0 ? "inc" : "ex"),
     qty: r.qty > 0 ? String(r.qty) : "1",
+    unit: r.unit?.trim() || "ədəd",
     marginPercent: typeof r.marginPercent === "number" ? String(r.marginPercent) : "",
     salePrice: r.salePrice > 0 ? String(r.salePrice) : "",
     saleManual: true,
@@ -4547,7 +4550,7 @@ export default function App() {
     }
     const rows = offerDraft.rows.map(rowDraftToRecord).filter((r): r is SupplierOfferRow => Boolean(r));
     if (rows.length === 0) {
-      flash(setToast, "Hər sətirdə təchizatçı, məhsul və ya əvəz məhsul və alış qiyməti (ƏDV-siz və ya ƏDV daxil) daxil edin.", "error");
+      flash(setToast, "Hər sətirdə təchizatçı, məhsul və ya əvəz məhsul, miqdar və ölçü vahidi daxil edin.", "error");
       return;
     }
     const offerDate = offerDraft.offerDate.trim() || new Date().toISOString().slice(0, 10);
@@ -5326,6 +5329,7 @@ export default function App() {
                         ƏDV daxil
                       </th>
                       <th className="dg-th-num dg-offer-col-qty">Miqd.</th>
+                      <th className="dg-offer-col-unit">Vahid</th>
                       <th className="dg-th-num dg-offer-col-margin">Faiz %</th>
                       <th className="dg-th-num dg-offer-col-price" title="Əl ilə satış (aktiv alış sütununa aiddir)">
                         Satış*
@@ -5339,7 +5343,7 @@ export default function App() {
                   <tbody>
                     {offerDraft.rows.length === 0 ? (
                       <tr>
-                        <td colSpan={13} className="dg-empty-cell">
+                        <td colSpan={14} className="dg-empty-cell">
                           «Sətir əlavə et» düyməsi ilə məhsul əlavə edin.
                         </td>
                       </tr>
@@ -5411,6 +5415,14 @@ export default function App() {
                                 step="any"
                                 value={r.qty}
                                 onChange={(e) => updateOfferRow(r.id, { qty: e.target.value })}
+                              />
+                            </td>
+                            <td className="dg-offer-col-unit">
+                              <input
+                                className="dg-input dg-input-table dg-input-offer-unit"
+                                value={r.unit}
+                                onChange={(e) => updateOfferRow(r.id, { unit: e.target.value })}
+                                placeholder="ədəd"
                               />
                             </td>
                             <td className="dg-offer-col-margin">
@@ -7614,6 +7626,7 @@ export default function App() {
                       <th style={{ width: 80 }} className="dg-num">
                         Miqdar
                       </th>
+                      <th style={{ width: 72 }}>Vahid</th>
                       <th style={{ width: 80 }} className="dg-num">
                         Faiz %
                       </th>
@@ -7646,6 +7659,7 @@ export default function App() {
                           {(r.purchasePriceWithVat ?? 0) > 0 ? formatMoney(r.purchasePriceWithVat!) : "—"}
                         </td>
                         <td className="dg-num">{r.qty}</td>
+                        <td>{r.unit?.trim() || "ədəd"}</td>
                         <td className="dg-num">
                           {typeof r.marginPercent === "number" ? r.marginPercent.toLocaleString("az-AZ") : "—"}
                         </td>

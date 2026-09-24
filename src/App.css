@@ -2110,11 +2110,15 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-table.dg-table--offer .dg-offer-col-qty {
-  width: 7%;
+  width: 6%;
+}
+
+.dg-table.dg-table--offer .dg-offer-col-unit {
+  width: 5.5%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-margin {
-  width: 7%;
+  width: 6%;
 }
 
 .dg-table.dg-table--offer .dg-offer-col-sale-computed {

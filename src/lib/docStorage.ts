@@ -420,6 +420,10 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
           const purchasePriceWithVat =
             Number.isFinite(purchasePriceWithVatRaw) && purchasePriceWithVatRaw > 0 ? purchasePriceWithVatRaw : undefined;
           const qty = Number((r as { qty?: unknown }).qty) || 0;
+          const unitRaw =
+            typeof (r as { unit?: unknown }).unit === "string"
+              ? String((r as { unit: string }).unit).trim()
+              : "";
           const marginRaw = (r as { marginPercent?: unknown }).marginPercent;
           const marginPercent = typeof marginRaw === "number" && Number.isFinite(marginRaw) ? marginRaw : undefined;
           const purchasePriceSourceRaw = (r as { purchasePriceSource?: unknown }).purchasePriceSource;
@@ -445,6 +449,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
             name,
             purchasePrice,
             qty,
+            unit: unitRaw || "ədəd",
             salePrice,
             ...(purchasePriceWithVat != null ? { purchasePriceWithVat } : {}),
             ...(purchasePriceSource ? { purchasePriceSource } : {}),
@@ -456,7 +461,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
           (r) =>
             (r.name.length > 0 || (r.replacementName?.length ?? 0) > 0) &&
             r.supplierName.length > 0 &&
-            (r.purchasePrice > 0 || (r.purchasePriceWithVat ?? 0) > 0),
+            r.qty > 0,
         );
       return {
         id: String((o as { id: string }).id),

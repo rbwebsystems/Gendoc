@@ -148,6 +148,8 @@ export interface SupplierOfferRow {
   /** Hansı alış sahəsi əsas götürülüb (satış daxil etmə üçün) */
   purchasePriceSource?: "ex" | "inc";
   qty: number;
+  /** Ölçü vahidi (ədəd, set və s.) */
+  unit?: string;
   /** Satış faizi — alışa əlavə */
   marginPercent?: number;
   /** Satış qiyməti (ƏDV-siz) */
