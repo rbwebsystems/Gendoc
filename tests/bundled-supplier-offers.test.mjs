@@ -38,9 +38,9 @@ test("imports the TELCON PDF as one distinct Bakfon supplier offer", () => {
   assert.equal(result.supplierOffers[0].id, imported.TELCON_BAKFON_OFFER_ID);
   assert.equal(result.supplierOffers[0].companyId, "bakfon-id");
   assert.equal(result.supplierOffers[0].offerDate, "2026-09-24");
-  assert.equal(result.supplierOffers[0].rows.length, 110);
-  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice > 0).length, 31);
-  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice === 0).length, 79);
+  assert.equal(result.supplierOffers[0].rows.length, 111);
+  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice > 0).length, 34);
+  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice === 0).length, 77);
   assert.ok(result.supplierOffers[0].rows.every((row) => row.supplierName === "TELCON MMC"));
   assert.equal(result.supplierOffers[0].rows.find((row) => row.name === "Mouse and Keyboard").unit, "set");
   assert.ok(result.supplierOffers[0].rows.find((row) => row.name === "Access card").replacementName.includes("Hikvision"));
@@ -48,14 +48,23 @@ test("imports the TELCON PDF as one distinct Bakfon supplier offer", () => {
   assert.equal(result.folders[0].supplierId, result.suppliers[0].id);
 });
 
-test("matched PDF prices keep their unit conversions and subtotal", () => {
-  assert.equal(imported.telconBakfonPricedRowCount(), 31);
-  assert.ok(Math.abs(imported.telconBakfonImportedPurchaseTotal() - 430295.73) < 0.001);
+test("matched PDF prices keep their unit conversions and full subtotal", () => {
+  assert.equal(imported.telconBakfonPricedRowCount(), 34);
+  assert.ok(Math.abs(imported.telconBakfonImportedPurchaseTotal() - 435888.05) < 0.001);
   const result = imported.applyBundledSupplierOfferImports(workspace());
   const connectors = result.supplierOffers[0].rows.find((row) => row.name === "RJ45 + Rezin CAT6");
   const sfp = result.supplierOffers[0].rows.find((row) => row.name === "SFP Single Mode 1KM (A+B)");
+  const left = result.supplierOffers[0].rows.find((row) => row.name === "Turniket Left Flap Barrier");
+  const right = result.supplierOffers[0].rows.find((row) => row.name === "Turniket Right Flap Barrier");
+  const glass = result.supplierOffers[0].rows.find((row) => row.name === "Turniket üçün şüşə qapı");
   assert.equal(connectors.purchasePrice * connectors.qty, 213.6);
   assert.equal(sfp.purchasePrice * sfp.qty, 128.84);
+  assert.equal(left.purchasePrice, 1300);
+  assert.equal(right.purchasePrice, 1300);
+  assert.equal(left.purchasePrice * left.qty + right.purchasePrice * right.qty, 5200);
+  assert.equal(glass.purchasePrice, 98.08);
+  assert.equal(glass.qty, 4);
+  assert.ok(Math.abs(glass.purchasePrice * glass.qty - 392.32) < 0.001);
 });
 
 test("import is idempotent and does not duplicate the offer", () => {
@@ -86,6 +95,6 @@ test("upgrades the previous short offer instead of adding a duplicate", () => {
   }];
   const result = imported.applyBundledSupplierOfferImports(source);
   assert.equal(result.supplierOffers.length, 1);
-  assert.equal(result.supplierOffers[0].rows.length, 110);
+  assert.equal(result.supplierOffers[0].rows.length, 111);
   assert.equal(result.supplierOffers[0].createdAt, 1);
 });
