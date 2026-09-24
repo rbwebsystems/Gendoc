@@ -1,10 +1,18 @@
-import type { DocWorkspace, SupplierOfferRow, SupplierRecord, WorkspaceFolderRecord } from "../types";
+import type {
+  CompanyProfile,
+  DocWorkspace,
+  SavedCompanyRecord,
+  SupplierOfferRow,
+  SupplierRecord,
+  WorkspaceFolderRecord,
+} from "../types";
 
 export const TELCON_BAKFON_IMPORT_KEY = "telcon-tlc-2209-26";
 export const TELCON_BAKFON_OFFER_ID = "offer-telcon-tlc-2209-26";
 
 const SUPPLIER_ID = "supplier-telcon-mmc";
 const SUPPLIER_FOLDER_ID = "folder-supplier-telcon-mmc";
+const BAKFON_COMPANY_ID = "company-bakfon-telcon-import";
 const IMPORTED_AT = Date.parse("2026-09-24T09:53:42+04:00");
 
 type ImportedRow = {
@@ -70,7 +78,26 @@ function importedOfferRows(): SupplierOfferRow[] {
   }));
 }
 
-/** Adds the bundled PDF offer once, after a matching Bakfon company exists. */
+function importedBakfonCompanyProfile(): CompanyProfile {
+  return {
+    currency: "AZN",
+    bankName: "",
+    branchCode: "",
+    bankVoen: "",
+    bankSwift: "",
+    correspondentAccount: "",
+    name: "Bakfon",
+    accountManat: "",
+    voen: "",
+    address: "",
+    phone: "",
+    fax: "",
+    email: "",
+    director: "",
+  };
+}
+
+/** Adds the bundled PDF offer once and creates its Bakfon company card if needed. */
 export function applyBundledSupplierOfferImports(workspace: DocWorkspace): DocWorkspace {
   if (workspace.settings.dataImports?.[TELCON_BAKFON_IMPORT_KEY]) return workspace;
 
@@ -87,10 +114,16 @@ export function applyBundledSupplierOfferImports(workspace: DocWorkspace): DocWo
     };
   }
 
-  const company = workspace.companies.find((item) =>
+  const existingCompany = workspace.companies.find((item) =>
     item.profile.name.trim().toLocaleLowerCase("az-AZ").includes("bakfon"),
   );
-  if (!company) return workspace;
+  const company: SavedCompanyRecord = existingCompany ?? {
+    id: BAKFON_COMPANY_ID,
+    profile: importedBakfonCompanyProfile(),
+    createdAt: IMPORTED_AT,
+    updatedAt: IMPORTED_AT,
+  };
+  const companies = existingCompany ? workspace.companies : [...workspace.companies, company];
 
   const existingSupplier = (workspace.suppliers ?? []).find(
     (supplier) => supplier.name.trim().toLocaleLowerCase("az-AZ") === "telcon mmc",
@@ -124,6 +157,7 @@ export function applyBundledSupplierOfferImports(workspace: DocWorkspace): DocWo
       ...workspace.settings,
       dataImports: { ...(workspace.settings.dataImports ?? {}), [TELCON_BAKFON_IMPORT_KEY]: true },
     },
+    companies,
     suppliers,
     folders: hasSupplierFolder ? workspace.folders ?? [] : [...(workspace.folders ?? []), supplierFolder],
     supplierOffers: [

@@ -45,7 +45,10 @@ test("import is idempotent and does not duplicate the offer", () => {
   assert.equal(twice.supplierOffers.length, 1);
 });
 
-test("does not create an ambiguous offer when Bakfon company is absent", () => {
-  const source = workspace("Başqa şirkət");
-  assert.strictEqual(imported.applyBundledSupplierOfferImports(source), source);
+test("creates a distinct Bakfon company when no matching company exists", () => {
+  const result = imported.applyBundledSupplierOfferImports(workspace("Başqa şirkət"));
+  const bakfon = result.companies.find((company) => company.profile.name === "Bakfon");
+  assert.ok(bakfon);
+  assert.equal(result.supplierOffers[0].companyId, bakfon.id);
+  assert.equal(result.companies.length, 2);
 });
