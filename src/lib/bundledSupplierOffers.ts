@@ -9,15 +9,21 @@ import type {
 } from "../types";
 import { BAKFON_EQUIPMENT } from "./bakfonEquipment";
 
-export const TELCON_BAKFON_IMPORT_KEY = "telcon-tlc-2209-26-equipment-v4-turnstiles";
+export const TELCON_BAKFON_IMPORT_KEY = "telcon-tlc-2209-26-equipment-v5-abv";
 export const TELCON_BAKFON_OFFER_ID = "offer-telcon-tlc-2209-26";
 
 const SUPPLIER_ID = "supplier-telcon-mmc";
 const SUPPLIER_FOLDER_ID = "folder-supplier-telcon-mmc";
+const ABV_SUPPLIER_ID = "supplier-abv";
+const ABV_SUPPLIER_FOLDER_ID = "folder-supplier-abv";
 const BAKFON_COMPANY_ID = "company-bakfon-telcon-import";
 const IMPORTED_AT = Date.parse("2026-09-24T09:53:42+04:00");
+const ABV_IMPORTED_AT = Date.parse("2026-10-02T15:26:00+04:00");
+const USD_TO_AZN = 1.7;
+const VAT_FACTOR = 1.18;
 
 type TelconPrice = { price: number; offeredProduct: string };
+type AbvPrice = { usdWithVat: number; offeredProduct: string };
 
 const TELCON_PRICES = new Map<string, TelconPrice>([
   ["Access card", { price: 0.58, offeredProduct: "Hikvision M1 Cards / DS-K7M101-M1" }],
@@ -55,15 +61,55 @@ const TELCON_PRICES = new Map<string, TelconPrice>([
   ["Decoder,9 Channel Ultra HD Network Video Decoder", { price: 3390.12, offeredProduct: "Hikvision DS-6910UDI(C)" }],
 ]);
 
+// ABV.xlsx: qiymətlər ABŞ dolları ilə və ƏDV daxil təqdim olunub.
+// Eyni adlı təkrarlanan məhsulları düzgün saxlamaq üçün uyğunluq sıra nömrəsi ilə qurulub.
+const ABV_PRICES = new Map<number, AbvPrice>([
+  [1, { usdWithVat: 1.26, offeredProduct: "IC S50" }],
+  [2, { usdWithVat: 34.94, offeredProduct: "DS-K1108AM" }],
+  [3, { usdWithVat: 1019.93, offeredProduct: "DS-K1T673TDWX-PROE1" }],
+  [16, { usdWithVat: 889.32, offeredProduct: "DS-2DF6A425IWG1-EL" }],
+  [17, { usdWithVat: 286.83, offeredProduct: "DS-2CD3643G2-LIZSU" }],
+  [18, { usdWithVat: 155.31, offeredProduct: "DS-2CD3147G3E-LIUF" }],
+  [19, { usdWithVat: 695.76, offeredProduct: "iDS-2CD7546G2-XZHS" }],
+  [24, { usdWithVat: 133.25, offeredProduct: "POE,LAS60-57CN-RJ45,60W" }],
+  [29, { usdWithVat: 66.93, offeredProduct: "DS-1660ZJ" }],
+  [30, { usdWithVat: 82.8, offeredProduct: "DS-1660ZJ-P" }],
+  [31, { usdWithVat: 205.94, offeredProduct: "DS-PRB2221" }],
+  [33, { usdWithVat: 22.5, offeredProduct: "DS-1276ZJ" }],
+  [34, { usdWithVat: 1221.36, offeredProduct: "DS-1600KI" }],
+  [35, { usdWithVat: 2064.83, offeredProduct: "DS-UPSB09240A-R/TJ" }],
+  [36, { usdWithVat: 589.95, offeredProduct: "DS-UPSB0948B-R/TJC" }],
+  [37, { usdWithVat: 765.9, offeredProduct: "DS-UPSB0972B-R/TJC" }],
+  [38, { usdWithVat: 29.01, offeredProduct: "DS-1275ZJ-S-SUS" }],
+  [39, { usdWithVat: 96.11, offeredProduct: "DS-1604ZJ-BOX-POLE" }],
+  [40, { usdWithVat: 3400.11, offeredProduct: "DS-TDSB0G-FK/120m" }],
+  [41, { usdWithVat: 9976.28, offeredProduct: "DS-TDSB0G-FK/500m" }],
+  [45, { usdWithVat: 5181.98, offeredProduct: "DS-2TD4137-25/WY" }],
+  [46, { usdWithVat: 133.25, offeredProduct: "POE,LAS60-57CN-RJ45,60W" }],
+  [91, { usdWithVat: 3703.44, offeredProduct: "DS-D2055HR-G" }],
+  [92, { usdWithVat: 234.03, offeredProduct: "DP-D2X55XXX-1X1-Q1-SW-Q0.8-TY" }],
+  [99, { usdWithVat: 2611.5, offeredProduct: "DS-6916UDI" }],
+  [100, { usdWithVat: 234.03, offeredProduct: "DP-D2X55XXX-1X1-Q1-SW-Q0.8-TY" }],
+  [104, { usdWithVat: 2611.5, offeredProduct: "DS-6916UDI" }],
+]);
+
+function abvExVatPrice(usdWithVat: number): number {
+  return Math.round((usdWithVat * USD_TO_AZN / VAT_FACTOR) * 100) / 100;
+}
+
 function importedOfferRows(): SupplierOfferRow[] {
   const equipmentRows: SupplierOfferRow[] = BAKFON_EQUIPMENT.map((item) => {
-    const quoted = TELCON_PRICES.get(item.name);
+    const telcon = TELCON_PRICES.get(item.name);
+    const abv = ABV_PRICES.get(item.sequence);
+    const abvPrice = abv ? abvExVatPrice(abv.usdWithVat) : 0;
+    const useAbv = Boolean(abv && abvPrice > 0 && (!telcon || abvPrice < telcon.price));
+    const quoted = useAbv ? abv : telcon;
     return {
       id: `${TELCON_BAKFON_IMPORT_KEY}-row-${item.sequence}`,
-      supplierName: "TELCON MMC",
+      supplierName: useAbv ? "ABV" : "TELCON MMC",
       name: item.name,
       ...(quoted ? { replacementName: quoted.offeredProduct } : {}),
-      purchasePrice: quoted?.price ?? 0,
+      purchasePrice: useAbv ? abvPrice : telcon?.price ?? 0,
       purchasePriceSource: "ex",
       qty: item.qty,
       unit: item.unit,
@@ -111,9 +157,9 @@ function importedOffer(companyId: string, existing?: SupplierOfferRecord): Suppl
     companyId,
     offerDate: "2026-09-24",
     rows: importedOfferRows(),
-    note: "Avadanliq_siyahisi_novlere_gore.xlsx faylının «Siyahı» sheet-indəki 110 sətir daxil edilib. TELCON TLC-2209/26 təklifində ayrıca göstərilən Turniket Left/Right Flap Barrier və turniket üçün şüşə qapı ayrıca sətirlər kimi əlavə olunub; Turniket Middle Flap Barrier isə əsas siyahıdakı uyğun sətirdə qiymətləndirilib. Təklifin bütün 33 mövqeyi mənbədəki miqdar və qiymətlərlə saxlanılıb. Çatdırılma: 45-65 iş günü, DDP Bakı. Ödəniş: 100% əvvəlcədən. Zəmanət: 1 il. Təklif 10 gün qüvvədədir.",
+    note: "Avadanliq_siyahisi_novlere_gore.xlsx faylının «Siyahı» sheet-indəki 110 sətir daxil edilib. TELCON TLC-2209/26 qiymətləri ABV.xlsx ilə müqayisə olunub: eyni məhsulda aşağı və ya bərabər TELCON qiyməti saxlanılıb, ABV daha ucuz olduqda və ya TELCON qiyməti olmadıqda ABV seçilib. ABV qiymətləri 1 USD = 1,7000 AZN məzənnəsi ilə manata çevrilib və ƏDV daxil məbləğ 1,18-ə bölünərək ƏDV-siz vahid qiymət yazılıb. ABV-dən 19 sətir seçilib: 1-i daha ucuz qiymət, 18-i TELCON-da qiymətsiz mövqedir. Turniket Left/Right, Middle və şüşə qapı TELCON təklifindəki ayrıca sətirlər kimi saxlanılıb. TELCON şərtləri: çatdırılma 45-65 iş günü, DDP Bakı; ödəniş 100% əvvəlcədən; zəmanət 1 il; təklif 10 gün qüvvədədir.",
     createdAt: existing?.createdAt ?? IMPORTED_AT,
-    updatedAt: IMPORTED_AT,
+    updatedAt: ABV_IMPORTED_AT,
   };
 }
 
@@ -148,6 +194,18 @@ export function applyBundledSupplierOfferImports(workspace: DocWorkspace): DocWo
   };
   const suppliers = existingSupplier ? workspace.suppliers ?? [] : [...(workspace.suppliers ?? []), supplier];
 
+  const existingAbvSupplier = suppliers.find(
+    (item) => item.name.trim().toLocaleLowerCase("az-AZ") === "abv",
+  );
+  const abvSupplier: SupplierRecord = existingAbvSupplier ?? {
+    id: ABV_SUPPLIER_ID,
+    name: "ABV",
+    note: "ABV.xlsx qiymət təklifi; USD, ƏDV daxil. GenDoc-da AZN, ƏDV-siz qiymətə çevrilib.",
+    createdAt: ABV_IMPORTED_AT,
+    updatedAt: ABV_IMPORTED_AT,
+  };
+  const suppliersWithAbv = existingAbvSupplier ? suppliers : [...suppliers, abvSupplier];
+
   const hasSupplierFolder = (workspace.folders ?? []).some(
     (folder) => folder.kind === "supplier" && folder.supplierId === supplier.id,
   );
@@ -158,6 +216,18 @@ export function applyBundledSupplierOfferImports(workspace: DocWorkspace): DocWo
     name: "TELCON MMC",
     createdAt: IMPORTED_AT,
     updatedAt: IMPORTED_AT,
+    files: [],
+  };
+  const hasAbvSupplierFolder = (workspace.folders ?? []).some(
+    (folder) => folder.kind === "supplier" && folder.supplierId === abvSupplier.id,
+  );
+  const abvSupplierFolder: WorkspaceFolderRecord = {
+    id: ABV_SUPPLIER_FOLDER_ID,
+    kind: "supplier",
+    supplierId: abvSupplier.id,
+    name: "ABV",
+    createdAt: ABV_IMPORTED_AT,
+    updatedAt: ABV_IMPORTED_AT,
     files: [],
   };
   const nextOffer = importedOffer(company.id, existingOffer);
@@ -172,8 +242,12 @@ export function applyBundledSupplierOfferImports(workspace: DocWorkspace): DocWo
       dataImports: { ...(workspace.settings.dataImports ?? {}), [TELCON_BAKFON_IMPORT_KEY]: true },
     },
     companies,
-    suppliers,
-    folders: hasSupplierFolder ? workspace.folders ?? [] : [...(workspace.folders ?? []), supplierFolder],
+    suppliers: suppliersWithAbv,
+    folders: [
+      ...(workspace.folders ?? []),
+      ...(hasSupplierFolder ? [] : [supplierFolder]),
+      ...(hasAbvSupplierFolder ? [] : [abvSupplierFolder]),
+    ],
     supplierOffers,
   };
 }
@@ -184,4 +258,8 @@ export function telconBakfonImportedPurchaseTotal(): number {
 
 export function telconBakfonPricedRowCount(): number {
   return importedOfferRows().filter((row) => row.purchasePrice > 0).length;
+}
+
+export function abvBakfonSelectedRowCount(): number {
+  return importedOfferRows().filter((row) => row.supplierName === "ABV").length;
 }

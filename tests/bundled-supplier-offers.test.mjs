@@ -39,18 +39,21 @@ test("imports the TELCON PDF as one distinct Bakfon supplier offer", () => {
   assert.equal(result.supplierOffers[0].companyId, "bakfon-id");
   assert.equal(result.supplierOffers[0].offerDate, "2026-09-24");
   assert.equal(result.supplierOffers[0].rows.length, 112);
-  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice > 0).length, 33);
-  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice === 0).length, 79);
-  assert.ok(result.supplierOffers[0].rows.every((row) => row.supplierName === "TELCON MMC"));
+  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice > 0).length, 51);
+  assert.equal(result.supplierOffers[0].rows.filter((row) => row.purchasePrice === 0).length, 61);
+  assert.equal(result.supplierOffers[0].rows.filter((row) => row.supplierName === "ABV").length, 19);
   assert.equal(result.supplierOffers[0].rows.find((row) => row.name === "Mouse and Keyboard").unit, "set");
   assert.ok(result.supplierOffers[0].rows.find((row) => row.name === "Access card").replacementName.includes("Hikvision"));
   assert.equal(result.suppliers[0].name, "TELCON MMC");
   assert.equal(result.folders[0].supplierId, result.suppliers[0].id);
+  assert.ok(result.suppliers.some((supplier) => supplier.name === "ABV"));
+  assert.ok(result.folders.some((folder) => folder.name === "ABV"));
 });
 
-test("matched PDF prices keep their unit conversions and full subtotal", () => {
-  assert.equal(imported.telconBakfonPricedRowCount(), 33);
-  assert.ok(Math.abs(imported.telconBakfonImportedPurchaseTotal() - 435888.05) < 0.001);
+test("selected TELCON and ABV prices keep their unit conversions and subtotal", () => {
+  assert.equal(imported.telconBakfonPricedRowCount(), 51);
+  assert.equal(imported.abvBakfonSelectedRowCount(), 19);
+  assert.ok(Math.abs(imported.telconBakfonImportedPurchaseTotal() - 963076.4) < 0.001);
   const result = imported.applyBundledSupplierOfferImports(workspace());
   const connectors = result.supplierOffers[0].rows.find((row) => row.name === "RJ45 + Rezin CAT6");
   const sfp = result.supplierOffers[0].rows.find((row) => row.name === "SFP Single Mode 1KM (A+B)");
@@ -72,6 +75,28 @@ test("matched PDF prices keep their unit conversions and full subtotal", () => {
   assert.equal(glass.purchasePrice, 98.08);
   assert.equal(glass.qty, 4);
   assert.ok(Math.abs(glass.purchasePrice * glass.qty - 392.32) < 0.001);
+});
+
+test("ABV replaces only a higher TELCON price and fills missing prices", () => {
+  const result = imported.applyBundledSupplierOfferImports(workspace());
+  const rows = result.supplierOffers[0].rows;
+  const reader = rows.find((row) => row.name === "Access Reader (card/PIN)");
+  const card = rows.find((row) => row.name === "Access card");
+  const speedDome = rows.find((row) => row.name.startsWith("4 MP 25X Powered Ultra Series"));
+  const bullet = rows.find((row) => row.name.startsWith("4 MP Motorized Varifocal 2.8 ~ 12 mm Bullet"));
+  const junctionBox = rows.find((row) => row.name === "Junction box for Bullet Camera");
+
+  assert.equal(reader.supplierName, "ABV");
+  assert.equal(reader.purchasePrice, 50.34);
+  assert.equal(reader.replacementName, "DS-K1108AM");
+  assert.equal(card.supplierName, "TELCON MMC");
+  assert.equal(card.purchasePrice, 0.58);
+  assert.equal(speedDome.supplierName, "ABV");
+  assert.equal(speedDome.purchasePrice, 1281.22);
+  assert.equal(bullet.supplierName, "TELCON MMC");
+  assert.equal(bullet.purchasePrice, 332.87);
+  assert.equal(junctionBox.supplierName, "TELCON MMC");
+  assert.equal(junctionBox.purchasePrice, 1.6);
 });
 
 test("import is idempotent and does not duplicate the offer", () => {
