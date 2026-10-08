@@ -2649,6 +2649,17 @@ textarea.dg-input {
   margin-top: 1rem;
 }
 
+.dg-pricecalc-whatsapp-btn {
+  border-color: #15803d;
+  background: #16a34a;
+  color: #fff;
+}
+
+.dg-pricecalc-whatsapp-btn:hover {
+  border-color: #166534;
+  background: #15803d;
+}
+
 .dg-pricecalc-tabs {
   display: inline-flex;
   gap: 0.35rem;

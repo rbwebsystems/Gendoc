@@ -181,3 +181,7 @@ export function buildCustomerCreditShareText(
     ...lines,
   ].join("\n");
 }
+
+export function buildWhatsAppWebShareUrl(text: string): string {
+  return `https://web.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+}

@@ -146,6 +146,7 @@ import {
 } from "./lib/workspaceSync";
 import {
   buildCustomerCreditShareText,
+  buildWhatsAppWebShareUrl,
   calculatePricePlan,
   calculatePricePlanFromSalePrice,
   customerCreditPaymentOptions,
@@ -2494,6 +2495,10 @@ export default function App() {
     } catch {
       flash(setToast, "Mətni kopyalamaq mümkün olmadı.", "error");
     }
+  };
+
+  const openPriceCalcShareInWhatsApp = () => {
+    window.open(buildWhatsAppWebShareUrl(priceCalcShareText), "_blank", "noopener,noreferrer");
   };
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
@@ -6245,6 +6250,9 @@ export default function App() {
               </button>
               <button type="button" className="dg-btn dg-btn-primary" onClick={() => void copyPriceCalcShareText()}>
                 Mətni kopyala
+              </button>
+              <button type="button" className="dg-btn dg-pricecalc-whatsapp-btn" onClick={openPriceCalcShareInWhatsApp}>
+                WhatsApp-la göndər
               </button>
             </div>
           </div>

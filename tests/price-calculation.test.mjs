@@ -32,3 +32,12 @@ test("customer share text contains product, down payment, and every monthly opti
   assert.match(text, /9 ay — aylıq 176,67 AZN/);
   assert.match(text, /24 ay — aylıq 75,63 AZN/);
 });
+
+test("WhatsApp Web URL contains the complete encoded customer offer", () => {
+  const result = imported.calculatePricePlanFromSalePrice(2000, 500);
+  const text = imported.buildCustomerCreditShareText("18 Pro 256GB Burgundy", 500, result);
+  const url = imported.buildWhatsAppWebShareUrl(text);
+
+  assert.ok(url.startsWith("https://web.whatsapp.com/send?text="));
+  assert.equal(decodeURIComponent(url.split("?text=")[1]), text);
+});
