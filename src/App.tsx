@@ -1498,6 +1498,7 @@ export default function App() {
   const [priceCalcSaleInput, setPriceCalcSaleInput] = useState("");
   const [priceCalcInitialPaymentInput, setPriceCalcInitialPaymentInput] = useState("");
   const [priceCalcTab, setPriceCalcTab] = useState<"price" | "credit">("price");
+  const [priceCalcSelectedMonths, setPriceCalcSelectedMonths] = useState<number[]>([]);
   const priceCalcShareDialogRef = useRef<HTMLDialogElement>(null);
   const [creditAssessmentDraft, setCreditAssessmentDraft] = useState({
     price: "",
@@ -2484,9 +2485,27 @@ export default function App() {
   );
 
   const priceCalcShareText = useMemo(
-    () => buildCustomerCreditShareText(priceCalcProductName, priceCalcInitialPaymentValue, priceCalcResult),
-    [priceCalcProductName, priceCalcInitialPaymentValue, priceCalcResult],
+    () => buildCustomerCreditShareText(
+      priceCalcProductName,
+      priceCalcInitialPaymentValue,
+      priceCalcResult,
+      priceCalcSelectedMonths,
+    ),
+    [priceCalcProductName, priceCalcInitialPaymentValue, priceCalcResult, priceCalcSelectedMonths],
   );
+
+  const togglePriceCalcShareMonth = (months: number) => {
+    setPriceCalcSelectedMonths((current) =>
+      current.includes(months)
+        ? current.filter((item) => item !== months)
+        : [...current, months].sort((a, b) => a - b),
+    );
+  };
+
+  const openPriceCalcCustomerCard = () => {
+    setPriceCalcSelectedMonths([]);
+    priceCalcShareDialogRef.current?.showModal();
+  };
 
   const copyPriceCalcShareText = async () => {
     try {
@@ -6183,7 +6202,7 @@ export default function App() {
               className="dg-btn dg-btn-primary"
               disabled={priceCalcResult.cashPrice <= 0 || !priceCalcProductName.trim()}
               title={!priceCalcProductName.trim() ? "Əvvəlcə məhsul adını yazın" : "Müştəriyə göndəriləcək kartı aç"}
-              onClick={() => priceCalcShareDialogRef.current?.showModal()}
+              onClick={openPriceCalcCustomerCard}
             >
               Müştəri kartını aç
             </button>
@@ -6235,12 +6254,23 @@ export default function App() {
               <div className="dg-pricecalc-share-downpayment">
                 İlkin ödəniş: <strong>{formatMoney(priceCalcInitialPaymentValue)}</strong>
               </div>
+              <p className="dg-pricecalc-share-hint">Müştəriyə göndərmək istədiyiniz müddətləri seçin.</p>
               <div className="dg-pricecalc-share-options">
                 {priceCalcCustomerOptions.map((option) => (
-                  <div key={option.months} className="dg-pricecalc-share-row">
-                    <span>{option.months} ay</span>
+                  <label
+                    key={option.months}
+                    className={`dg-pricecalc-share-row${priceCalcSelectedMonths.includes(option.months) ? " is-selected" : ""}`}
+                  >
+                    <span className="dg-pricecalc-share-period">
+                      <input
+                        type="checkbox"
+                        checked={priceCalcSelectedMonths.includes(option.months)}
+                        onChange={() => togglePriceCalcShareMonth(option.months)}
+                      />
+                      <span>{option.months} ay</span>
+                    </span>
                     <strong>Aylıq {formatMoney(option.monthly)}</strong>
-                  </div>
+                  </label>
                 ))}
               </div>
             </article>
@@ -6248,10 +6278,20 @@ export default function App() {
               <button type="button" className="dg-btn dg-btn-secondary" onClick={() => priceCalcShareDialogRef.current?.close()}>
                 Bağla
               </button>
-              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void copyPriceCalcShareText()}>
+              <button
+                type="button"
+                className="dg-btn dg-btn-primary"
+                disabled={priceCalcSelectedMonths.length === 0}
+                onClick={() => void copyPriceCalcShareText()}
+              >
                 Mətni kopyala
               </button>
-              <button type="button" className="dg-btn dg-pricecalc-whatsapp-btn" onClick={openPriceCalcShareInWhatsApp}>
+              <button
+                type="button"
+                className="dg-btn dg-pricecalc-whatsapp-btn"
+                disabled={priceCalcSelectedMonths.length === 0}
+                onClick={openPriceCalcShareInWhatsApp}
+              >
                 WhatsApp-la göndər
               </button>
             </div>

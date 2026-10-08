@@ -169,9 +169,13 @@ export function buildCustomerCreditShareText(
   productName: string,
   initialPayment: number,
   result: PriceCalculationResult,
+  selectedMonths?: readonly number[],
 ): string {
   const title = productName.trim() || "Məhsul";
-  const lines = customerCreditPaymentOptions(result).map(
+  const allowedMonths = selectedMonths ? new Set(selectedMonths) : null;
+  const lines = customerCreditPaymentOptions(result)
+    .filter((option) => !allowedMonths || allowedMonths.has(option.months))
+    .map(
     (option) => `${option.months} ay — aylıq ${formatCustomerAmount(option.monthly)} AZN`,
   );
   return [

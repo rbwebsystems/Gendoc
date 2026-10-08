@@ -41,3 +41,14 @@ test("WhatsApp Web URL contains the complete encoded customer offer", () => {
   assert.ok(url.startsWith("https://web.whatsapp.com/send?text="));
   assert.equal(decodeURIComponent(url.split("?text=")[1]), text);
 });
+
+test("customer can share only the selected credit periods", () => {
+  const result = imported.calculatePricePlanFromSalePrice(2000, 500);
+  const text = imported.buildCustomerCreditShareText("18 Pro 256GB Burgundy", 500, result, [3, 6]);
+
+  assert.match(text, /3 ay — aylıq 500 AZN/);
+  assert.match(text, /6 ay — aylıq 250 AZN/);
+  assert.doesNotMatch(text, /9 ay/);
+  assert.doesNotMatch(text, /12 ay/);
+  assert.doesNotMatch(text, /24 ay/);
+});

@@ -2621,6 +2621,16 @@ textarea.dg-input {
   color: var(--win-text);
 }
 
+.dg-pricecalc-share-hint {
+  margin: 0;
+  padding: 0.75rem 1.1rem;
+  border-top: 1px solid var(--win-border);
+  background: #f8fafc;
+  color: var(--win-text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
 .dg-pricecalc-share-options {
   border-top: 1px solid var(--win-border);
 }
@@ -2634,6 +2644,16 @@ textarea.dg-input {
   border-bottom: 1px solid var(--win-border);
   color: var(--win-text-secondary);
   font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.dg-pricecalc-share-row:hover {
+  background: #f8fafc;
+}
+
+.dg-pricecalc-share-row.is-selected {
+  background: #f0fdf4;
 }
 
 .dg-pricecalc-share-row:last-child {
@@ -2643,6 +2663,21 @@ textarea.dg-input {
 .dg-pricecalc-share-row strong {
   color: var(--win-text);
   font-variant-numeric: tabular-nums;
+}
+
+.dg-pricecalc-share-period {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--win-text);
+  font-weight: 650;
+}
+
+.dg-pricecalc-share-period input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: #16a34a;
 }
 
 .dg-pricecalc-share-actions {
@@ -2658,6 +2693,12 @@ textarea.dg-input {
 .dg-pricecalc-whatsapp-btn:hover {
   border-color: #166534;
   background: #15803d;
+}
+
+.dg-pricecalc-whatsapp-btn:disabled {
+  border-color: var(--win-border);
+  background: #94a3b8;
+  color: #fff;
 }
 
 .dg-pricecalc-tabs {
