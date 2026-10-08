@@ -2579,6 +2579,76 @@ textarea.dg-input {
   width: 100%;
 }
 
+.dg-pricecalc-results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dg-pricecalc-results-head .dg-panel-section-title {
+  margin: 0;
+}
+
+.dg-pricecalc-share-dialog {
+  width: min(480px, 96vw);
+}
+
+.dg-pricecalc-share-card {
+  border: 1px solid color-mix(in srgb, var(--win-border) 82%, #dc2626 18%);
+  border-radius: var(--win-radius-xl);
+  background: linear-gradient(165deg, #fff 0%, #fff7f7 100%);
+  box-shadow: var(--win-shadow-card);
+  overflow: hidden;
+}
+
+.dg-pricecalc-share-card h3 {
+  margin: 0;
+  padding: 1rem 1.1rem 0.85rem;
+  color: var(--win-text);
+  font-size: 1.1rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.dg-pricecalc-share-downpayment {
+  padding: 0 1.1rem 1rem;
+  color: var(--win-text-secondary);
+  font-size: 0.925rem;
+}
+
+.dg-pricecalc-share-downpayment strong {
+  color: var(--win-text);
+}
+
+.dg-pricecalc-share-options {
+  border-top: 1px solid var(--win-border);
+}
+
+.dg-pricecalc-share-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.72rem 1.1rem;
+  border-bottom: 1px solid var(--win-border);
+  color: var(--win-text-secondary);
+  font-size: 0.9rem;
+}
+
+.dg-pricecalc-share-row:last-child {
+  border-bottom: 0;
+}
+
+.dg-pricecalc-share-row strong {
+  color: var(--win-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.dg-pricecalc-share-actions {
+  margin-top: 1rem;
+}
+
 .dg-pricecalc-tabs {
   display: inline-flex;
   gap: 0.35rem;
@@ -2834,6 +2904,16 @@ textarea.dg-input {
 
   .dg-pricecalc-card-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dg-pricecalc-results-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dg-pricecalc-results-head .dg-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 

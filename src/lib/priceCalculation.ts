@@ -32,6 +32,11 @@ export type PriceCalculationResult = {
   creditLines: PriceCalcCreditLine[];
 };
 
+export type CustomerCreditPaymentOption = {
+  months: number;
+  monthly: number;
+};
+
 function toCents(amountAzn: number): number {
   return Math.round(amountAzn * 100);
 }
@@ -138,4 +143,41 @@ export function calculatePricePlanFromSalePrice(
   const cashPrice = fromCents(toCents(salePriceRaw));
   const financedAmount = financedAmountFromCash(cashPrice, initialPaymentRaw);
   return { cashPrice, financedAmount, creditLines: creditLinesFromCash(cashPrice, initialPaymentRaw) };
+}
+
+/** Müştəriyə göndərilən kart üçün 0–6 ay intervalını ayrıca 3 və 6 aya bölür. */
+export function customerCreditPaymentOptions(result: PriceCalculationResult): CustomerCreditPaymentOption[] {
+  const zeroPercentLine = result.creditLines.find((line) => line.key === "m0to6");
+  const zeroPercentTotal = zeroPercentLine?.total ?? 0;
+  return [
+    { months: 3, monthly: monthlyCreditPayment(zeroPercentTotal, 3) },
+    { months: 6, monthly: monthlyCreditPayment(zeroPercentTotal, 6) },
+    ...result.creditLines
+      .filter((line) => line.key !== "m0to6")
+      .map((line) => ({ months: line.months, monthly: line.monthly })),
+  ];
+}
+
+function formatCustomerAmount(amount: number): string {
+  return new Intl.NumberFormat("az-AZ", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+export function buildCustomerCreditShareText(
+  productName: string,
+  initialPayment: number,
+  result: PriceCalculationResult,
+): string {
+  const title = productName.trim() || "Məhsul";
+  const lines = customerCreditPaymentOptions(result).map(
+    (option) => `${option.months} ay — aylıq ${formatCustomerAmount(option.monthly)} AZN`,
+  );
+  return [
+    title,
+    `İlkin ödəniş: ${formatCustomerAmount(initialPayment)} AZN`,
+    "",
+    ...lines,
+  ].join("\n");
 }

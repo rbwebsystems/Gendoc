@@ -6,6 +6,7 @@
   "scripts": {
     "test:cash-sync": "node --test tests/cash-sync.test.mjs",
     "test:credit-assessment": "node --test tests/credit-assessment.test.mjs",
+    "test:price-calculation": "node --test tests/price-calculation.test.mjs",
     "test:sync-timing": "node --test tests/sync-timing.test.mjs",
     "test:bundled-offers": "node --test tests/bundled-supplier-offers.test.mjs",
     "dev": "vite",

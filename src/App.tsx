@@ -145,8 +145,10 @@ import {
   workspaceFingerprint,
 } from "./lib/workspaceSync";
 import {
+  buildCustomerCreditShareText,
   calculatePricePlan,
   calculatePricePlanFromSalePrice,
+  customerCreditPaymentOptions,
   PRICE_CALC_PRODUCT_OPTIONS,
   type PriceCalcProductType,
 } from "./lib/priceCalculation";
@@ -1489,11 +1491,13 @@ export default function App() {
   const [customerOrderEditId, setCustomerOrderEditId] = useState<string | null>(null);
   const [customerOrderDraft, setCustomerOrderDraft] = useState<CustomerOrderDraft>(() => emptyCustomerOrderDraft());
   const [customerOrderMode, setCustomerOrderMode] = useState<OrderFormMode>("list");
+  const [priceCalcProductName, setPriceCalcProductName] = useState("");
   const [priceCalcProductType, setPriceCalcProductType] = useState<PriceCalcProductType>("mobileNew");
   const [priceCalcCostInput, setPriceCalcCostInput] = useState("");
   const [priceCalcSaleInput, setPriceCalcSaleInput] = useState("");
   const [priceCalcInitialPaymentInput, setPriceCalcInitialPaymentInput] = useState("");
   const [priceCalcTab, setPriceCalcTab] = useState<"price" | "credit">("price");
+  const priceCalcShareDialogRef = useRef<HTMLDialogElement>(null);
   const [creditAssessmentDraft, setCreditAssessmentDraft] = useState({
     price: "",
     months: "",
@@ -2472,6 +2476,25 @@ export default function App() {
     }
     return calculatePricePlan(priceCalcProductType, priceCalcCostValue, priceCalcInitialPaymentValue);
   }, [priceCalcProductType, priceCalcCostValue, priceCalcSaleValue, priceCalcInitialPaymentValue]);
+
+  const priceCalcCustomerOptions = useMemo(
+    () => customerCreditPaymentOptions(priceCalcResult),
+    [priceCalcResult],
+  );
+
+  const priceCalcShareText = useMemo(
+    () => buildCustomerCreditShareText(priceCalcProductName, priceCalcInitialPaymentValue, priceCalcResult),
+    [priceCalcProductName, priceCalcInitialPaymentValue, priceCalcResult],
+  );
+
+  const copyPriceCalcShareText = async () => {
+    try {
+      await navigator.clipboard.writeText(priceCalcShareText);
+      flash(setToast, "Kredit təklifi kopyalandı.");
+    } catch {
+      flash(setToast, "Mətni kopyalamaq mümkün olmadı.", "error");
+    }
+  };
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
   const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
@@ -6076,6 +6099,15 @@ export default function App() {
         <section className="dg-form-inner-panel">
           <h2 className="dg-panel-section-title">Hesablama girişləri</h2>
           <div className="dg-form-meta-grid">
+            <label className="dg-field dg-field-span-full">
+              <span className="dg-label">Məhsul adı</span>
+              <input
+                className="dg-input"
+                value={priceCalcProductName}
+                onChange={(e) => setPriceCalcProductName(e.target.value)}
+                placeholder="Məsələn: 18 Pro 256GB Burgundy"
+              />
+            </label>
             <label className="dg-field">
               <span className="dg-label">Məhsul növü</span>
               <select
@@ -6139,7 +6171,18 @@ export default function App() {
         </section>
 
         <section className="dg-form-inner-panel" style={{ marginTop: "1rem" }}>
-          <h2 className="dg-panel-section-title">Nəticələr</h2>
+          <div className="dg-pricecalc-results-head">
+            <h2 className="dg-panel-section-title">Nəticələr</h2>
+            <button
+              type="button"
+              className="dg-btn dg-btn-primary"
+              disabled={priceCalcResult.cashPrice <= 0 || !priceCalcProductName.trim()}
+              title={!priceCalcProductName.trim() ? "Əvvəlcə məhsul adını yazın" : "Müştəriyə göndəriləcək kartı aç"}
+              onClick={() => priceCalcShareDialogRef.current?.showModal()}
+            >
+              Müştəri kartını aç
+            </button>
+          </div>
           <div className="dg-pricecalc-card-grid" style={{ marginTop: "0.5rem" }}>
             <article className="dg-pricecalc-card" aria-label="Nağd satış qiyməti kartı">
               <div className="dg-pricecalc-card-label">Nağd satış qiyməti</div>
@@ -6178,6 +6221,34 @@ export default function App() {
             </li>
           </ol>
         </section>
+
+        <dialog ref={priceCalcShareDialogRef} className="dg-modal dg-pricecalc-share-dialog">
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">Müştəri üçün kredit təklifi</h2>
+            <article className="dg-pricecalc-share-card" aria-label="Kopyalanacaq kredit təklifi">
+              <h3>{priceCalcProductName.trim() || "Məhsul"}</h3>
+              <div className="dg-pricecalc-share-downpayment">
+                İlkin ödəniş: <strong>{formatMoney(priceCalcInitialPaymentValue)}</strong>
+              </div>
+              <div className="dg-pricecalc-share-options">
+                {priceCalcCustomerOptions.map((option) => (
+                  <div key={option.months} className="dg-pricecalc-share-row">
+                    <span>{option.months} ay</span>
+                    <strong>Aylıq {formatMoney(option.monthly)}</strong>
+                  </div>
+                ))}
+              </div>
+            </article>
+            <div className="dg-modal-actions dg-pricecalc-share-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => priceCalcShareDialogRef.current?.close()}>
+                Bağla
+              </button>
+              <button type="button" className="dg-btn dg-btn-primary" onClick={() => void copyPriceCalcShareText()}>
+                Mətni kopyala
+              </button>
+            </div>
+          </div>
+        </dialog>
           </>
         ) : renderCreditAssessment()}
       </div>
