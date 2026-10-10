@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import "./App.css";
 import "./rbsoft-theme.css";
+import gendocMarkUrl from "./assets/gendoc-mark.svg";
 import { InstructionsModule } from "./components/InstructionsModule";
 import { LabelsModule } from "./components/LabelsModule";
 import { TableActionMenu } from "./components/TableActionMenu";
@@ -8310,16 +8311,9 @@ export default function App() {
         <div className="rb-shell">
           <aside className={`rb-sidebar ${sidebarOpen ? "is-open" : ""}`} aria-label="Modullar">
             <div className="rb-profile-card">
-              <div className="rb-profile-avatar" aria-hidden>
-                <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false">
-                  <circle cx="20" cy="20" r="20" fill="rgba(255,255,255,0.12)" />
-                  <circle cx="20" cy="16" r="7" fill="rgba(255,255,255,0.9)" />
-                  <path d="M7.5 36.5c2.7-6.7 8.2-10 12.5-10s9.8 3.3 12.5 10" fill="rgba(255,255,255,0.9)" />
-                </svg>
-              </div>
-              <div className="rb-profile-meta">
-                <div className="rb-profile-name">GenDoc</div>
-                <div className="rb-profile-sub">Sənəd generatoru</div>
+              <div className="rb-brand-logo" aria-label="GenDoc">
+                <img src={gendocMarkUrl} alt="" aria-hidden="true" />
+                <span>GenDoc</span>
               </div>
             </div>
 
