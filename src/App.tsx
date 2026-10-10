@@ -6114,10 +6114,6 @@ export default function App() {
   const renderPriceCalculationsModule = () => (
     <div className="dg-form-page pg-panel dg-form-page--pricecalc" aria-label="Qiymət hesablanması">
       <div className="dg-form-page-body">
-        <div className="dg-pricecalc-tabs" role="tablist" aria-label="Qiymət hesablanması bölmələri">
-          <button type="button" role="tab" aria-selected={priceCalcTab === "price"} className={`dg-pricecalc-tab${priceCalcTab === "price" ? " is-active" : ""}`} onClick={() => setPriceCalcTab("price")}>Qiymət hesablanması</button>
-          <button type="button" role="tab" aria-selected={priceCalcTab === "credit"} className={`dg-pricecalc-tab${priceCalcTab === "credit" ? " is-active" : ""}`} onClick={() => setPriceCalcTab("credit")}>Kredit uyğunluğu</button>
-        </div>
         {priceCalcTab === "price" ? (
           <>
         <section className="dg-form-inner-panel">
@@ -8495,7 +8491,34 @@ export default function App() {
               </div>
             </header>
 
-            <nav className="rb-module-tabs" aria-label={`${workspaceHeader.title} tabları`} />
+            <nav
+              className="rb-module-tabs"
+              aria-label={`${workspaceHeader.title} tabları`}
+              role={module === "priceCalculations" ? "tablist" : undefined}
+            >
+              {module === "priceCalculations" ? (
+                <>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={priceCalcTab === "price"}
+                    className={`rb-module-tab${priceCalcTab === "price" ? " is-active" : ""}`}
+                    onClick={() => setPriceCalcTab("price")}
+                  >
+                    Qiymət hesablanması
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={priceCalcTab === "credit"}
+                    className={`rb-module-tab${priceCalcTab === "credit" ? " is-active" : ""}`}
+                    onClick={() => setPriceCalcTab("credit")}
+                  >
+                    Kredit uyğunluğu
+                  </button>
+                </>
+              ) : null}
+            </nav>
 
             <main ref={contentRef} className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}${module === "priceCalculations" ? " rb-content--pricecalc" : ""}`}>
               {toast ? (
