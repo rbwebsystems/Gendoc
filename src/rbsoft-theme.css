@@ -100,13 +100,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 58px;
+  min-height: 64px;
   gap: 0;
   padding: 8px 5px;
   border-radius: 0;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--rb-sidebar-deep);
+  border-bottom: 2px solid rgba(19, 167, 189, 0.62);
+  background: #171824;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+  z-index: 1;
 }
 
 .rb-profile-avatar {
@@ -121,7 +123,7 @@
 
 .rb-profile-name {
   font-weight: 700;
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
   letter-spacing: 0.02em;
   line-height: 1.2;
   color: var(--rb-sidebar-text);
@@ -200,7 +202,7 @@
 }
 
 .rb-menu-icon {
-  width: 24px;
+  width: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -208,8 +210,8 @@
 }
 
 .rb-menu-icon .dg-nav-icon {
-  width: 21px;
-  height: 21px;
+  width: 23px;
+  height: 23px;
 }
 
 .rb-menu-item-logout {
