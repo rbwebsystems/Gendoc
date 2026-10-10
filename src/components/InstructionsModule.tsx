@@ -15,6 +15,7 @@ import {
   normalizePosTerminal,
   POS_TERMINAL_ORDER,
 } from "../lib/instructions";
+import { TableActionMenu } from "./TableActionMenu";
 
 type InstructionTab = "cash" | "credit" | "corporate" | "pos";
 type StatusFilter = "all" | InstructionRowStatus;
@@ -315,11 +316,13 @@ export function InstructionsModule({ state, onChange }: Props) {
                       <StatusSelect value={row.status} onChange={(status) => patchCash(row.id, { status })} />
                     </td>
                     <td className="dg-td-actions">
-                      <DeleteButton
-                        onClick={() =>
-                          onChange({ ...state, cashSales: state.cashSales.filter((r) => r.id !== row.id) })
-                        }
-                      />
+                      <TableActionMenu>
+                        <DeleteButton
+                          onClick={() =>
+                            onChange({ ...state, cashSales: state.cashSales.filter((r) => r.id !== row.id) })
+                          }
+                        />
+                      </TableActionMenu>
                     </td>
                   </tr>
                 ))}
@@ -374,11 +377,13 @@ export function InstructionsModule({ state, onChange }: Props) {
                       <StatusSelect value={row.status} onChange={(status) => patchCredit(row.id, { status })} />
                     </td>
                     <td className="dg-td-actions">
-                      <DeleteButton
-                        onClick={() =>
-                          onChange({ ...state, creditSales: state.creditSales.filter((r) => r.id !== row.id) })
-                        }
-                      />
+                      <TableActionMenu>
+                        <DeleteButton
+                          onClick={() =>
+                            onChange({ ...state, creditSales: state.creditSales.filter((r) => r.id !== row.id) })
+                          }
+                        />
+                      </TableActionMenu>
                     </td>
                   </tr>
                 ))}
@@ -433,14 +438,16 @@ export function InstructionsModule({ state, onChange }: Props) {
                       <StatusSelect value={row.status} onChange={(status) => patchCorporate(row.id, { status })} />
                     </td>
                     <td className="dg-td-actions">
-                      <DeleteButton
-                        onClick={() =>
-                          onChange({
-                            ...state,
-                            corporateSales: state.corporateSales.filter((r) => r.id !== row.id),
-                          })
-                        }
-                      />
+                      <TableActionMenu>
+                        <DeleteButton
+                          onClick={() =>
+                            onChange({
+                              ...state,
+                              corporateSales: state.corporateSales.filter((r) => r.id !== row.id),
+                            })
+                          }
+                        />
+                      </TableActionMenu>
                     </td>
                   </tr>
                 ))}
@@ -505,11 +512,13 @@ export function InstructionsModule({ state, onChange }: Props) {
                               />
                             </td>
                             <td className="dg-td-actions">
-                              <DeleteButton
-                                onClick={() =>
-                                  onChange({ ...state, posFees: state.posFees.filter((r) => r.id !== row.id) })
-                                }
-                              />
+                              <TableActionMenu>
+                                <DeleteButton
+                                  onClick={() =>
+                                    onChange({ ...state, posFees: state.posFees.filter((r) => r.id !== row.id) })
+                                  }
+                                />
+                              </TableActionMenu>
                             </td>
                           </tr>
                         ))}

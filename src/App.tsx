@@ -5,6 +5,7 @@ import "./App.css";
 import "./rbsoft-theme.css";
 import { InstructionsModule } from "./components/InstructionsModule";
 import { LabelsModule } from "./components/LabelsModule";
+import { TableActionMenu } from "./components/TableActionMenu";
 import { rebaseCashReport } from "./lib/cashSync";
 import {
   buildDeliveryActHtml,
@@ -3258,7 +3259,7 @@ export default function App() {
                         <td>{c.profile.name || "—"}</td>
                         <td>{c.profile.voen || "—"}</td>
                         <td className="dg-td-actions">
-                          <div className="dg-icon-row">
+                          <TableActionMenu>
                             <button
                               type="button"
                               className="dg-icon-btn"
@@ -3286,7 +3287,7 @@ export default function App() {
                             >
                               <IconTrash />
                             </button>
-                          </div>
+                          </TableActionMenu>
                         </td>
                       </tr>
                     ))}
@@ -3405,7 +3406,7 @@ export default function App() {
                           </td>
                           <td>{p.title.trim() || "—"}</td>
                           <td className="dg-td-actions">
-                            <div className="dg-icon-row">
+                            <TableActionMenu>
                               <button
                                 type="button"
                                 className="dg-icon-btn"
@@ -3442,7 +3443,7 @@ export default function App() {
                               >
                                 <IconPrint />
                               </button>
-                            </div>
+                            </TableActionMenu>
                           </td>
                         </tr>
                       );
@@ -3737,15 +3738,17 @@ export default function App() {
                           </td>
                           <td className="dg-num">{formatMoney(r.qty * r.unitPrice)}</td>
                           <td className="dg-td-actions">
-                            <button
-                              type="button"
-                              className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
-                              aria-label="Sil"
-                              title="Sil"
-                              onClick={() => removeDraftRow(r.id)}
-                            >
-                              <IconTrash />
-                            </button>
+                            <TableActionMenu>
+                              <button
+                                type="button"
+                                className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
+                                aria-label="Sil"
+                                title="Sil"
+                                onClick={() => removeDraftRow(r.id)}
+                              >
+                                <IconTrash />
+                              </button>
+                            </TableActionMenu>
                           </td>
                         </tr>
                       ))
@@ -4973,15 +4976,17 @@ export default function App() {
                 </td>
                 <td className="dg-td-amount dg-order-col-total">{formatMoney(r.qty * r.purchasePrice)}</td>
                 <td className="dg-td-actions">
-                  <button
-                    type="button"
-                    className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
-                    aria-label="Sil"
-                    title="Sil"
-                    onClick={() => onRemove(r.id)}
-                  >
-                    <IconTrash />
-                  </button>
+                  <TableActionMenu>
+                    <button
+                      type="button"
+                      className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
+                      aria-label="Sil"
+                      title="Sil"
+                      onClick={() => onRemove(r.id)}
+                    >
+                      <IconTrash />
+                    </button>
+                  </TableActionMenu>
                 </td>
               </tr>
             ))
@@ -5051,7 +5056,7 @@ export default function App() {
                   <td className="dg-td-amount dg-order-col-qty">{totalQty}</td>
                   <td className="dg-td-amount dg-order-col-total">{formatMoney(totalAmount)}</td>
                   <td className="dg-td-actions">
-                    <div className="dg-icon-row">
+                    <TableActionMenu>
                       <button
                         type="button"
                         className="dg-icon-btn"
@@ -5088,7 +5093,7 @@ export default function App() {
                       >
                         <IconTrash />
                       </button>
-                    </div>
+                    </TableActionMenu>
                   </td>
                 </tr>
               );
@@ -5500,21 +5505,23 @@ export default function App() {
                             <td className="dg-td-num dg-offer-col-sale-computed">{formatMoney(saleOfficial)}</td>
                             <td className="dg-td-num dg-offer-col-sale-computed">{formatMoney(saleCash)}</td>
                             <td className="dg-td-actions">
-                              <button
-                                type="button"
-                                className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
-                                aria-label="Sil"
-                                title="Sil"
-                                onClick={() =>
-                                  setOfferDraft((d) => ({
-                                    ...d,
-                                    rows: d.rows.length <= 1 ? d.rows : d.rows.filter((x) => x.id !== r.id),
-                                  }))
-                                }
-                                disabled={offerDraft.rows.length <= 1}
-                              >
-                                <IconTrash />
-                              </button>
+                              <TableActionMenu>
+                                <button
+                                  type="button"
+                                  className="dg-icon-btn dg-icon-btn-danger dg-icon-btn--compact"
+                                  aria-label="Sil"
+                                  title="Sil"
+                                  onClick={() =>
+                                    setOfferDraft((d) => ({
+                                      ...d,
+                                      rows: d.rows.length <= 1 ? d.rows : d.rows.filter((x) => x.id !== r.id),
+                                    }))
+                                  }
+                                  disabled={offerDraft.rows.length <= 1}
+                                >
+                                  <IconTrash />
+                                </button>
+                              </TableActionMenu>
                             </td>
                           </tr>
                         );
@@ -5619,7 +5626,7 @@ export default function App() {
                         <td className="dg-td-amount">{formatMoney(totals.saleOfficialGrand)}</td>
                         <td className="dg-td-amount">{formatMoney(totals.saleCash)}</td>
                         <td className="dg-td-actions">
-                          <div className="dg-icon-row">
+                          <TableActionMenu>
                             <button
                               type="button"
                               className="dg-icon-btn"
@@ -5655,7 +5662,7 @@ export default function App() {
                             >
                               Sənəd
                             </button>
-                          </div>
+                          </TableActionMenu>
                         </td>
                       </tr>
                     );
@@ -6830,7 +6837,7 @@ export default function App() {
                       <td>{appUserRoleLabel(u.role)}</td>
                       <td>{u.mustChangePassword ? "Şifrə dəyişməli" : "—"}</td>
                       <td className="dg-td-actions">
-                        <div className="dg-icon-row">
+                        <TableActionMenu>
                           <button
                             type="button"
                             className="dg-icon-btn"
@@ -6846,7 +6853,7 @@ export default function App() {
                           <button type="button" className="dg-icon-btn dg-icon-btn-danger" title="Sil" aria-label="Sil" onClick={() => void deleteAppUser(u.id)}>
                             <IconTrash />
                           </button>
-                        </div>
+                        </TableActionMenu>
                       </td>
                     </tr>
                   ))}
@@ -6944,9 +6951,11 @@ export default function App() {
                         {u.modules.map((id) => PERMISSION_MODULE_OPTIONS.find((m) => m.id === id)?.label ?? id).join(", ")}
                       </td>
                       <td className="dg-td-actions">
-                        <button type="button" className="dg-btn dg-btn-secondary dg-btn--compact" onClick={() => startEditPermissions(u)}>
-                          İcazələr
-                        </button>
+                        <TableActionMenu>
+                          <button type="button" className="dg-btn dg-btn-secondary dg-btn--compact" onClick={() => startEditPermissions(u)}>
+                            İcazələr
+                          </button>
+                        </TableActionMenu>
                       </td>
                     </tr>
                   ))}
@@ -7241,7 +7250,7 @@ export default function App() {
                         {r.status === "rejected" ? r.rejectReason || "—" : "—"}
                       </td>
                       <td className="dg-td-actions">
-                        <div className="dg-icon-row dg-icon-row--wrap">
+                        <TableActionMenu>
                           <button type="button" className="dg-icon-btn" title="Məlumat" aria-label="Məlumat" onClick={() => setLeaveInfoId(r.id)}>
                             <IconInfo />
                           </button>
@@ -7265,7 +7274,7 @@ export default function App() {
                               <IconTrash />
                             </button>
                           )}
-                        </div>
+                        </TableActionMenu>
                       </td>
                     </tr>
                   ))}

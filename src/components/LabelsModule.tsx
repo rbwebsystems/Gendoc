@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { readSheet } from "read-excel-file/browser";
 import type { LabelProductRecord } from "../types";
+import { TableActionMenu } from "./TableActionMenu";
 
 type LabelProductDraft = {
   id: string;
@@ -432,14 +433,16 @@ export function LabelsModule({ products, onSave }: LabelsModuleProps) {
                   </td>
                   {editing ? (
                     <td className="dg-labels-row-actions">
-                      <button
-                        type="button"
-                        className="dg-btn dg-btn-danger dg-btn--compact"
-                        onClick={() => setDraft((rows) => rows.filter((item) => item.id !== row.id))}
-                        aria-label={`${index + 1}-ci məhsulu sil`}
-                      >
-                        Sil
-                      </button>
+                      <TableActionMenu>
+                        <button
+                          type="button"
+                          className="dg-btn dg-btn-danger dg-btn--compact"
+                          onClick={() => setDraft((rows) => rows.filter((item) => item.id !== row.id))}
+                          aria-label={`${index + 1}-ci məhsulu sil`}
+                        >
+                          Sil
+                        </button>
+                      </TableActionMenu>
                     </td>
                   ) : null}
                 </tr>

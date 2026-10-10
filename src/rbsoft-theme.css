@@ -1259,6 +1259,116 @@
   color: var(--rb-text);
 }
 
+.rb-desktop .dg-td-actions,
+.rb-desktop .dg-labels-row-actions {
+  text-align: center;
+}
+
+.dg-action-menu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.dg-action-menu-trigger {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #52616f;
+  font: 700 20px/1 var(--font-ui);
+  cursor: pointer;
+}
+
+.dg-action-menu-trigger:hover,
+.dg-action-menu-trigger[aria-expanded="true"] {
+  border-color: #dfe5e9;
+  background: #f3f6f8;
+  color: #17212b;
+}
+
+.dg-action-menu-popover {
+  position: fixed;
+  z-index: 1000;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid #dfe5e9;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+  font-family: var(--font-ui);
+}
+
+.dg-action-menu-popover .dg-icon-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.dg-action-menu-popover .dg-icon-btn,
+.dg-action-menu-popover .dg-btn {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  color: #354452;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.dg-action-menu-popover .dg-icon-btn::after {
+  content: attr(aria-label);
+}
+
+.dg-action-menu-popover .dg-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.dg-action-menu-popover .dg-icon-btn:hover,
+.dg-action-menu-popover .dg-btn:hover {
+  border: 0;
+  background: #f1f7f8;
+  box-shadow: none;
+  transform: none;
+}
+
+.dg-action-menu-popover .dg-icon-btn-danger,
+.dg-action-menu-popover .dg-btn-danger {
+  color: #c43d3d;
+}
+
+.dg-action-menu-popover .dg-icon-btn-danger:hover,
+.dg-action-menu-popover .dg-btn-danger:hover {
+  background: #fff1f1;
+  color: #b42323;
+}
+
+.dg-action-menu-popover button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .rb-desktop .dg-qty-wrap {
   border-color: #9ebdd6;
 }
