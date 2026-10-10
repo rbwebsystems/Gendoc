@@ -1216,6 +1216,21 @@
   color: #cf3f3f !important;
 }
 
+.rb-desktop .dg-table thead th:not(:last-child),
+.rb-desktop .dg-info-table thead th:not(:last-child) {
+  border-right: 1px solid #edf0f2;
+}
+
+.rb-desktop .dg-table tbody td:not(:last-child),
+.rb-desktop .dg-info-table tbody td:not(:last-child) {
+  border-right: 1px solid #f0f2f4;
+}
+
+.rb-desktop .dg-table tfoot td:not(:last-child),
+.rb-desktop .dg-info-table tfoot td:not(:last-child) {
+  border-right: 1px solid #e8ecef;
+}
+
 .rb-desktop .dg-icon-btn {
   width: 28px;
   height: 26px;
