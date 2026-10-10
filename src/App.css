@@ -3376,7 +3376,7 @@ textarea.dg-input {
   width: 100%;
   margin: 0;
   color: #0b7d8f;
-  font-size: 0.86rem;
+  font-size: 0.94rem;
   font-weight: 750;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -3386,6 +3386,9 @@ textarea.dg-input {
 .dg-cash-card-balance {
   margin-top: 22px;
   padding-right: 34px;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
   overflow: hidden;
   font-size: clamp(1.45rem, 2vw, 1.85rem);
   font-variant-numeric: tabular-nums;
@@ -3403,11 +3406,17 @@ textarea.dg-input {
 }
 
 .dg-cash-card-balance.dg-cash-amount--pos {
-  color: #166b5d;
+  color: #111827;
 }
 
 .dg-cash-card-balance.dg-cash-amount--neg {
   color: #c23b3b;
+}
+
+.dg-cash-card-currency {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
 }
 
 @media (max-width: 620px) {

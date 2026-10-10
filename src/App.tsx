@@ -6350,7 +6350,8 @@ export default function App() {
                     </h2>
                   </header>
                   <div className={`dg-cash-card-balance ${cashAmountClass(balance)}`}>
-                    {formatCashAmount(balance)}
+                    <span className="dg-cash-card-currency">AZN</span>
+                    <span>{formatCashAmount(balance)}</span>
                   </div>
                   <div className="dg-cash-card-menu">
                     <TableActionMenu label={`${row.name || "Hesab"} əməliyyatları`}>
