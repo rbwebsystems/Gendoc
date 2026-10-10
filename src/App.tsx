@@ -8494,22 +8494,7 @@ export default function App() {
               </div>
             </header>
 
-            <nav className="rb-module-tabs" aria-label="Modul tabları">
-              {[...filteredMainNavIds, ...filteredSystemNavIds].map((id) => {
-                const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`rb-module-tab ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-module-tab--red" : ""}`}
-                    aria-current={module === m.id ? "page" : undefined}
-                    onClick={() => switchSidebarModule(m.id)}
-                  >
-                    {m.label}
-                  </button>
-                );
-              })}
-            </nav>
+            <nav className="rb-module-tabs" aria-label={`${workspaceHeader.title} tabları`} />
 
             <main ref={contentRef} className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}${module === "priceCalculations" ? " rb-content--pricecalc" : ""}`}>
               {toast ? (
