@@ -63,6 +63,7 @@ import {
   changeCashRowBalance,
   cloneCashRow,
   commitCashInput,
+  isPartialCashInput,
   appendCashReportHistory,
   mergeCashReportOnSync,
   resolveCashReportState,
@@ -1510,6 +1511,8 @@ export default function App() {
   const [creditAssessmentError, setCreditAssessmentError] = useState("");
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
   const [cashAccountHistoryId, setCashAccountHistoryId] = useState<string | null>(null);
+  const [cashMovementDialog, setCashMovementDialog] = useState<{ rowId: string; kind: "income" | "expense" } | null>(null);
+  const [cashMovementAmounts, setCashMovementAmounts] = useState<string[]>([""]);
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
@@ -2521,6 +2524,10 @@ export default function App() {
     () => cashReportRows.reduce((total, row) => total + rowDisplayTotal(row), 0),
     [cashReportRows],
   );
+  const cashMovementTotal = useMemo(
+    () => cashMovementAmounts.reduce((sum, raw) => sum + Math.abs(commitCashInput(raw)), 0),
+    [cashMovementAmounts],
+  );
   const cashAccountHistory = useMemo(() => {
     if (!cashAccountHistoryId) return [];
     const snapshots = cashReportHistory.flatMap((entry) => {
@@ -2539,6 +2546,7 @@ export default function App() {
     if (module !== "cashReport") {
       setCashHistoryOpen(false);
       setCashAccountHistoryId(null);
+      setCashMovementDialog(null);
     }
   }, [module]);
 
@@ -2800,39 +2808,40 @@ export default function App() {
     [askConfirm, patchCashReport, authState.status, flushRemoteWrite],
   );
 
-  const addCashMovement = useCallback(
-    async (rowId: string, kind: "income" | "expense") => {
-      const row = cashReportRows.find((item) => item.id === rowId);
+  const openCashMovement = useCallback((rowId: string, kind: "income" | "expense") => {
+    setCashMovementAmounts([""]);
+    setCashMovementDialog({ rowId, kind });
+  }, []);
+
+  const saveCashMovement = useCallback(() => {
+      if (!cashMovementDialog) return;
+      const row = cashReportRows.find((item) => item.id === cashMovementDialog.rowId);
       if (!row) return;
-      const kindLabel = kind === "income" ? "Mədaxil" : "Məxaric";
-      const raw = await askPrompt({
-        title: `${row.name || "Hesab"} — ${kindLabel}`,
-        label: "Məbləğ",
-        confirmLabel: "Təsdiq et",
-        cancelLabel: "Ləğv et",
-      });
-      if (raw === null) return;
-      const amount = Math.abs(commitCashInput(raw));
-      if (!(amount > 0)) {
-        flash(setToast, "Düzgün məbləğ daxil edin.", "error");
+      const amounts = cashMovementAmounts
+        .map((raw) => Math.abs(commitCashInput(raw)))
+        .filter((amount) => amount > 0);
+      if (amounts.length === 0) {
+        flash(setToast, "Ən azı bir düzgün məbləğ daxil edin.", "error");
         return;
       }
-      const delta = kind === "income" ? amount : -amount;
+      const total = amounts.reduce((sum, amount) => sum + amount, 0);
+      const kindLabel = cashMovementDialog.kind === "income" ? "Mədaxil" : "Məxaric";
+      const delta = cashMovementDialog.kind === "income" ? total : -total;
       updateCashRow(
-        rowId,
+        cashMovementDialog.rowId,
         (current) => changeCashRowBalance(current, delta),
         {
           trackUndo: true,
-          historyLabel: `${kindLabel}: ${row.name || "Hesab"} — ${formatCashAmount(amount)}`,
+          historyLabel: `${kindLabel}: ${row.name || "Hesab"} — ${amounts.map(formatCashAmount).join(" + ")} = ${formatCashAmount(total)}`,
         },
       );
       flash(setToast, `${kindLabel} əlavə edildi`);
+      setCashMovementDialog(null);
+      setCashMovementAmounts([""]);
       if (firebaseEnabled && authState.status === "signedIn") {
         window.setTimeout(() => void flushRemoteWrite(), 0);
       }
-    },
-    [askPrompt, cashReportRows, updateCashRow, authState.status, flushRemoteWrite],
-  );
+    }, [cashMovementDialog, cashMovementAmounts, cashReportRows, updateCashRow, authState.status, flushRemoteWrite]);
 
   const renameCashReportRow = useCallback(
     async (rowId: string) => {
@@ -6383,10 +6392,10 @@ export default function App() {
                     </div>
                     <div className="dg-cash-card-menu">
                       <TableActionMenu label={`${row.name || "Hesab"} əməliyyatları`}>
-                        <button type="button" className="dg-btn" onClick={() => void addCashMovement(row.id, "income")}>
+                        <button type="button" className="dg-btn" onClick={() => openCashMovement(row.id, "income")}>
                           Mədaxil
                         </button>
-                        <button type="button" className="dg-btn" onClick={() => void addCashMovement(row.id, "expense")}>
+                        <button type="button" className="dg-btn" onClick={() => openCashMovement(row.id, "expense")}>
                           Məxaric
                         </button>
                         <button type="button" className="dg-btn" onClick={() => setCashAccountHistoryId(row.id)}>
@@ -7879,6 +7888,80 @@ export default function App() {
               </button>
               <button type="submit" className="dg-btn dg-btn-primary">
                 {promptDialog.confirmLabel ?? "OK"}
+              </button>
+            </div>
+          </form>
+        </dialog>
+      ) : null}
+
+      {cashMovementDialog ? (
+        <dialog
+          open
+          className="dg-modal dg-modal--cash-movement"
+          onClose={() => setCashMovementDialog(null)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setCashMovementDialog(null);
+          }}
+        >
+          <form
+            className="dg-modal-body"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveCashMovement();
+            }}
+          >
+            <h2 className="dg-modal-title">
+              {cashReportRows.find((row) => row.id === cashMovementDialog.rowId)?.name || "Hesab"} — {cashMovementDialog.kind === "income" ? "Mədaxil" : "Məxaric"}
+            </h2>
+            <div className="dg-cash-movement-list">
+              {cashMovementAmounts.map((amount, index) => (
+                <div key={index} className="dg-cash-movement-row">
+                  <label className="dg-field">
+                    <span className="dg-label">Məbləğ {index + 1}</span>
+                    <input
+                      className="dg-input"
+                      inputMode="decimal"
+                      autoFocus={index === 0}
+                      value={amount}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (!isPartialCashInput(value)) return;
+                        setCashMovementAmounts((current) => current.map((item, itemIndex) => itemIndex === index ? value : item));
+                      }}
+                      placeholder="0"
+                    />
+                  </label>
+                  {cashMovementAmounts.length > 1 ? (
+                    <button
+                      type="button"
+                      className="dg-btn dg-btn-danger dg-cash-movement-remove"
+                      aria-label={`${index + 1}-ci məbləği sil`}
+                      title="Xananı sil"
+                      onClick={() => setCashMovementAmounts((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                    >
+                      −
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="dg-btn dg-btn-secondary dg-cash-movement-add"
+              onClick={() => setCashMovementAmounts((current) => [...current, ""])}
+            >
+              <span aria-hidden>+</span> Məbləğ xanası əlavə et
+            </button>
+            <div className="dg-cash-movement-total">
+              <span>Yekun</span>
+              <strong>{formatCashAmount(cashMovementTotal)} AZN</strong>
+            </div>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashMovementDialog(null)}>
+                Ləğv et
+              </button>
+              <button type="submit" className="dg-btn dg-btn-primary">
+                Təsdiq et
               </button>
             </div>
           </form>

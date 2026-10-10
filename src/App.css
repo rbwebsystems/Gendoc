@@ -3396,6 +3396,68 @@ textarea.dg-input {
   letter-spacing: 0.045em;
 }
 
+.dg-modal--cash-movement {
+  width: min(440px, calc(100vw - 24px));
+}
+
+.dg-cash-movement-list {
+  max-height: min(48vh, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.dg-cash-movement-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: end;
+  gap: 7px;
+}
+
+.dg-cash-movement-row:only-child {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dg-cash-movement-remove {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  font-size: 1rem;
+}
+
+.dg-cash-movement-add {
+  width: 100%;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.dg-cash-movement-add > span {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.dg-cash-movement-total {
+  margin-top: 12px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 6px;
+  background: #f7f9fa;
+  color: #344451;
+  font-size: 0.82rem;
+}
+
+.dg-cash-movement-total strong {
+  color: #111827;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .dg-cash-card {
   position: relative;
   min-width: 0;
