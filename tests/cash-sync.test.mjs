@@ -11,7 +11,7 @@ async function loadSource(path) {
   return import("data:text/javascript;base64," + Buffer.from(outputText).toString("base64"));
 }
 const { rebaseCashReport } = await loadSource("../src/lib/cashSync.ts");
-const { pruneCashSlotEdits } = await loadSource("../src/lib/cashReport.ts");
+const { changeCashRowBalance, pruneCashSlotEdits } = await loadSource("../src/lib/cashReport.ts");
 const row = (id, values = [], updatedAt = 1) => ({
   id, name: id, slots: Array.from({ length: 8 }, (_, i) => values[i] ?? 0),
   createdAt: 1, updatedAt,
@@ -22,6 +22,10 @@ test("remote snapshots preserve active negative/decimal input", () => {
   const drafts = { "a:1": "-", "a:2": "0.", "a:3": "15", "deleted:0": "99" };
   assert.deepEqual(pruneCashSlotEdits([row("a", [0, 0, 0, 15])], drafts),
     { "a:1": "-", "a:2": "0.", "a:3": "15" });
+});
+test("card movement applies to the full visible balance and clears legacy pending slots", () => {
+  const result = changeCashRowBalance(row("a", [100, 25, -10]), 40);
+  assert.deepEqual(result.slots, [155, 0, 0, 0, 0, 0, 0, 0]);
 });
 test("two devices editing different cells retain both amounts", () => {
   const base = state(row("a", [100]));

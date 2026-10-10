@@ -78,6 +78,13 @@ export function rowDisplayTotal(row: CashReportRow): number {
   return rowPostedBalance(row) + rowPendingSum(row);
 }
 
+/** Cari yekuna mədaxil/məxaric tətbiq edir və köhnə gözləyən xanaları əsas balansa birləşdirir. */
+export function changeCashRowBalance(row: CashReportRow, delta: number): CashReportRow {
+  const slots = Array.from({ length: CASH_REPORT_SLOT_COUNT }, () => 0) as CashReportRow["slots"];
+  slots[0] = rowDisplayTotal(row) + (Number.isFinite(delta) ? delta : 0);
+  return { ...row, slots, updatedAt: Date.now() };
+}
+
 export function totalCashBalance(rows: CashReportRow[]): number {
   return rows.reduce((sum, row) => sum + rowDisplayTotal(row), 0);
 }

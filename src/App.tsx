@@ -60,6 +60,7 @@ import { escapeHtml, formatDateAzLong, formatMoney } from "./lib/text";
 import {
   CASH_REPORT_SLOT_COUNT,
   cashAmountClass,
+  changeCashRowBalance,
   cloneCashRow,
   commitCashInput,
   appendCashReportHistory,
@@ -67,17 +68,8 @@ import {
   resolveCashReportState,
   rowsFromCashSnapshot,
   formatCashAmount,
-  cashAmountClassForInput,
-  cashSlotDisplayValue,
-  cashSlotKey,
-  isPartialCashInput,
-  applyCashRowDrafts,
-  clearCashRowDraftKeys,
-  mergeCashRowSlots,
   newCashReportRow,
-  pruneCashSlotEdits,
-  rowPendingSum,
-  totalCashBalanceWithDrafts,
+  rowDisplayTotal,
   defaultCashReportRows,
   normalizeCashReportSlots,
 } from "./lib/cashReport";
@@ -1517,9 +1509,7 @@ export default function App() {
   const [creditAssessmentResult, setCreditAssessmentResult] = useState<CreditAssessmentResult | null>(null);
   const [creditAssessmentError, setCreditAssessmentError] = useState("");
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
-  const [cashSlotEdits, setCashSlotEdits] = useState<Record<string, string>>({});
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
-  const cashNameFocusRef = useRef<Map<string, string>>(new Map());
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
   const [permissionMode, setPermissionMode] = useState<SystemUserFormMode>("list");
@@ -2526,24 +2516,11 @@ export default function App() {
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
   const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
-  const cashReportBalance = useMemo(
-    () => totalCashBalanceWithDrafts(cashReportRows, cashSlotEdits),
-    [cashReportRows, cashSlotEdits],
-  );
-
   useEffect(() => {
     if (module !== "cashReport") {
       setCashHistoryOpen(false);
-      setCashSlotEdits({});
     }
   }, [module]);
-
-  useEffect(() => {
-    const rows = workspace.cashReport?.rows ?? [];
-    setCashSlotEdits((prev) => {
-      return pruneCashSlotEdits(rows, prev);
-    });
-  }, [workspace.cashReport?.rows, remoteSyncEpoch]);
 
   useEffect(() => {
     if (module !== "cashReport") return;
@@ -2586,6 +2563,23 @@ export default function App() {
     if (authState.status === "signedIn") return authState.user.email?.trim() || "İstifadəçi";
     return "Direktor";
   }, [sessionKind, currentMember?.name, authState]);
+
+  const askPrompt = useCallback(
+    (opts: {
+      title: string;
+      label: string;
+      defaultValue?: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+      multiline?: boolean;
+    }) => {
+      return new Promise<string | null>((resolve) => {
+        promptResolverRef.current = resolve;
+        setPromptDialog(opts);
+      });
+    },
+    [],
+  );
 
   const patchCashReport = useCallback(
     (
@@ -2658,42 +2652,27 @@ export default function App() {
     [patchCashReport, pushCashRowUndo],
   );
 
-  const addCashReportRow = useCallback(() => {
+  const addCashReportRow = useCallback(async () => {
+    const value = await askPrompt({
+      title: "Yeni hesab",
+      label: "Hesab adı",
+      confirmLabel: "Əlavə et",
+      cancelLabel: "Ləğv et",
+    });
+    if (value === null) return;
+    const name = value.trim();
+    if (!name) {
+      flash(setToast, "Hesab adı boş ola bilməz.", "error");
+      return;
+    }
     patchCashReport(
       (prev) => ({
         ...prev,
-        rows: [...prev.rows, newCashReportRow("Yeni hesab")],
+        rows: [...prev.rows, newCashReportRow(name)],
       }),
-      "Yeni hesab sətri əlavə edildi",
+      `Yeni hesab əlavə edildi: ${name}`,
     );
-  }, [patchCashReport]);
-
-  const mergeCashReportRow = useCallback(
-    (rowId: string) => {
-      const row = cashReportRows.find((r) => r.id === rowId);
-      if (!row) return;
-      const rowWithDrafts = applyCashRowDrafts(row, cashSlotEdits);
-      if (rowPendingSum(rowWithDrafts) === 0) {
-        flash(setToast, "Cəmlənəcək dəyər yoxdur (sütun 2–8).", "error");
-        return;
-      }
-      const draftsSnapshot = cashSlotEdits;
-      setCashSlotEdits((prev) => clearCashRowDraftKeys(prev, rowId));
-      updateCashRow(
-        rowId,
-        (current) => mergeCashRowSlots(applyCashRowDrafts(current, draftsSnapshot)),
-        {
-          trackUndo: true,
-          historyLabel: `Cəmləndi: ${rowWithDrafts.name || "Hesab"}`,
-        },
-      );
-      flash(setToast, "Cəmləndi");
-      if (firebaseEnabled && authState.status === "signedIn") {
-        window.setTimeout(() => void flushRemoteWrite(), 0);
-      }
-    },
-    [cashReportRows, cashSlotEdits, updateCashRow, authState.status, flushRemoteWrite],
-  );
+  }, [askPrompt, patchCashReport]);
 
   const undoCashReportRow = useCallback(
     (rowId: string) => {
@@ -2789,7 +2768,6 @@ export default function App() {
       });
       if (!ok) return;
       const rows = rowsFromCashSnapshot(entry);
-      setCashSlotEdits({});
       patchCashReport(
         (prev) => ({ ...prev, rows }),
         `Tarixçədən bərpa: ${formatCashAmount(entry.balance)}`,
@@ -2802,21 +2780,66 @@ export default function App() {
     [askConfirm, patchCashReport, authState.status, flushRemoteWrite],
   );
 
-  const askPrompt = useCallback(
-    (opts: {
-      title: string;
-      label: string;
-      defaultValue?: string;
-      confirmLabel?: string;
-      cancelLabel?: string;
-      multiline?: boolean;
-    }) => {
-      return new Promise<string | null>((resolve) => {
-        promptResolverRef.current = resolve;
-        setPromptDialog(opts);
+  const addCashMovement = useCallback(
+    async (rowId: string, kind: "income" | "expense") => {
+      const row = cashReportRows.find((item) => item.id === rowId);
+      if (!row) return;
+      const kindLabel = kind === "income" ? "Mədaxil" : "Məxaric";
+      const raw = await askPrompt({
+        title: `${row.name || "Hesab"} — ${kindLabel}`,
+        label: "Məbləğ",
+        confirmLabel: "Təsdiq et",
+        cancelLabel: "Ləğv et",
       });
+      if (raw === null) return;
+      const amount = Math.abs(commitCashInput(raw));
+      if (!(amount > 0)) {
+        flash(setToast, "Düzgün məbləğ daxil edin.", "error");
+        return;
+      }
+      const delta = kind === "income" ? amount : -amount;
+      updateCashRow(
+        rowId,
+        (current) => changeCashRowBalance(current, delta),
+        {
+          trackUndo: true,
+          historyLabel: `${kindLabel}: ${row.name || "Hesab"} — ${formatCashAmount(amount)}`,
+        },
+      );
+      flash(setToast, `${kindLabel} əlavə edildi`);
+      if (firebaseEnabled && authState.status === "signedIn") {
+        window.setTimeout(() => void flushRemoteWrite(), 0);
+      }
     },
-    [],
+    [askPrompt, cashReportRows, updateCashRow, authState.status, flushRemoteWrite],
+  );
+
+  const renameCashReportRow = useCallback(
+    async (rowId: string) => {
+      const row = cashReportRows.find((item) => item.id === rowId);
+      if (!row) return;
+      const value = await askPrompt({
+        title: "Hesabın adını dəyiş",
+        label: "Hesab adı",
+        defaultValue: row.name,
+        confirmLabel: "Yadda saxla",
+        cancelLabel: "Ləğv et",
+      });
+      if (value === null) return;
+      const name = value.trim();
+      if (!name) {
+        flash(setToast, "Hesab adı boş ola bilməz.", "error");
+        return;
+      }
+      if (name === row.name.trim()) return;
+      updateCashRow(
+        rowId,
+        (current) => ({ ...current, name, updatedAt: Date.now() }),
+        { trackUndo: true, historyLabel: `Hesab adı dəyişdirildi: ${name}` },
+      );
+      flash(setToast, "Hesab adı dəyişdirildi");
+    },
+    [askPrompt, cashReportRows, updateCashRow],
   );
 
   const deleteCashReportRow = useCallback(
@@ -2824,8 +2847,8 @@ export default function App() {
       const row = cashReportRows.find((r) => r.id === rowId);
       if (!row) return;
       const ok = await askConfirm({
-        title: "Sətri sil",
-        message: `«${row.name || "Hesab"}» silinsin?`,
+        title: "Hesabı sil",
+        message: `«${row.name || "Hesab"}» hesabı silinsin?`,
         confirmLabel: "Sil",
         cancelLabel: "Ləğv et",
         danger: true,
@@ -2837,9 +2860,9 @@ export default function App() {
           ...prev,
           rows: prev.rows.filter((r) => r.id !== rowId),
         }),
-        `Sətir silindi: ${row.name || "Hesab"}`,
+        `Hesab silindi: ${row.name || "Hesab"}`,
       );
-      flash(setToast, "Sətir silindi");
+      flash(setToast, "Hesab silindi");
     },
     [askConfirm, cashReportRows, patchCashReport],
   );
@@ -6308,150 +6331,50 @@ export default function App() {
       );
     }
 
-    const cashColGroup = (
-      <colgroup>
-        <col className="dg-cash-col-idx" />
-        <col className="dg-cash-col-name" />
-        {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, i) => (
-          <col key={i} className="dg-cash-col-slot" />
-        ))}
-        <col className="dg-cash-col-actions" />
-      </colgroup>
-    );
-
     return (
-    <div className="dg-cash-report pg-panel" aria-label="Kassa hesabatı">
-      <div className="dg-cash-table-shell">
-        <div className="dg-cash-table-scroll dg-table-wrap">
-          <table className="dg-table dg-table--cash-report">
-            {cashColGroup}
-            <thead>
-              <tr>
-                <th className="dg-cash-col-idx">#</th>
-                <th className="dg-cash-col-name">Hesab</th>
-                {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, i) => (
-                  <th key={i} className="dg-cash-col-slot">
-                    {i + 1}
-                  </th>
-                ))}
-                <th className="dg-cash-col-actions">Əməliyyat</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cashReportRows.map((row, index) => (
-                <tr key={row.id}>
-                  <td className="dg-cash-col-idx">{index + 1}</td>
-                  <td className="dg-cash-col-name">
-                    <input
-                      className="dg-input dg-cash-name-input"
-                      value={row.name}
-                      onFocus={() => cashNameFocusRef.current.set(row.id, row.name)}
-                      onChange={(e) =>
-                        updateCashRow(row.id, (r) => ({ ...r, name: e.target.value, updatedAt: Date.now() }))
-                      }
-                      onBlur={(e) => {
-                        const prevName = (cashNameFocusRef.current.get(row.id) ?? row.name).trim();
-                        const nextName = e.target.value.trim();
-                        cashNameFocusRef.current.delete(row.id);
-                        if (nextName && nextName !== prevName) {
-                          patchCashReport((prev) => ({ rows: prev.rows }), `Hesab adı dəyişdirildi: ${nextName}`);
-                        }
-                      }}
-                      placeholder="Hesab adı"
-                    />
-                  </td>
-                  {row.slots.map((value, slotIndex) => {
-                    const slotKey = cashSlotKey(row.id, slotIndex);
-                    const slotDraft = cashSlotEdits[slotKey];
-                    const slotDisplay = cashSlotDisplayValue(value, slotDraft);
-                    return (
-                      <td key={slotIndex} className="dg-cash-col-slot">
-                        <input
-                          className={`dg-input dg-cash-slot-input ${cashAmountClassForInput(value, slotDraft)}`}
-                          inputMode="decimal"
-                          value={slotDisplay}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            if (!isPartialCashInput(raw)) return;
-                            setCashSlotEdits((prev) => ({ ...prev, [slotKey]: raw }));
-                          }}
-                          onBlur={(event) => {
-                            const raw = event.currentTarget.value;
-                            const next = commitCashInput(raw);
-                            const committed =
-                              workspaceRef.current.cashReport?.rows.find((r) => r.id === row.id)?.slots[slotIndex] ??
-                              value;
-                            const changed = next !== committed;
-                            setCashSlotEdits((prev) => {
-                              if (!(slotKey in prev)) return prev;
-                              const rest = { ...prev };
-                              delete rest[slotKey];
-                              return rest;
-                            });
-                            if (!changed) return;
-                            updateCashRow(
-                              row.id,
-                              (r) => {
-                                const slots = [...r.slots] as CashReportRow["slots"];
-                                slots[slotIndex] = next;
-                                return { ...r, slots, updatedAt: Date.now() };
-                              },
-                              {
-                                historyLabel: `${row.name || "Hesab"} — sütun ${slotIndex + 1}: ${next === 0 ? "boşaldı" : formatCashAmount(next)}`,
-                              },
-                            );
-                          }}
-                        />
-                      </td>
-                    );
-                  })}
-                  <td className="dg-cash-col-actions">
-                    <div className="dg-icon-row dg-cash-actions">
-                      <button
-                        type="button"
-                        className="dg-btn dg-btn-primary dg-btn-sm dg-cash-btn-merge"
-                        onClick={() => mergeCashReportRow(row.id)}
-                        title="Sütun 2–8-i balansa cəmlə"
-                      >
-                        Cəmlə
+      <div className="dg-cash-report pg-panel" aria-label="Kassa hesabatı">
+        {cashReportRows.length === 0 ? (
+          <div className="dg-empty-state-card" role="status">
+            <div className="dg-empty-state-title">Hələ hesab yoxdur</div>
+            <div className="dg-empty-state-desc">“Hesab əlavə et” düyməsi ilə yeni hesab yaradın.</div>
+          </div>
+        ) : (
+          <div className="dg-cash-card-grid" role="list" aria-label="Kassa hesabları">
+            {cashReportRows.map((row) => {
+              const balance = rowDisplayTotal(row);
+              return (
+                <article key={row.id} className="dg-cash-card" role="listitem">
+                  <header className="dg-cash-card-head">
+                    <h2 className="dg-cash-card-name" title={row.name || "Hesab"}>
+                      {row.name || "Hesab"}
+                    </h2>
+                    <TableActionMenu label={`${row.name || "Hesab"} əməliyyatları`}>
+                      <button type="button" className="dg-btn" onClick={() => void addCashMovement(row.id, "income")}>
+                        Mədaxil
                       </button>
-                      <button
-                        type="button"
-                        className="dg-btn dg-btn-ghost dg-btn-sm"
-                        onClick={() => undoCashReportRow(row.id)}
-                        title="Son əməliyyatı geri al"
-                      >
-                        Geri
+                      <button type="button" className="dg-btn" onClick={() => void addCashMovement(row.id, "expense")}>
+                        Məxaric
                       </button>
-                      <button
-                        type="button"
-                        className="dg-btn dg-btn-danger dg-btn-sm"
-                        onClick={() => void deleteCashReportRow(row.id)}
-                        title="Sətiri sil"
-                      >
+                      <button type="button" className="dg-btn" onClick={() => void renameCashReportRow(row.id)}>
+                        Adı dəyiş
+                      </button>
+                      <button type="button" className="dg-btn" onClick={() => undoCashReportRow(row.id)}>
+                        Geri al
+                      </button>
+                      <button type="button" className="dg-btn dg-btn-danger" onClick={() => void deleteCashReportRow(row.id)}>
                         Sil
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="dg-cash-foot-row">
-                <td colSpan={2} className="dg-cash-foot-label">
-                  Ümumi balans
-                </td>
-                <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
-                  {cashReportBalance === 0 ? "" : formatCashAmount(cashReportBalance)}
-                </td>
-                <td colSpan={CASH_REPORT_SLOT_COUNT - 1} className="dg-cash-foot-spacer" />
-                <td className="dg-cash-col-actions dg-cash-foot-spacer" />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                    </TableActionMenu>
+                  </header>
+                  <div className={`dg-cash-card-balance ${cashAmountClass(balance)}`}>
+                    {formatCashAmount(balance)}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
     );
   };
 
@@ -8492,7 +8415,7 @@ export default function App() {
                         ) : null}
                       </button>
                       <button type="button" className="dg-btn dg-btn-primary" onClick={addCashReportRow}>
-                        Sətir əlavə et
+                        Hesab əlavə et
                       </button>
                     </>
                   ) : headerPrimaryAction ? (
