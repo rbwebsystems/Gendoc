@@ -3413,6 +3413,18 @@ textarea.dg-input {
   color: #c23b3b;
 }
 
+.dg-cash-account-history-balance {
+  margin-top: 4px;
+  color: #111827;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+}
+
+.dg-cash-account-history-balance.dg-cash-amount--neg {
+  color: #c23b3b;
+}
+
 .dg-cash-card-currency {
   font-size: 0.72rem;
   font-weight: 700;

@@ -1509,6 +1509,7 @@ export default function App() {
   const [creditAssessmentResult, setCreditAssessmentResult] = useState<CreditAssessmentResult | null>(null);
   const [creditAssessmentError, setCreditAssessmentError] = useState("");
   const [cashHistoryOpen, setCashHistoryOpen] = useState(false);
+  const [cashAccountHistoryId, setCashAccountHistoryId] = useState<string | null>(null);
   const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
@@ -2516,9 +2517,24 @@ export default function App() {
 
   const cashReportRows = useMemo(() => workspace.cashReport?.rows ?? [], [workspace.cashReport?.rows]);
   const cashReportHistory = useMemo(() => workspace.cashReport?.history ?? [], [workspace.cashReport?.history]);
+  const cashAccountHistory = useMemo(() => {
+    if (!cashAccountHistoryId) return [];
+    const snapshots = cashReportHistory.flatMap((entry) => {
+      const row = entry.rows.find((item) => item.id === cashAccountHistoryId);
+      return row ? [{ entry, row, balance: rowDisplayTotal(row) }] : [];
+    });
+    return snapshots.flatMap((item, index) => {
+      const older = snapshots[index + 1];
+      if (!older) return [{ ...item, displayLabel: "Başlanğıc vəziyyət" }];
+      const changed = item.row.name !== older.row.name
+        || item.row.slots.some((value, slotIndex) => value !== older.row.slots[slotIndex]);
+      return changed ? [{ ...item, displayLabel: item.entry.label }] : [];
+    });
+  }, [cashAccountHistoryId, cashReportHistory]);
   useEffect(() => {
     if (module !== "cashReport") {
       setCashHistoryOpen(false);
+      setCashAccountHistoryId(null);
     }
   }, [module]);
 
@@ -6361,6 +6377,9 @@ export default function App() {
                       <button type="button" className="dg-btn" onClick={() => void addCashMovement(row.id, "expense")}>
                         Məxaric
                       </button>
+                      <button type="button" className="dg-btn" onClick={() => setCashAccountHistoryId(row.id)}>
+                        Tarixçə
+                      </button>
                       <button type="button" className="dg-btn" onClick={() => void renameCashReportRow(row.id)}>
                         Adı dəyiş
                       </button>
@@ -7898,6 +7917,49 @@ export default function App() {
               type="button"
               className="dg-btn dg-btn-primary dg-btn-block dg-modal-close"
               onClick={() => setCashHistoryOpen(false)}
+            >
+              Bağla
+            </button>
+          </div>
+        </dialog>
+      ) : null}
+
+      {cashAccountHistoryId ? (
+        <dialog
+          open
+          className="dg-modal dg-modal--wide"
+          onClose={() => setCashAccountHistoryId(null)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setCashAccountHistoryId(null);
+          }}
+        >
+          <div className="dg-modal-body">
+            <h2 className="dg-modal-title">
+              {cashReportRows.find((row) => row.id === cashAccountHistoryId)?.name || "Hesab"} — Tarixçə
+            </h2>
+            <p className="dg-modal-hint">Yalnız bu hesabda baş verən dəyişikliklər göstərilir.</p>
+            {cashAccountHistory.length === 0 ? (
+              <p className="dg-muted">Bu hesab üçün tarixçə qeydi yoxdur.</p>
+            ) : (
+              <ul className="dg-cash-changelog">
+                {cashAccountHistory.map(({ entry, balance, displayLabel }) => (
+                  <li key={entry.id} className="dg-cash-changelog-item">
+                    <div className="dg-cash-changelog-meta">
+                      <span className="dg-cash-changelog-time">{new Date(entry.savedAt).toLocaleString("az-AZ")}</span>
+                      {entry.authorName ? <span className="dg-cash-changelog-author">{entry.authorName}</span> : null}
+                    </div>
+                    <div className="dg-cash-changelog-text">{displayLabel}</div>
+                    <div className={`dg-cash-account-history-balance ${cashAmountClass(balance)}`}>
+                      AZN {formatCashAmount(balance)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              className="dg-btn dg-btn-primary dg-btn-block dg-modal-close"
+              onClick={() => setCashAccountHistoryId(null)}
             >
               Bağla
             </button>
