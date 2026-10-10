@@ -59,13 +59,32 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-right: 0;
   background: var(--rb-sidebar);
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 0;
   box-shadow: none;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.rb-sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.rb-sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.rb-sidebar-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .rb-profile-card {
@@ -182,10 +201,6 @@
 .rb-menu-icon .dg-nav-icon {
   width: 21px;
   height: 21px;
-}
-
-.rb-sidebar-spacer {
-  margin-top: auto;
 }
 
 .rb-menu-item-logout {

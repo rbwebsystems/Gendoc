@@ -8316,47 +8316,48 @@ export default function App() {
               </div>
             </div>
 
-            <p className="rb-menu-section">Modullar</p>
-            <nav className="rb-menu" aria-label="Əsas modullar">
-              {filteredMainNavIds.map((id) => {
-                const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
-                    onClick={() => switchSidebarModule(m.id)}
-                  >
-                    <span className="rb-menu-icon">
-                      <SidebarNavIcon mod={m.id} />
-                    </span>
-                    <span>{m.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+            <div className="rb-sidebar-scroll">
+              <p className="rb-menu-section">Modullar</p>
+              <nav className="rb-menu" aria-label="Əsas modullar">
+                {filteredMainNavIds.map((id) => {
+                  const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`rb-menu-item ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
+                      onClick={() => switchSidebarModule(m.id)}
+                    >
+                      <span className="rb-menu-icon">
+                        <SidebarNavIcon mod={m.id} />
+                      </span>
+                      <span>{m.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
 
-            <p className="rb-menu-section">Sistem</p>
-            <nav className="rb-menu" aria-label="Sistem modulları">
-              {filteredSystemNavIds.map((id) => {
-                const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`rb-menu-item ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
-                    onClick={() => switchSidebarModule(m.id)}
-                  >
-                    <span className="rb-menu-icon">
-                      <SidebarNavIcon mod={m.id} />
-                    </span>
-                    <span>{m.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+              <p className="rb-menu-section">Sistem</p>
+              <nav className="rb-menu" aria-label="Sistem modulları">
+                {filteredSystemNavIds.map((id) => {
+                  const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`rb-menu-item ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
+                      onClick={() => switchSidebarModule(m.id)}
+                    >
+                      <span className="rb-menu-icon">
+                        <SidebarNavIcon mod={m.id} />
+                      </span>
+                      <span>{m.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
 
-            <div className="rb-sidebar-spacer" aria-hidden />
             {authState.status === "signedIn" ? (
               <div className="rb-auth-bar">
                 <div className="rb-auth-email" title={authState.user.email || ""}>
