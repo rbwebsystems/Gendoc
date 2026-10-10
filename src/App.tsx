@@ -2269,11 +2269,17 @@ export default function App() {
     });
   }, [moduleAccessSet]);
 
-  const sidebarMainNavIds = useMemo<Array<SidebarModule | "orders">>(() => {
-    const result: Array<SidebarModule | "orders"> = [];
+  const sidebarMainNavIds = useMemo<Array<SidebarModule | "companyGroup" | "orders">>(() => {
+    const result: Array<SidebarModule | "companyGroup" | "orders"> = [];
+    let companyGroupAdded = false;
     let ordersAdded = false;
     for (const id of filteredMainNavIds) {
-      if (id === "storeOrders" || id === "customerOrders") {
+      if (id === "companies" || id === "projects" || id === "suppliers") {
+        if (!companyGroupAdded) {
+          result.push("companyGroup");
+          companyGroupAdded = true;
+        }
+      } else if (id === "storeOrders" || id === "customerOrders") {
         if (!ordersAdded) {
           result.push("orders");
           ordersAdded = true;
@@ -2380,18 +2386,10 @@ export default function App() {
   const workspaceHeader = useMemo(() => {
     if (module === "settings") return { title: "Ayarlar", sub: MODULE_TAGLINE.settings };
     if (module === "companies") {
-      if (companyMode === "list") return { title: "Şirkətlər", sub: MODULE_TAGLINE.companies };
-      return {
-        title: companyEditId ? "Şirkət redaktəsi" : "Yeni şirkət",
-        sub: companyEditId ? "Mövcud şirkət kartını yeniləyin" : "Yeni alıcı və ya tərəf şirkəti əlavə edin",
-      };
+      return { title: "Şirkətlər", sub: MODULE_TAGLINE.companies };
     }
     if (module === "projects") {
-      if (projectMode === "list") return { title: "Təkliflər", sub: MODULE_TAGLINE.projects };
-      return {
-        title: projectEditId ? "Təklif redaktəsi" : "Yeni təklif",
-        sub: projectEditId ? "Mövcud təklifi yeniləyin" : "Yeni təklif əlavə edin",
-      };
+      return { title: "Şirkətlər", sub: MODULE_TAGLINE.projects };
     }
     if (module === "folders") {
       return { title: "Qovluqlar", sub: MODULE_TAGLINE.folders };
@@ -2400,11 +2398,7 @@ export default function App() {
       return { title: "Qeydlər", sub: MODULE_TAGLINE.notes };
     }
     if (module === "suppliers") {
-      if (offerMode === "list") return { title: "Təchizatçı təklifləri", sub: MODULE_TAGLINE.suppliers };
-      return {
-        title: offerEditId ? "Təklif redaktəsi" : "Yeni təklif",
-        sub: offerEditId ? "Mövcud təchizatçı təklifini yeniləyin" : "Yeni təchizatçı təklifi əlavə edin",
-      };
+      return { title: "Şirkətlər", sub: MODULE_TAGLINE.suppliers };
     }
     if (module === "storeOrders") {
       return { title: "Sifarişlər", sub: MODULE_TAGLINE.storeOrders };
@@ -8324,17 +8318,27 @@ export default function App() {
               <p className="rb-menu-section">Modullar</p>
               <nav className="rb-menu" aria-label="Əsas modullar">
                 {sidebarMainNavIds.map((id) => {
+                  const isCompanyGroup = id === "companyGroup";
                   const isOrders = id === "orders";
+                  const companyTarget: SidebarModule = filteredMainNavIds.includes("companies")
+                    ? "companies"
+                    : filteredMainNavIds.includes("projects")
+                      ? "projects"
+                      : "suppliers";
                   const orderTarget: SidebarModule = filteredMainNavIds.includes("customerOrders")
                     ? "customerOrders"
                     : "storeOrders";
-                  const target = isOrders ? orderTarget : id;
-                  const m = isOrders
-                    ? { id: target, label: "Sifarişlər" }
+                  const target = isCompanyGroup ? companyTarget : isOrders ? orderTarget : id;
+                  const m = isCompanyGroup
+                    ? { id: target, label: "Şirkətlər" }
+                    : isOrders
+                      ? { id: target, label: "Sifarişlər" }
                     : SIDEBAR_MODULES.find((x) => x.id === id)!;
-                  const isActive = isOrders
-                    ? module === "storeOrders" || module === "customerOrders"
-                    : module === m.id;
+                  const isActive = isCompanyGroup
+                    ? module === "companies" || module === "projects" || module === "suppliers"
+                    : isOrders
+                      ? module === "storeOrders" || module === "customerOrders"
+                      : module === m.id;
                   return (
                     <button
                       key={id}
@@ -8343,7 +8347,7 @@ export default function App() {
                       onClick={() => switchSidebarModule(target)}
                     >
                       <span className="rb-menu-icon">
-                        <SidebarNavIcon mod={isOrders ? "customerOrders" : m.id} />
+                        <SidebarNavIcon mod={isCompanyGroup ? "companies" : isOrders ? "customerOrders" : m.id} />
                       </span>
                       <span>{m.label}</span>
                     </button>
@@ -8512,9 +8516,45 @@ export default function App() {
             <nav
               className="rb-module-tabs"
               aria-label={`${workspaceHeader.title} tabları`}
-              role={module === "priceCalculations" || module === "storeOrders" || module === "customerOrders" ? "tablist" : undefined}
+              role={module === "companies" || module === "projects" || module === "suppliers" || module === "priceCalculations" || module === "storeOrders" || module === "customerOrders" ? "tablist" : undefined}
             >
-              {module === "storeOrders" || module === "customerOrders" ? (
+              {module === "companies" || module === "projects" || module === "suppliers" ? (
+                <>
+                  {filteredMainNavIds.includes("companies") ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={module === "companies"}
+                      className={`rb-module-tab${module === "companies" ? " is-active" : ""}`}
+                      onClick={() => switchSidebarModule("companies")}
+                    >
+                      Şirkətlər
+                    </button>
+                  ) : null}
+                  {filteredMainNavIds.includes("projects") ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={module === "projects"}
+                      className={`rb-module-tab${module === "projects" ? " is-active" : ""}`}
+                      onClick={() => switchSidebarModule("projects")}
+                    >
+                      Təkliflər
+                    </button>
+                  ) : null}
+                  {filteredMainNavIds.includes("suppliers") ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={module === "suppliers"}
+                      className={`rb-module-tab${module === "suppliers" ? " is-active" : ""}`}
+                      onClick={() => switchSidebarModule("suppliers")}
+                    >
+                      Təchizatçı təklifləri
+                    </button>
+                  ) : null}
+                </>
+              ) : module === "storeOrders" || module === "customerOrders" ? (
                 <>
                   {filteredMainNavIds.includes("customerOrders") ? (
                     <button
