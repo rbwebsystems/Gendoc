@@ -17,6 +17,7 @@
 
   --rb-sidebar: #20212f;
   --rb-sidebar-deep: #181925;
+  --rb-sidebar-modules: #2b2d3e;
   --rb-sidebar-text: rgba(255, 255, 255, 0.92);
   --rb-sidebar-muted: rgba(255, 255, 255, 0.68);
   --rb-sidebar-hover: rgba(255, 255, 255, 0.07);
@@ -83,6 +84,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  background: var(--rb-sidebar-modules);
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
@@ -107,7 +109,7 @@
   border-radius: 0;
   border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--rb-sidebar);
+  background: var(--rb-sidebar-deep);
   box-shadow: none;
   z-index: 1;
 }
@@ -372,7 +374,7 @@
   padding: 8px 14px;
   min-height: 52px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: var(--rb-sidebar);
+  background: var(--rb-sidebar-modules);
   flex-wrap: nowrap;
 }
 
