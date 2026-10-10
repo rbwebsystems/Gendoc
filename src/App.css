@@ -3400,6 +3400,30 @@ textarea.dg-input {
   width: min(440px, calc(100vw - 24px));
 }
 
+.dg-modal--cash-transfer {
+  width: min(560px, calc(100vw - 24px));
+}
+
+.dg-cash-transfer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+  align-items: end;
+  gap: 8px;
+}
+
+.dg-cash-transfer-arrow {
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: #087f91;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.dg-cash-transfer-amount {
+  margin-top: 12px;
+}
+
 .dg-cash-movement-list {
   max-height: min(48vh, 420px);
   display: flex;
@@ -3456,6 +3480,17 @@ textarea.dg-input {
   color: #111827;
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .dg-cash-transfer-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dg-cash-transfer-arrow {
+    height: 18px;
+    transform: rotate(90deg);
+  }
 }
 
 .dg-cash-card {

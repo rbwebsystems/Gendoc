@@ -85,6 +85,17 @@ export function changeCashRowBalance(row: CashReportRow, delta: number): CashRep
   return { ...row, slots, updatedAt: Date.now() };
 }
 
+/** Məbləği iki fərqli hesab arasında köçürür və ümumi balansı dəyişmir. */
+export function transferCashRowBalance(
+  source: CashReportRow,
+  target: CashReportRow,
+  amount: number,
+): [CashReportRow, CashReportRow] {
+  const value = Math.abs(Number.isFinite(amount) ? amount : 0);
+  if (!(value > 0) || source.id === target.id) return [source, target];
+  return [changeCashRowBalance(source, -value), changeCashRowBalance(target, value)];
+}
+
 export function totalCashBalance(rows: CashReportRow[]): number {
   return rows.reduce((sum, row) => sum + rowDisplayTotal(row), 0);
 }

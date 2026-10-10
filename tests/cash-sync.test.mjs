@@ -11,7 +11,7 @@ async function loadSource(path) {
   return import("data:text/javascript;base64," + Buffer.from(outputText).toString("base64"));
 }
 const { rebaseCashReport } = await loadSource("../src/lib/cashSync.ts");
-const { changeCashRowBalance, pruneCashSlotEdits } = await loadSource("../src/lib/cashReport.ts");
+const { changeCashRowBalance, pruneCashSlotEdits, transferCashRowBalance } = await loadSource("../src/lib/cashReport.ts");
 const row = (id, values = [], updatedAt = 1) => ({
   id, name: id, slots: Array.from({ length: 8 }, (_, i) => values[i] ?? 0),
   createdAt: 1, updatedAt,
@@ -26,6 +26,17 @@ test("remote snapshots preserve active negative/decimal input", () => {
 test("card movement applies to the full visible balance and clears legacy pending slots", () => {
   const result = changeCashRowBalance(row("a", [100, 25, -10]), 40);
   assert.deepEqual(result.slots, [155, 0, 0, 0, 0, 0, 0, 0]);
+});
+test("transfer moves the amount between accounts without changing the total", () => {
+  const [source, target] = transferCashRowBalance(row("source", [100, 25]), row("target", [40, -5]), 30);
+  assert.deepEqual(source.slots, [95, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(target.slots, [65, 0, 0, 0, 0, 0, 0, 0]);
+  assert.equal(source.slots[0] + target.slots[0], 160);
+});
+test("transfer ignores zero amounts and the same account", () => {
+  const account = row("same", [100]);
+  assert.deepEqual(transferCashRowBalance(account, row("target", [20]), 0), [account, row("target", [20])]);
+  assert.deepEqual(transferCashRowBalance(account, account, 25), [account, account]);
 });
 test("two devices editing different cells retain both amounts", () => {
   const base = state(row("a", [100]));

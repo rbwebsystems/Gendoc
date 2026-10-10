@@ -71,6 +71,7 @@ import {
   formatCashAmount,
   newCashReportRow,
   rowDisplayTotal,
+  transferCashRowBalance,
   defaultCashReportRows,
   normalizeCashReportSlots,
 } from "./lib/cashReport";
@@ -1513,7 +1514,8 @@ export default function App() {
   const [cashAccountHistoryId, setCashAccountHistoryId] = useState<string | null>(null);
   const [cashMovementDialog, setCashMovementDialog] = useState<{ rowId: string; kind: "income" | "expense" } | null>(null);
   const [cashMovementAmounts, setCashMovementAmounts] = useState<string[]>([""]);
-  const cashUndoRef = useRef<Map<string, CashReportRow[]>>(new Map());
+  const [cashTransferDialog, setCashTransferDialog] = useState<{ sourceId: string; targetId: string; amount: string } | null>(null);
+  const cashUndoRef = useRef<Map<string, Array<{ id: string; rows: CashReportRow[] }>>>(new Map());
 
   const [permissionDraft, setPermissionDraft] = useState<PermissionEditDraft>({ memberId: "", modules: [] });
   const [permissionMode, setPermissionMode] = useState<SystemUserFormMode>("list");
@@ -2547,6 +2549,7 @@ export default function App() {
       setCashHistoryOpen(false);
       setCashAccountHistoryId(null);
       setCashMovementDialog(null);
+      setCashTransferDialog(null);
     }
   }, [module]);
 
@@ -2645,21 +2648,34 @@ export default function App() {
     [cashHistoryAuthorName, authState.status],
   );
 
-  const pushCashRowUndo = useCallback((row: CashReportRow) => {
+  const pushCashRowsUndo = useCallback((rows: CashReportRow[]) => {
+    const entry = { id: crypto.randomUUID(), rows: rows.map(cloneCashRow) };
     const map = cashUndoRef.current;
-    const stack = map.get(row.id) ?? [];
-    stack.push(cloneCashRow(row));
-    if (stack.length > 12) stack.shift();
-    map.set(row.id, stack);
+    for (const row of rows) {
+      const stack = map.get(row.id) ?? [];
+      stack.push(entry);
+      if (stack.length > 12) stack.shift();
+      map.set(row.id, stack);
+    }
   }, []);
 
-  const popCashRowUndo = useCallback((rowId: string): CashReportRow | null => {
+  const pushCashRowUndo = useCallback((row: CashReportRow) => {
+    pushCashRowsUndo([row]);
+  }, [pushCashRowsUndo]);
+
+  const popCashRowUndo = useCallback((rowId: string): CashReportRow[] | null => {
     const map = cashUndoRef.current;
     const stack = map.get(rowId);
     if (!stack || stack.length === 0) return null;
-    const prev = stack.pop()!;
-    if (stack.length === 0) map.delete(rowId);
-    return prev;
+    const entry = stack[stack.length - 1];
+    for (const row of entry.rows) {
+      const relatedStack = map.get(row.id);
+      if (!relatedStack) continue;
+      const nextStack = relatedStack.filter((item) => item.id !== entry.id);
+      if (nextStack.length > 0) map.set(row.id, nextStack);
+      else map.delete(row.id);
+    }
+    return entry.rows;
   }, []);
 
   const updateCashRow = useCallback(
@@ -2704,17 +2720,18 @@ export default function App() {
 
   const undoCashReportRow = useCallback(
     (rowId: string) => {
-      const prev = popCashRowUndo(rowId);
-      if (!prev) {
+      const previousRows = popCashRowUndo(rowId);
+      if (!previousRows) {
         flash(setToast, "Geri alınacaq addım yoxdur.", "error");
         return;
       }
+      const previousById = new Map(previousRows.map((row) => [row.id, row]));
       patchCashReport(
         (state) => ({
           ...state,
-          rows: state.rows.map((row) => (row.id === rowId ? prev : row)),
+          rows: state.rows.map((row) => previousById.get(row.id) ?? row),
         }),
-        `Geri alındı: ${prev.name || "Hesab"}`,
+        `Geri alındı: ${previousRows.map((row) => row.name || "Hesab").join(" ↔ ")}`,
       );
       flash(setToast, "Geri alındı");
     },
@@ -2814,34 +2831,86 @@ export default function App() {
   }, []);
 
   const saveCashMovement = useCallback(() => {
-      if (!cashMovementDialog) return;
-      const row = cashReportRows.find((item) => item.id === cashMovementDialog.rowId);
-      if (!row) return;
-      const amounts = cashMovementAmounts
-        .map((raw) => Math.abs(commitCashInput(raw)))
-        .filter((amount) => amount > 0);
-      if (amounts.length === 0) {
-        flash(setToast, "Ən azı bir düzgün məbləğ daxil edin.", "error");
-        return;
-      }
-      const total = amounts.reduce((sum, amount) => sum + amount, 0);
-      const kindLabel = cashMovementDialog.kind === "income" ? "Mədaxil" : "Məxaric";
-      const delta = cashMovementDialog.kind === "income" ? total : -total;
-      updateCashRow(
-        cashMovementDialog.rowId,
-        (current) => changeCashRowBalance(current, delta),
-        {
-          trackUndo: true,
-          historyLabel: `${kindLabel}: ${row.name || "Hesab"} — ${amounts.map(formatCashAmount).join(" + ")} = ${formatCashAmount(total)}`,
-        },
-      );
-      flash(setToast, `${kindLabel} əlavə edildi`);
-      setCashMovementDialog(null);
-      setCashMovementAmounts([""]);
-      if (firebaseEnabled && authState.status === "signedIn") {
-        window.setTimeout(() => void flushRemoteWrite(), 0);
-      }
-    }, [cashMovementDialog, cashMovementAmounts, cashReportRows, updateCashRow, authState.status, flushRemoteWrite]);
+    if (!cashMovementDialog) return;
+    const row = cashReportRows.find((item) => item.id === cashMovementDialog.rowId);
+    if (!row) return;
+    const amounts = cashMovementAmounts
+      .map((raw) => Math.abs(commitCashInput(raw)))
+      .filter((amount) => amount > 0);
+    if (amounts.length === 0) {
+      flash(setToast, "Ən azı bir düzgün məbləğ daxil edin.", "error");
+      return;
+    }
+    const total = amounts.reduce((sum, amount) => sum + amount, 0);
+    const kindLabel = cashMovementDialog.kind === "income" ? "Mədaxil" : "Məxaric";
+    const delta = cashMovementDialog.kind === "income" ? total : -total;
+    updateCashRow(
+      cashMovementDialog.rowId,
+      (current) => changeCashRowBalance(current, delta),
+      {
+        trackUndo: true,
+        historyLabel: `${kindLabel}: ${row.name || "Hesab"} — ${amounts.map(formatCashAmount).join(" + ")} = ${formatCashAmount(total)}`,
+      },
+    );
+    flash(setToast, `${kindLabel} əlavə edildi`);
+    setCashMovementDialog(null);
+    setCashMovementAmounts([""]);
+    if (firebaseEnabled && authState.status === "signedIn") {
+      window.setTimeout(() => void flushRemoteWrite(), 0);
+    }
+  }, [cashMovementDialog, cashMovementAmounts, cashReportRows, updateCashRow, authState.status, flushRemoteWrite]);
+
+  const openCashTransfer = useCallback((sourceId: string) => {
+    const target = cashReportRows.find((row) => row.id !== sourceId);
+    if (!target) {
+      flash(setToast, "Transfer üçün ən azı iki hesab olmalıdır.", "error");
+      return;
+    }
+    setCashTransferDialog({ sourceId, targetId: target.id, amount: "" });
+  }, [cashReportRows]);
+
+  const saveCashTransfer = useCallback(() => {
+    if (!cashTransferDialog) return;
+    const { sourceId, targetId } = cashTransferDialog;
+    if (!sourceId || !targetId || sourceId === targetId) {
+      flash(setToast, "Fərqli hesablar seçin.", "error");
+      return;
+    }
+    const amount = Math.abs(commitCashInput(cashTransferDialog.amount));
+    if (!(amount > 0)) {
+      flash(setToast, "Düzgün məbləğ daxil edin.", "error");
+      return;
+    }
+    const source = cashReportRows.find((row) => row.id === sourceId);
+    const target = cashReportRows.find((row) => row.id === targetId);
+    if (!source || !target) {
+      flash(setToast, "Seçilmiş hesab tapılmadı.", "error");
+      return;
+    }
+    patchCashReport(
+      (state) => {
+        const currentSource = state.rows.find((row) => row.id === sourceId);
+        const currentTarget = state.rows.find((row) => row.id === targetId);
+        if (!currentSource || !currentTarget) return state;
+        pushCashRowsUndo([currentSource, currentTarget]);
+        const [nextSource, nextTarget] = transferCashRowBalance(currentSource, currentTarget, amount);
+        return {
+          ...state,
+          rows: state.rows.map((row) => {
+            if (row.id === sourceId) return nextSource;
+            if (row.id === targetId) return nextTarget;
+            return row;
+          }),
+        };
+      },
+      `Transfer: ${source.name || "Hesab"} → ${target.name || "Hesab"} — ${formatCashAmount(amount)} AZN`,
+    );
+    setCashTransferDialog(null);
+    flash(setToast, "Transfer tamamlandı");
+    if (firebaseEnabled && authState.status === "signedIn") {
+      window.setTimeout(() => void flushRemoteWrite(), 0);
+    }
+  }, [cashTransferDialog, cashReportRows, patchCashReport, pushCashRowsUndo, authState.status, flushRemoteWrite]);
 
   const renameCashReportRow = useCallback(
     async (rowId: string) => {
@@ -6398,6 +6467,14 @@ export default function App() {
                         <button type="button" className="dg-btn" onClick={() => openCashMovement(row.id, "expense")}>
                           Məxaric
                         </button>
+                        <button
+                          type="button"
+                          className="dg-btn"
+                          disabled={cashReportRows.length < 2}
+                          onClick={() => openCashTransfer(row.id)}
+                        >
+                          Transfer
+                        </button>
                         <button type="button" className="dg-btn" onClick={() => setCashAccountHistoryId(row.id)}>
                           Tarixçə
                         </button>
@@ -7962,6 +8039,90 @@ export default function App() {
               </button>
               <button type="submit" className="dg-btn dg-btn-primary">
                 Təsdiq et
+              </button>
+            </div>
+          </form>
+        </dialog>
+      ) : null}
+
+      {cashTransferDialog ? (
+        <dialog
+          open
+          className="dg-modal dg-modal--cash-transfer"
+          onClose={() => setCashTransferDialog(null)}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setCashTransferDialog(null);
+          }}
+        >
+          <form
+            className="dg-modal-body"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveCashTransfer();
+            }}
+          >
+            <h2 className="dg-modal-title">Hesablararası transfer</h2>
+            <div className="dg-cash-transfer-grid">
+              <label className="dg-field">
+                <span className="dg-label">Hansı hesabdan</span>
+                <select
+                  className="dg-input"
+                  value={cashTransferDialog.sourceId}
+                  onChange={(event) => {
+                    const sourceId = event.target.value;
+                    setCashTransferDialog((current) => {
+                      if (!current) return current;
+                      const targetId = current.targetId !== sourceId
+                        ? current.targetId
+                        : cashReportRows.find((row) => row.id !== sourceId)?.id ?? "";
+                      return { ...current, sourceId, targetId };
+                    });
+                  }}
+                >
+                  {cashReportRows.map((row) => (
+                    <option key={row.id} value={row.id}>{row.name || "Hesab"}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="dg-cash-transfer-arrow" aria-hidden="true">→</div>
+              <label className="dg-field">
+                <span className="dg-label">Hansı hesaba</span>
+                <select
+                  className="dg-input"
+                  value={cashTransferDialog.targetId}
+                  onChange={(event) => setCashTransferDialog((current) => current
+                    ? { ...current, targetId: event.target.value }
+                    : current)}
+                >
+                  {cashReportRows
+                    .filter((row) => row.id !== cashTransferDialog.sourceId)
+                    .map((row) => (
+                      <option key={row.id} value={row.id}>{row.name || "Hesab"}</option>
+                    ))}
+                </select>
+              </label>
+            </div>
+            <label className="dg-field dg-cash-transfer-amount">
+              <span className="dg-label">Məbləğ</span>
+              <input
+                className="dg-input"
+                inputMode="decimal"
+                autoFocus
+                value={cashTransferDialog.amount}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (!isPartialCashInput(value)) return;
+                  setCashTransferDialog((current) => current ? { ...current, amount: value } : current);
+                }}
+                placeholder="0"
+              />
+            </label>
+            <div className="dg-modal-actions">
+              <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setCashTransferDialog(null)}>
+                Ləğv et
+              </button>
+              <button type="submit" className="dg-btn dg-btn-primary">
+                Transfer et
               </button>
             </div>
           </form>
