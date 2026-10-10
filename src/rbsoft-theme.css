@@ -156,6 +156,7 @@
   padding: 7px 4px;
   border-radius: 0;
   font-size: var(--font-size-sm);
+  font-weight: 500;
   line-height: 1.15;
   color: var(--rb-sidebar-text);
   border: 1px solid transparent;
@@ -173,9 +174,10 @@
 
 .rb-menu-item.is-active {
   border-color: transparent;
-  background: var(--rb-sidebar-active);
-  font-weight: 700;
+  background: rgba(255, 255, 255, 0.075);
+  font-weight: 500;
   color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
 }
 
 .rb-menu-item.is-active::before {
