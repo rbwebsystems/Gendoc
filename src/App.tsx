@@ -6348,6 +6348,11 @@ export default function App() {
                     <h2 className="dg-cash-card-name" title={row.name || "Hesab"}>
                       {row.name || "Hesab"}
                     </h2>
+                  </header>
+                  <div className={`dg-cash-card-balance ${cashAmountClass(balance)}`}>
+                    {formatCashAmount(balance)}
+                  </div>
+                  <div className="dg-cash-card-menu">
                     <TableActionMenu label={`${row.name || "Hesab"} əməliyyatları`}>
                       <button type="button" className="dg-btn" onClick={() => void addCashMovement(row.id, "income")}>
                         Mədaxil
@@ -6365,9 +6370,6 @@ export default function App() {
                         Sil
                       </button>
                     </TableActionMenu>
-                  </header>
-                  <div className={`dg-cash-card-balance ${cashAmountClass(balance)}`}>
-                    {formatCashAmount(balance)}
                   </div>
                 </article>
               );

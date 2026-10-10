@@ -3354,9 +3354,10 @@ textarea.dg-input {
 }
 
 .dg-cash-card {
+  position: relative;
   min-width: 0;
-  min-height: 132px;
-  padding: 14px 15px 16px;
+  min-height: 146px;
+  padding: 0 15px 16px;
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 9px;
   background: linear-gradient(180deg, #ffffff 0%, #f8fafb 100%);
@@ -3366,24 +3367,25 @@ textarea.dg-input {
 .dg-cash-card-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  min-height: 48px;
+  padding: 12px 0 10px;
+  border-bottom: 1px solid rgba(19, 167, 189, 0.2);
 }
 
 .dg-cash-card-name {
-  min-width: 0;
+  width: 100%;
   margin: 0;
-  overflow: hidden;
-  color: #344451;
-  font-size: 0.82rem;
-  font-weight: 700;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #0b7d8f;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .dg-cash-card-balance {
-  margin-top: 26px;
+  margin-top: 22px;
+  padding-right: 34px;
   overflow: hidden;
   font-size: clamp(1.45rem, 2vw, 1.85rem);
   font-variant-numeric: tabular-nums;
@@ -3392,6 +3394,12 @@ textarea.dg-input {
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dg-cash-card-menu {
+  position: absolute;
+  right: 10px;
+  bottom: 9px;
 }
 
 .dg-cash-card-balance.dg-cash-amount--pos {
