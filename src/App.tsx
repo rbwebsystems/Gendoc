@@ -8383,22 +8383,6 @@ export default function App() {
           </aside>
 
           <section className="rb-workspace">
-            <nav className="rb-module-tabs" aria-label="Sürətli modul keçidləri">
-              {filteredMainNavIds.map((id) => {
-                const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`rb-module-tab ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-module-tab--red" : ""}`}
-                    aria-current={module === m.id ? "page" : undefined}
-                    onClick={() => switchSidebarModule(m.id)}
-                  >
-                    {m.label}
-                  </button>
-                );
-              })}
-            </nav>
             <header className="rb-topbar">
               <div className="rb-topbar-leading">
                 <button
@@ -8411,10 +8395,11 @@ export default function App() {
                 </button>
                 <div className="rb-page-title">
                   <h1>{workspaceHeader.title}</h1>
-                  {workspaceHeader.sub ? <p>{workspaceHeader.sub}</p> : null}
                 </div>
               </div>
-              <div className="rb-topbar-tools">
+            </header>
+
+            <div className="rb-content-tools">
                 {canReviewLeave ? (
                   <div className="rb-notifications" ref={notificationsRef}>
                     <button
@@ -8508,8 +8493,7 @@ export default function App() {
                     </button>
                   ) : null}
                 </div>
-              </div>
-            </header>
+            </div>
 
             <main ref={contentRef} className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}${module === "priceCalculations" ? " rb-content--pricecalc" : ""}`}>
               {toast ? (
