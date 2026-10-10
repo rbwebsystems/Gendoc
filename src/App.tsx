@@ -5650,53 +5650,70 @@ export default function App() {
 
   const renderNotesModule = () => {
     const notes = [...(workspace.notes ?? [])].sort((a, b) => b.updatedAt - a.updatedAt);
+    const doneNoteCount = notes.filter((note) => note.done).length;
     return (
       <div className="dg-form-page pg-panel" aria-label="Qeydlər">
-        <header className="dg-form-page-head">
-          <div>
-            <h1 className="dg-form-page-title">Qeydlər</h1>
-          </div>
-        </header>
-        <div className="dg-form-page-body">
-          <div className="dg-folders-toolbar" aria-label="Qeydlər alət paneli">
-            <div className="dg-folders-toolbar-left" />
-            <div className="dg-folders-toolbar-right" />
-          </div>
-
+        <div className="dg-form-page-body dg-notes-browser">
           {notes.length === 0 ? (
             <div className="dg-empty-state-card" role="status">
               <div className="dg-empty-state-title">Hələ qeyd yoxdur</div>
-              <div className="dg-empty-state-desc">Yeni qeyd yazaraq reminder vaxtı təyin edə bilərsiniz.</div>
+              <div className="dg-empty-state-desc">“Yeni qeyd” düyməsi ilə qeyd və xatırlatma yaradın.</div>
             </div>
           ) : (
-            <div className="dg-notes-list" role="list" aria-label="Qeydlər siyahısı">
-              {notes.map((n) => (
-                <div key={n.id} className={`dg-note-row ${n.done ? "is-done" : ""}`} role="listitem">
-                  <button type="button" className="dg-icon-btn dg-icon-btn--compact" onClick={() => setNoteInfoId(n.id)} aria-label="Məlumat">
-                    <IconInfo />
-                  </button>
-                  <button type="button" className="dg-note-check" onClick={() => toggleNoteDone(n.id)} aria-label="Tamamlandı">
-                    {n.done ? "✓" : ""}
-                  </button>
-                  <div className="dg-note-main">
-                    <div className="dg-note-title" title={n.title}>
-                      {n.title || "Qeyd"}
-                    </div>
-                    <div className="dg-note-sub">
-                      {n.remindAt ? `⏰ ${n.remindAt.replace("T", " ")}` : "—"} · {new Date(n.updatedAt).toLocaleString("az-AZ")}
-                    </div>
-                  </div>
-                  <div className="dg-note-actions">
-                    <button type="button" className="dg-btn dg-btn-secondary" onClick={() => startEditNote(n)}>
-                      Düzəliş
-                    </button>
-                    <button type="button" className="dg-btn dg-btn-danger" onClick={() => deleteNote(n.id)}>
-                      Sil
-                    </button>
-                  </div>
+            <>
+              <div className="dg-notes-summary" aria-label="Qeydlərin xülasəsi">
+                <div>
+                  <span className="dg-notes-summary-value">{notes.length}</span>
+                  <span className="dg-notes-summary-label">Ümumi qeyd</span>
                 </div>
-              ))}
-            </div>
+                <div>
+                  <span className="dg-notes-summary-value">{notes.length - doneNoteCount}</span>
+                  <span className="dg-notes-summary-label">Aktiv</span>
+                </div>
+                <div>
+                  <span className="dg-notes-summary-value">{doneNoteCount}</span>
+                  <span className="dg-notes-summary-label">Tamamlanan</span>
+                </div>
+              </div>
+              <div className="dg-notes-list" role="list" aria-label="Qeydlər siyahısı">
+                {notes.map((n) => (
+                  <article key={n.id} className={`dg-note-row ${n.done ? "is-done" : ""}`} role="listitem">
+                    <button
+                      type="button"
+                      className="dg-note-check"
+                      onClick={() => toggleNoteDone(n.id)}
+                      aria-label={n.done ? "Aktiv et" : "Tamamlandı kimi işarələ"}
+                      title={n.done ? "Aktiv et" : "Tamamlandı kimi işarələ"}
+                    >
+                      {n.done ? "✓" : ""}
+                    </button>
+                    <div className="dg-note-main">
+                      <div className="dg-note-title" title={n.title}>
+                        {n.title || "Qeyd"}
+                      </div>
+                      {n.body ? <p className="dg-note-preview">{n.body}</p> : null}
+                      <div className="dg-note-sub">
+                        <span>{n.remindAt ? `Xatırlatma: ${n.remindAt.replace("T", " ")}` : "Xatırlatma yoxdur"}</span>
+                        <span>Yenilənib: {new Date(n.updatedAt).toLocaleString("az-AZ")}</span>
+                      </div>
+                    </div>
+                    <div className="dg-note-actions">
+                      <TableActionMenu label={`${n.title || "Qeyd"} əməliyyatları`}>
+                        <button type="button" className="dg-icon-btn" title="Məlumat" aria-label="Məlumat" onClick={() => setNoteInfoId(n.id)}>
+                          <IconInfo />
+                        </button>
+                        <button type="button" className="dg-icon-btn" title="Düzəliş" aria-label="Düzəliş" onClick={() => startEditNote(n)}>
+                          <IconEdit />
+                        </button>
+                        <button type="button" className="dg-icon-btn dg-icon-btn-danger" title="Sil" aria-label="Sil" onClick={() => deleteNote(n.id)}>
+                          <IconTrash />
+                        </button>
+                      </TableActionMenu>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
