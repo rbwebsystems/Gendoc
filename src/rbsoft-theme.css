@@ -68,7 +68,7 @@
   border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-right: 0;
-  background: var(--rb-sidebar);
+  background: var(--rb-sidebar-modules);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -108,8 +108,8 @@
   padding: 8px 5px;
   border-radius: 0;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--rb-sidebar-deep);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  background: var(--rb-sidebar-modules);
   box-shadow: none;
   z-index: 1;
 }
@@ -241,7 +241,8 @@
 
 .rb-menu-item-logout {
   opacity: 0.92;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.11);
+  background: var(--rb-sidebar-modules);
 }
 
 .rb-auth-bar {
@@ -962,6 +963,18 @@
   font-size: var(--font-size-sm);
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+.rb-desktop .rb-topbar .dg-btn-secondary {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.rb-desktop .rb-topbar .dg-btn-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
 
 /* Formalar və panellər */
