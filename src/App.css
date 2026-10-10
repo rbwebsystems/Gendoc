@@ -3353,6 +3353,49 @@ textarea.dg-input {
   overflow: auto;
 }
 
+.dg-cash-total {
+  flex: 0 0 auto;
+  min-height: 66px;
+  margin: 16px 16px 0;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-left: 4px solid #13a7bd;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafb 100%);
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.045);
+}
+
+.dg-cash-total-label {
+  color: #344451;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.dg-cash-total-value {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  color: #111827;
+  font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+}
+
+.dg-cash-total-value.dg-cash-amount--neg {
+  color: #c23b3b;
+}
+
+.dg-cash-total-currency {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+}
+
 .dg-cash-card {
   position: relative;
   min-width: 0;
@@ -3432,6 +3475,10 @@ textarea.dg-input {
 }
 
 @media (max-width: 620px) {
+  .dg-cash-total {
+    margin: 12px 12px 0;
+  }
+
   .dg-cash-card-grid {
     grid-template-columns: 1fr;
     padding: 12px;
