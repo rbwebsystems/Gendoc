@@ -982,31 +982,39 @@ textarea.dg-input::placeholder {
   color: rgba(15, 23, 42, 0.65);
 }
 
-/* Windows-like folder view overrides */
+/* Qovluqlar modulu */
+.dg-folders-browser {
+  padding: 18px 20px 28px;
+  background: #f7f8fa;
+}
+
 .dg-folder-grid {
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 10px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
 }
 
 .dg-folder-tile {
   align-items: center;
   text-align: center;
-  border: 1px solid transparent;
-  background: transparent;
+  gap: 4px;
+  min-height: 142px;
+  padding: 14px 10px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 8px;
+  background: #ffffff;
   box-shadow: none;
   transform: none !important;
-  min-height: auto;
-  cursor: default;
+  cursor: pointer;
 }
 
 .dg-folder-tile:hover {
-  border-color: rgba(0, 120, 215, 0.35);
-  background: rgba(0, 120, 215, 0.12);
-  box-shadow: none;
+  border-color: rgba(19, 167, 189, 0.45);
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.07);
 }
 
 .dg-folder-tile:active {
-  background: rgba(0, 120, 215, 0.18);
+  background: rgba(19, 167, 189, 0.06);
 }
 
 .dg-folder-name {
@@ -1022,7 +1030,7 @@ textarea.dg-input::placeholder {
 }
 
 .dg-folder-name {
-  font-weight: 800;
+  font-weight: 650;
   color: rgba(15, 23, 42, 0.92);
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1032,25 +1040,57 @@ textarea.dg-input::placeholder {
 }
 
 .dg-folder-sub {
-  margin-top: 2px;
-  font-size: 0.875rem;
-  color: rgba(15, 23, 42, 0.58);
+  margin-top: 1px;
+  font-size: 0.75rem;
+  color: rgba(15, 23, 42, 0.5);
 }
 
 .dg-folder-head {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-height: 58px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.dg-folder-head-meta {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .dg-folder-head-title {
-  font-weight: 900;
+  font-weight: 700;
   font-size: 1rem;
   color: rgba(15, 23, 42, 0.9);
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.dg-folder-head-sub {
+  margin-top: 2px;
+  color: rgba(15, 23, 42, 0.5);
+  font-size: 0.75rem;
+}
+
+.dg-folder-upload {
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.dg-folder-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .dg-page-desc {
@@ -1086,16 +1126,40 @@ textarea.dg-input::placeholder {
 }
 
 .dg-folders-section {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 9px;
+  background: #ffffff;
+}
+
+.dg-folders-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 11px;
 }
 
 .dg-folders-section-title {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: rgba(15, 23, 42, 0.52);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgba(15, 23, 42, 0.82);
+}
+
+.dg-folders-section-count {
+  display: inline-grid;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(19, 167, 189, 0.1);
+  color: #08788a;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .dg-empty-state-card {
@@ -1304,28 +1368,52 @@ textarea.dg-input::placeholder {
   color: rgba(15, 23, 42, 0.6);
 }
 
+.dg-folders-browser .dg-empty-card {
+  min-height: 170px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-style: dashed;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.dg-folders-browser .dg-empty-card strong {
+  color: rgba(15, 23, 42, 0.86);
+  font-size: 0.95rem;
+}
+
+.dg-folders-browser .dg-empty-card span {
+  color: rgba(15, 23, 42, 0.5);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
 .dg-file-grid {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .dg-file-tile {
-  border: 1px solid rgba(15, 23, 42, 0.10);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: none;
   display: grid;
-  grid-template-columns: 48px 1fr auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 8px 10px;
 }
 
 .dg-file-thumb {
-  width: 48px;
-  height: 36px;
-  border-radius: 10px;
+  width: 44px;
+  height: 34px;
+  border-radius: 5px;
   background: rgba(15, 23, 42, 0.04);
   text-decoration: none;
   color: inherit;
@@ -1353,7 +1441,8 @@ textarea.dg-input::placeholder {
 }
 
 .dg-file-name {
-  font-weight: 900;
+  font-weight: 650;
+  font-size: 0.875rem;
   color: rgba(15, 23, 42, 0.92);
   white-space: nowrap;
   overflow: hidden;
@@ -1361,8 +1450,8 @@ textarea.dg-input::placeholder {
 }
 
 .dg-file-sub {
-  margin-top: 0.2rem;
-  font-size: 0.875rem;
+  margin-top: 1px;
+  font-size: 0.75rem;
   color: rgba(15, 23, 42, 0.55);
 }
 
@@ -1370,12 +1459,49 @@ textarea.dg-input::placeholder {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 5px;
 }
 
 .dg-file-actions .dg-btn {
-  min-width: 78px;
+  min-width: 58px;
+  min-height: 30px;
+  height: 30px;
+  padding: 0 9px;
+  font-size: 0.75rem;
   justify-content: center;
+}
+
+@media (max-width: 720px) {
+  .dg-folders-browser {
+    padding: 12px;
+  }
+
+  .dg-folder-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dg-folder-head {
+    flex-wrap: wrap;
+  }
+
+  .dg-folder-head-meta {
+    flex: 1 1 calc(100% - 90px);
+  }
+
+  .dg-folder-upload {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .dg-file-tile {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .dg-file-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding-left: 54px;
+  }
 }
 
 select.dg-input {

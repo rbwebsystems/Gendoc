@@ -4147,18 +4147,16 @@ export default function App() {
             ) : null}
           </div>
           <div className="dg-folder-name">{label}</div>
+          <div className="dg-folder-sub">
+            {(folderRec.files ?? []).length} fayl
+          </div>
         </button>
       );
     };
 
     return (
       <div className="dg-form-page pg-panel" aria-label="Qovluqlar">
-        <header className="dg-form-page-head">
-          <div>
-            <h1 className="dg-form-page-title">Qovluqlar</h1>
-          </div>
-        </header>
-        <div className="dg-form-page-body">
+        <div className="dg-form-page-body dg-folders-browser">
           {nothingToShow ? (
             <div className="dg-empty-state-card" role="status" aria-label="Boş vəziyyət">
               <div className="dg-empty-state-title">Hələ qovluq yoxdur</div>
@@ -4173,20 +4171,6 @@ export default function App() {
             </div>
           ) : folderView === "grid" ? (
             <>
-              <div
-                className="dg-folders-toolbar"
-                aria-label="Qovluqlar alət paneli"
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "root" });
-                }}
-              >
-                <div className="dg-folders-toolbar-left">
-                  <input className="dg-input dg-folders-search" type="search" placeholder="Qovluqlarda axtar..." aria-label="Qovluqlarda axtar" />
-                </div>
-                <div className="dg-folders-toolbar-right" />
-              </div>
-
               {!anyFoldersExist ? (
                 <div className="dg-empty-state-card" role="status">
                   <div className="dg-empty-state-title">Hələ qovluq yoxdur</div>
@@ -4195,7 +4179,10 @@ export default function App() {
 
               {companies.length > 0 ? (
                 <section className="dg-folders-section" aria-label="Şirkət qovluqları">
-                  <h2 className="dg-folders-section-title">Şirkətlər</h2>
+                  <div className="dg-folders-section-head">
+                    <h2 className="dg-folders-section-title">Şirkətlər</h2>
+                    <span className="dg-folders-section-count">{companies.length}</span>
+                  </div>
                   <div className="dg-folder-grid" role="list">
                     {companies.map((c) =>
                       renderFolderTile(
@@ -4211,7 +4198,10 @@ export default function App() {
 
               {suppliers.length > 0 ? (
                 <section className="dg-folders-section" aria-label="Təchizatçı qovluqları">
-                  <h2 className="dg-folders-section-title">Təchizatçılar</h2>
+                  <div className="dg-folders-section-head">
+                    <h2 className="dg-folders-section-title">Təchizatçılar</h2>
+                    <span className="dg-folders-section-count">{suppliers.length}</span>
+                  </div>
                   <div className="dg-folder-grid" role="list">
                     {suppliers.map((s) =>
                       renderFolderTile(s.id, foldersBySupplier.get(s.id), s.name || "Təchizatçı", { supplierId: s.id }),
@@ -4230,32 +4220,12 @@ export default function App() {
                     setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "root" });
                   }}
                 >
-                  <h2 className="dg-folders-section-title">Digər qovluqlar</h2>
+                  <div className="dg-folders-section-head">
+                    <h2 className="dg-folders-section-title">Digər qovluqlar</h2>
+                    <span className="dg-folders-section-count">{customFolders.length}</span>
+                  </div>
                   <div className="dg-folder-grid" role="list">
-                    {customFolders.map((cf) => (
-                      <button
-                        key={cf.id}
-                        type="button"
-                        className="dg-folder-tile"
-                        role="listitem"
-                        onDoubleClick={() => {
-                          setActiveFolderId(cf.id);
-                          setFolderView("folder");
-                        }}
-                        onClick={() => setActiveFolderId(cf.id)}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          setActiveFolderId(cf.id);
-                          setFolderMenu({ open: true, x: e.clientX, y: e.clientY, kind: "folder", folderId: cf.id });
-                        }}
-                        title="Açmaq üçün iki dəfə klik"
-                      >
-                        <div className="dg-folder-icon-wrap" aria-hidden>
-                          <IconFolder />
-                        </div>
-                        <div className="dg-folder-name">{cf.name || "Qovluq"}</div>
-                      </button>
-                    ))}
+                    {customFolders.map((cf) => renderFolderTile(cf.id, cf, cf.name || "Qovluq", {}))}
                   </div>
                 </section>
               ) : null}
@@ -4314,20 +4284,20 @@ export default function App() {
                 <button type="button" className="dg-btn dg-btn-secondary" onClick={() => setFolderView("grid")}>
                   ← Geri
                 </button>
-                <div className="dg-folder-head-title">
-                  {folder?.kind === "company"
-                    ? sortedCompanies.find((c) => c.id === folder.companyId)?.profile.name || folder.name || "Qovluq"
-                    : folder?.kind === "supplier"
-                      ? supplierById.get(folder.supplierId || "")?.name || folder.name || "Qovluq"
-                      : folder?.name || "Qovluq"}
+                <div className="dg-folder-head-meta">
+                  <div className="dg-folder-head-title">
+                    {folder?.kind === "company"
+                      ? sortedCompanies.find((c) => c.id === folder.companyId)?.profile.name || folder.name || "Qovluq"
+                      : folder?.kind === "supplier"
+                        ? supplierById.get(folder.supplierId || "")?.name || folder.name || "Qovluq"
+                        : folder?.name || "Qovluq"}
+                  </div>
+                  <div className="dg-folder-head-sub">{(folder?.files ?? []).length} fayl</div>
                 </div>
-              </div>
-
-              <div className="dg-grid dg-grid-2">
-                <label className="dg-field">
-                  <span className="dg-label">Fayl əlavə et (PDF/JPG/PNG)</span>
+                <label className="dg-btn dg-btn-primary dg-folder-upload">
+                  <span>Fayl əlavə et</span>
                   <input
-                    className="dg-input"
+                    className="dg-folder-upload-input"
                     type="file"
                     multiple
                     accept="application/pdf,image/*"
@@ -4342,7 +4312,8 @@ export default function App() {
 
               {!folder || (folder.files ?? []).length === 0 ? (
                 <div className="dg-empty-card" role="status">
-                  Bu qovluqda hələ fayl yoxdur.
+                  <strong>Bu qovluq boşdur</strong>
+                  <span>PDF, JPG və ya PNG faylı əlavə edə bilərsiniz.</span>
                 </div>
               ) : (
                 <div className="dg-file-grid" role="list" aria-label="Qovluq faylları">
