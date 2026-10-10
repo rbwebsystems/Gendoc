@@ -8397,9 +8397,7 @@ export default function App() {
                   <h1>{workspaceHeader.title}</h1>
                 </div>
               </div>
-            </header>
-
-            <div className="rb-content-tools">
+              <div className="rb-topbar-tools">
                 {canReviewLeave ? (
                   <div className="rb-notifications" ref={notificationsRef}>
                     <button
@@ -8493,7 +8491,8 @@ export default function App() {
                     </button>
                   ) : null}
                 </div>
-            </div>
+              </div>
+            </header>
 
             <main ref={contentRef} className={`rb-content${module === "cashReport" ? " rb-content--cash-report" : ""}${module === "priceCalculations" ? " rb-content--pricecalc" : ""}`}>
               {toast ? (
