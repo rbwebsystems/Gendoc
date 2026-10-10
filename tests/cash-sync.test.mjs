@@ -11,7 +11,12 @@ async function loadSource(path) {
   return import("data:text/javascript;base64," + Buffer.from(outputText).toString("base64"));
 }
 const { rebaseCashReport } = await loadSource("../src/lib/cashSync.ts");
-const { changeCashRowBalance, pruneCashSlotEdits, transferCashRowBalance } = await loadSource("../src/lib/cashReport.ts");
+const {
+  changeCashRowBalance,
+  pruneCashSlotEdits,
+  summarizeCashHistoryEntry,
+  transferCashRowBalance,
+} = await loadSource("../src/lib/cashReport.ts");
 const row = (id, values = [], updatedAt = 1) => ({
   id, name: id, slots: Array.from({ length: 8 }, (_, i) => values[i] ?? 0),
   createdAt: 1, updatedAt,
@@ -37,6 +42,47 @@ test("transfer ignores zero amounts and the same account", () => {
   const account = row("same", [100]);
   assert.deepEqual(transferCashRowBalance(account, row("target", [20]), 0), [account, row("target", [20])]);
   assert.deepEqual(transferCashRowBalance(account, account, 25), [account, account]);
+});
+test("history summaries replace legacy column labels with real balance actions", () => {
+  const older = { id: "old", label: "Köhnə", authorName: "Test", savedAt: 1, balance: 100, rows: [row("cash", [100])] };
+  const entry = {
+    id: "new",
+    label: "Nağd: Sütun 2 dəyişdirildi",
+    authorName: "Test",
+    savedAt: 2,
+    balance: 125,
+    rows: [row("cash", [100, 25], 2)],
+  };
+  const summary = summarizeCashHistoryEntry(entry, older);
+  assert.equal(summary.title, "Mədaxil");
+  assert.deepEqual(summary.changes.map(({ kind, delta, balance }) => ({ kind, delta, balance })), [
+    { kind: "income", delta: 25, balance: 125 },
+  ]);
+});
+test("a first history entry keeps a modern movement meaningful without an older snapshot", () => {
+  const entry = {
+    id: "first",
+    label: "Mədaxil: Nağd AZN — 10 + 15 = 25",
+    authorName: "Test",
+    savedAt: 2,
+    balance: 125,
+    rows: [{ ...row("cash", [125], 2), name: "Nağd AZN" }],
+  };
+  const summary = summarizeCashHistoryEntry(entry);
+  assert.equal(summary.title, "Mədaxil");
+  assert.deepEqual(summary.changes.map(({ name, kind, delta, balance }) => ({ name, kind, delta, balance })), [
+    { name: "Nağd AZN", kind: "income", delta: 25, balance: 125 },
+  ]);
+});
+test("history summaries recognize account transfers from paired deltas", () => {
+  const older = { id: "old", label: "Köhnə", authorName: "Test", savedAt: 1, balance: 150, rows: [row("a", [100]), row("b", [50])] };
+  const entry = { id: "new", label: "Dəyişiklik", authorName: "Test", savedAt: 2, balance: 150, rows: [row("a", [70], 2), row("b", [80], 2)] };
+  const summary = summarizeCashHistoryEntry(entry, older);
+  assert.equal(summary.title, "Hesablararası transfer");
+  assert.deepEqual(summary.changes.map(({ rowId, delta }) => ({ rowId, delta })), [
+    { rowId: "a", delta: -30 },
+    { rowId: "b", delta: 30 },
+  ]);
 });
 test("two devices editing different cells retain both amounts", () => {
   const base = state(row("a", [100]));

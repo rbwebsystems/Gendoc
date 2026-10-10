@@ -379,6 +379,148 @@ export function appendCashReportHistory(
   return [createCashHistoryEntry(rows, label, authorName), ...history].slice(0, CASH_REPORT_HISTORY_LIMIT);
 }
 
+export type CashHistoryChangeKind = "income" | "expense" | "added" | "removed" | "renamed";
+
+export interface CashHistoryChange {
+  rowId: string;
+  name: string;
+  previousName?: string;
+  kind: CashHistoryChangeKind;
+  delta: number;
+  balance: number;
+}
+
+export interface CashHistorySummary {
+  title: string;
+  changes: CashHistoryChange[];
+}
+
+function parseHistoryAmount(value: string): number {
+  const normalized = value.replace(/\s/g, "").replace(/,/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? Math.abs(parsed) : 0;
+}
+
+function summarizeFirstCashHistoryEntry(entry: CashReportSnapshot): CashHistorySummary {
+  const label = entry.label.trim();
+  const movement = label.match(/^(Mədaxil|Məxaric):\s*(.*?)\s+—.*?=\s*([\d.,-]+)(?:\s*AZN)?$/i);
+  if (movement) {
+    const kind = movement[1].toLocaleLowerCase("az-AZ") === "mədaxil" ? "income" : "expense";
+    const name = movement[2].trim();
+    const amount = parseHistoryAmount(movement[3]);
+    const row = entry.rows.find((item) => item.name.trim() === name);
+    if (row && amount > 0) {
+      return {
+        title: kind === "income" ? "Mədaxil" : "Məxaric",
+        changes: [{
+          rowId: row.id,
+          name: row.name || "Hesab",
+          kind,
+          delta: kind === "income" ? amount : -amount,
+          balance: rowDisplayTotal(row),
+        }],
+      };
+    }
+  }
+
+  const transfer = label.match(/^Transfer:\s*(.*?)\s*→\s*(.*?)\s*—\s*([\d.,-]+)\s*AZN$/i);
+  if (transfer) {
+    const source = entry.rows.find((row) => row.name.trim() === transfer[1].trim());
+    const target = entry.rows.find((row) => row.name.trim() === transfer[2].trim());
+    const amount = parseHistoryAmount(transfer[3]);
+    if (source && target && amount > 0) {
+      return {
+        title: "Hesablararası transfer",
+        changes: [
+          { rowId: source.id, name: source.name || "Hesab", kind: "expense", delta: -amount, balance: rowDisplayTotal(source) },
+          { rowId: target.id, name: target.name || "Hesab", kind: "income", delta: amount, balance: rowDisplayTotal(target) },
+        ],
+      };
+    }
+  }
+
+  if (/^tarixçədən bərpa/i.test(label)) return { title: "Tarixçədən bərpa", changes: [] };
+  if (/^geri alındı/i.test(label)) return { title: "Dəyişiklik geri alındı", changes: [] };
+  if (/^yeni hesab əlavə edildi/i.test(label)) return { title: "Yeni hesab", changes: [] };
+  if (/^hesab silindi/i.test(label)) return { title: "Hesab silindi", changes: [] };
+  if (/^hesab adı dəyişdirildi/i.test(label)) return { title: "Hesab adı dəyişdirildi", changes: [] };
+  return { title: "Başlanğıc vəziyyət", changes: [] };
+}
+
+/**
+ * Köhnə tarixçə başlıqlarında olan “sütun” terminlərinə güvənmədən iki snapshot
+ * arasındakı real hesab fərqlərindən istifadəçi üçün oxunaqlı əməliyyat yaradır.
+ */
+export function summarizeCashHistoryEntry(
+  entry: CashReportSnapshot,
+  older?: CashReportSnapshot,
+): CashHistorySummary {
+  if (!older) return summarizeFirstCashHistoryEntry(entry);
+
+  const currentRows = new Map(entry.rows.map((row) => [row.id, row]));
+  const olderRows = new Map(older.rows.map((row) => [row.id, row]));
+  const changes: CashHistoryChange[] = [];
+
+  for (const row of entry.rows) {
+    const previous = olderRows.get(row.id);
+    const balance = rowDisplayTotal(row);
+    if (!previous) {
+      changes.push({ rowId: row.id, name: row.name || "Hesab", kind: "added", delta: balance, balance });
+      continue;
+    }
+    if (previous.name !== row.name) {
+      changes.push({
+        rowId: row.id,
+        name: row.name || "Hesab",
+        previousName: previous.name || "Hesab",
+        kind: "renamed",
+        delta: 0,
+        balance,
+      });
+    }
+    const delta = balance - rowDisplayTotal(previous);
+    if (Math.abs(delta) > 0.000001) {
+      changes.push({
+        rowId: row.id,
+        name: row.name || "Hesab",
+        kind: delta > 0 ? "income" : "expense",
+        delta,
+        balance,
+      });
+    }
+  }
+
+  for (const row of older.rows) {
+    if (currentRows.has(row.id)) continue;
+    const balance = rowDisplayTotal(row);
+    changes.push({
+      rowId: row.id,
+      name: row.name || "Hesab",
+      kind: "removed",
+      delta: -balance,
+      balance,
+    });
+  }
+
+  const label = entry.label.trim();
+  const balanceChanges = changes.filter((change) => change.kind === "income" || change.kind === "expense");
+  const balanceDelta = balanceChanges.reduce((sum, change) => sum + change.delta, 0);
+  const isTransfer = /^transfer:/i.test(label)
+    || (balanceChanges.length === 2 && Math.abs(balanceDelta) < 0.000001);
+
+  let title = "Kassa yeniləndi";
+  if (/^tarixçədən bərpa/i.test(label)) title = "Tarixçədən bərpa";
+  else if (/^geri alındı/i.test(label)) title = "Dəyişiklik geri alındı";
+  else if (isTransfer) title = "Hesablararası transfer";
+  else if (changes.length === 1 && changes[0].kind === "income") title = "Mədaxil";
+  else if (changes.length === 1 && changes[0].kind === "expense") title = "Məxaric";
+  else if (changes.some((change) => change.kind === "added")) title = "Yeni hesab";
+  else if (changes.some((change) => change.kind === "removed")) title = "Hesab silindi";
+  else if (changes.some((change) => change.kind === "renamed")) title = "Hesab adı dəyişdirildi";
+
+  return { title, changes };
+}
+
 /** Remote sinxronizasiyasında sətir və tarixçəni birləşdirir */
 export function mergeCashReportOnSync(
   local: CashReportState | undefined,

@@ -71,6 +71,7 @@ import {
   formatCashAmount,
   newCashReportRow,
   rowDisplayTotal,
+  summarizeCashHistoryEntry,
   transferCashRowBalance,
   defaultCashReportRows,
   normalizeCashReportSlots,
@@ -2530,20 +2531,28 @@ export default function App() {
     () => cashMovementAmounts.reduce((sum, raw) => sum + Math.abs(commitCashInput(raw)), 0),
     [cashMovementAmounts],
   );
+  const cashHistoryView = useMemo(
+    () => cashReportHistory.map((entry, index) => ({
+      entry,
+      summary: summarizeCashHistoryEntry(entry, cashReportHistory[index + 1]),
+    })),
+    [cashReportHistory],
+  );
   const cashAccountHistory = useMemo(() => {
     if (!cashAccountHistoryId) return [];
-    const snapshots = cashReportHistory.flatMap((entry) => {
+    return cashHistoryView.flatMap(({ entry, summary }, index) => {
       const row = entry.rows.find((item) => item.id === cashAccountHistoryId);
-      return row ? [{ entry, row, balance: rowDisplayTotal(row) }] : [];
+      if (!row) return [];
+      const changes = summary.changes.filter((change) => change.rowId === cashAccountHistoryId);
+      if (changes.length > 0) {
+        return [{ entry, balance: rowDisplayTotal(row), title: summary.title, changes }];
+      }
+      const isOldestSnapshot = index === cashHistoryView.length - 1;
+      return isOldestSnapshot
+        ? [{ entry, balance: rowDisplayTotal(row), title: "Başlanğıc vəziyyət", changes: [] }]
+        : [];
     });
-    return snapshots.flatMap((item, index) => {
-      const older = snapshots[index + 1];
-      if (!older) return [{ ...item, displayLabel: "Başlanğıc vəziyyət" }];
-      const changed = item.row.name !== older.row.name
-        || item.row.slots.some((value, slotIndex) => value !== older.row.slots[slotIndex]);
-      return changed ? [{ ...item, displayLabel: item.entry.label }] : [];
-    });
-  }, [cashAccountHistoryId, cashReportHistory]);
+  }, [cashAccountHistoryId, cashHistoryView]);
   useEffect(() => {
     if (module !== "cashReport") {
       setCashHistoryOpen(false);
@@ -8140,34 +8149,71 @@ export default function App() {
         >
           <div className="dg-modal-body">
             <h2 className="dg-modal-title">Kassa tarixçəsi</h2>
-            <p className="dg-modal-hint">Hər dəyişiklik avtomatik qeyd olunur. Bərpa etdikdə həmin anın cədvəli bütün istifadəçilər üçün yenilənir.</p>
+            <p className="dg-modal-hint">Əməliyyat, dəyişən hesablar və yekun balans bir yerdə göstərilir.</p>
             {cashReportHistory.length === 0 ? (
               <p className="dg-muted">Hələ dəyişiklik qeydi yoxdur.</p>
             ) : (
               <ul className="dg-cash-changelog">
-                {cashReportHistory.map((entry) => (
-                  <li key={entry.id} className="dg-cash-changelog-item">
-                    <div className="dg-cash-changelog-meta">
-                      <span className="dg-cash-changelog-time">
-                        {new Date(entry.savedAt).toLocaleString("az-AZ")}
-                      </span>
-                      {entry.authorName ? (
-                        <span className="dg-cash-changelog-author">{entry.authorName}</span>
-                      ) : null}
-                    </div>
-                    <div className="dg-cash-changelog-text">{entry.label}</div>
-                    <div className={`dg-cash-changelog-balance ${cashAmountClass(entry.balance)}`}>
-                      {entry.balance === 0 ? "—" : `Balans: ${formatCashAmount(entry.balance)}`}
-                    </div>
-                    <button
-                      type="button"
-                      className="dg-btn dg-btn-secondary dg-btn-sm dg-cash-changelog-restore"
-                      onClick={() => void restoreCashHistoryEntry(entry)}
-                    >
-                      Bərpa et
-                    </button>
-                  </li>
-                ))}
+                {cashHistoryView.map(({ entry, summary }) => {
+                  const visibleChanges = summary.changes.slice(0, 4);
+                  return (
+                    <li key={entry.id} className="dg-cash-changelog-item">
+                      <div className="dg-cash-changelog-head">
+                        <span className="dg-cash-changelog-action">{summary.title}</span>
+                        <div className="dg-cash-changelog-meta">
+                          {entry.authorName ? <span className="dg-cash-changelog-author">{entry.authorName}</span> : null}
+                          <time className="dg-cash-changelog-time" dateTime={new Date(entry.savedAt).toISOString()}>
+                            {new Date(entry.savedAt).toLocaleString("az-AZ")}
+                          </time>
+                        </div>
+                      </div>
+                      {visibleChanges.length > 0 ? (
+                        <div className="dg-cash-history-changes">
+                          {visibleChanges.map((change, changeIndex) => (
+                            <div key={`${change.rowId}-${change.kind}-${changeIndex}`} className="dg-cash-history-change">
+                              <div className="dg-cash-history-account">
+                                {change.kind === "renamed" ? (
+                                  <><span>{change.previousName}</span><span aria-hidden="true">→</span><strong>{change.name}</strong></>
+                                ) : (
+                                  <strong>{change.name}</strong>
+                                )}
+                              </div>
+                              {change.kind === "income" || change.kind === "expense" ? (
+                                <span className={`dg-cash-history-delta ${cashAmountClass(change.delta)}`}>
+                                  {change.delta > 0 ? "+" : ""}{formatCashAmount(change.delta)} AZN
+                                </span>
+                              ) : (
+                                <span className="dg-cash-history-kind">
+                                  {change.kind === "added" ? "yaradıldı" : change.kind === "removed" ? "silindi" : "adı dəyişdi"}
+                                </span>
+                              )}
+                              <span className="dg-cash-history-result">
+                                {change.kind === "removed" ? "Son balans" : "Balans"}: {formatCashAmount(change.balance)} AZN
+                              </span>
+                            </div>
+                          ))}
+                          {summary.changes.length > visibleChanges.length ? (
+                            <div className="dg-cash-history-more">+{summary.changes.length - visibleChanges.length} hesab dəyişikliyi</div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="dg-cash-history-empty-change">Bu qeyddə hesab balansı dəyişməyib.</div>
+                      )}
+                      <div className="dg-cash-changelog-foot">
+                        <div className={`dg-cash-changelog-balance ${cashAmountClass(entry.balance)}`}>
+                          Ümumi balans <strong>{formatCashAmount(entry.balance)} AZN</strong>
+                        </div>
+                        <button
+                          type="button"
+                          className="dg-btn dg-btn-secondary dg-btn-sm dg-cash-changelog-restore"
+                          onClick={() => void restoreCashHistoryEntry(entry)}
+                        >
+                          Bərpa et
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
             <button
@@ -8199,15 +8245,32 @@ export default function App() {
               <p className="dg-muted">Bu hesab üçün tarixçə qeydi yoxdur.</p>
             ) : (
               <ul className="dg-cash-changelog">
-                {cashAccountHistory.map(({ entry, balance, displayLabel }) => (
+                {cashAccountHistory.map(({ entry, balance, title, changes }) => (
                   <li key={entry.id} className="dg-cash-changelog-item">
-                    <div className="dg-cash-changelog-meta">
-                      <span className="dg-cash-changelog-time">{new Date(entry.savedAt).toLocaleString("az-AZ")}</span>
-                      {entry.authorName ? <span className="dg-cash-changelog-author">{entry.authorName}</span> : null}
+                    <div className="dg-cash-changelog-head">
+                      <span className="dg-cash-changelog-action">{title}</span>
+                      <div className="dg-cash-changelog-meta">
+                        {entry.authorName ? <span className="dg-cash-changelog-author">{entry.authorName}</span> : null}
+                        <time className="dg-cash-changelog-time" dateTime={new Date(entry.savedAt).toISOString()}>
+                          {new Date(entry.savedAt).toLocaleString("az-AZ")}
+                        </time>
+                      </div>
                     </div>
-                    <div className="dg-cash-changelog-text">{displayLabel}</div>
-                    <div className={`dg-cash-account-history-balance ${cashAmountClass(balance)}`}>
-                      AZN {formatCashAmount(balance)}
+                    <div className="dg-cash-account-history-summary">
+                      {changes.map((change, changeIndex) => (
+                        change.kind === "income" || change.kind === "expense" ? (
+                          <span key={`${change.kind}-${changeIndex}`} className={`dg-cash-history-delta ${cashAmountClass(change.delta)}`}>
+                            {change.delta > 0 ? "+" : ""}{formatCashAmount(change.delta)} AZN
+                          </span>
+                        ) : (
+                          <span key={`${change.kind}-${changeIndex}`} className="dg-cash-history-kind">
+                            {change.kind === "added" ? "Hesab yaradıldı" : change.kind === "removed" ? "Hesab silindi" : `${change.previousName} → ${change.name}`}
+                          </span>
+                        )
+                      ))}
+                      <span className={`dg-cash-account-history-balance ${cashAmountClass(balance)}`}>
+                        Balans: {formatCashAmount(balance)} AZN
+                      </span>
                     </div>
                   </li>
                 ))}

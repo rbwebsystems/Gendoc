@@ -410,7 +410,22 @@
 }
 
 .rb-page-title {
+  position: relative;
   min-width: 0;
+  padding-left: 13px;
+}
+
+.rb-page-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 2px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #38e3f3 0%, #08a9c1 100%);
+  box-shadow: 0 0 8px rgba(56, 227, 243, 0.42);
+  transform: translateY(-50%);
 }
 
 .rb-page-title h1 {

@@ -3871,58 +3871,205 @@ textarea.dg-input {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .dg-cash-changelog-item {
-  padding: 0.75rem 0.9rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
-  background: #f8fafc;
+  padding: 0.62rem 0.72rem;
+  border: 1px solid #d9e0e5;
+  border-radius: 0.45rem;
+  background: #fbfcfd;
+}
+
+.dg-cash-changelog-head,
+.dg-cash-changelog-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.dg-cash-changelog-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid rgba(8, 127, 145, 0.18);
+  border-radius: 999px;
+  background: rgba(8, 127, 145, 0.08);
+  color: #0b6674;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .dg-cash-changelog-time {
-  font-size: 0.8125rem;
+  font-size: 0.74rem;
   color: var(--win-text-muted);
+  white-space: nowrap;
 }
 
 .dg-cash-changelog-meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.65rem;
-  margin-bottom: 0.25rem;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem 0.55rem;
 }
 
 .dg-cash-changelog-author {
-  font-size: 0.8125rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  color: var(--win-text);
+  color: #344451;
 }
 
-.dg-cash-changelog-text {
-  font-size: 0.9375rem;
-  color: var(--win-text);
-  line-height: 1.45;
+.dg-cash-history-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 0.45rem;
+}
+
+.dg-cash-history-change {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) auto minmax(8rem, auto);
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 1px solid #e5eaee;
+  border-radius: 4px;
+  background: #ffffff;
+  font-size: 0.78rem;
+}
+
+.dg-cash-history-account {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #263642;
+  overflow: hidden;
+}
+
+.dg-cash-history-account > span,
+.dg-cash-history-account > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dg-cash-history-delta,
+.dg-cash-history-kind,
+.dg-cash-history-result {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dg-cash-history-delta {
+  font-weight: 800;
+}
+
+.dg-cash-history-delta.dg-cash-amount--pos {
+  color: #087f5b;
+}
+
+.dg-cash-history-delta.dg-cash-amount--neg {
+  color: #c23b3b;
+}
+
+.dg-cash-history-kind {
+  color: #546570;
+  font-weight: 700;
+}
+
+.dg-cash-history-result {
+  color: #4b5c67;
+  text-align: right;
+}
+
+.dg-cash-history-more,
+.dg-cash-history-empty-change {
+  padding: 3px 7px;
+  color: #687985;
+  font-size: 0.74rem;
 }
 
 .dg-cash-changelog-balance {
-  margin-top: 0.35rem;
-  font-size: 0.875rem;
+  color: #3f505b;
+  font-size: 0.76rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.dg-cash-changelog-balance strong {
+  margin-left: 4px;
+  color: #111827;
+  font-size: 0.84rem;
 }
 
 .dg-cash-changelog-balance.dg-cash-amount--pos {
   color: #16a34a;
 }
 
+.dg-cash-changelog-balance.dg-cash-amount--pos strong {
+  color: #087f5b;
+}
+
 .dg-cash-changelog-balance.dg-cash-amount--neg {
   color: #dc2626;
 }
 
+.dg-cash-changelog-balance.dg-cash-amount--neg strong {
+  color: #c23b3b;
+}
+
 .dg-cash-changelog-restore {
+  min-height: 27px;
+  padding: 3px 8px;
+}
+
+.dg-cash-changelog-foot {
   margin-top: 0.45rem;
+  padding-top: 0.42rem;
+  border-top: 1px solid #e3e8ec;
+}
+
+.dg-cash-account-history-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+  padding-top: 0.42rem;
+  border-top: 1px solid #e3e8ec;
+}
+
+.dg-cash-account-history-summary .dg-cash-account-history-balance {
+  margin: 0 0 0 auto;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 620px) {
+  .dg-cash-changelog-head,
+  .dg-cash-changelog-foot,
+  .dg-cash-account-history-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .dg-cash-changelog-meta {
+    justify-content: flex-start;
+  }
+
+  .dg-cash-history-change {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .dg-cash-history-result {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
 }
 
 .rb-list-search-hidden {
