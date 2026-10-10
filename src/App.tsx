@@ -2269,6 +2269,22 @@ export default function App() {
     });
   }, [moduleAccessSet]);
 
+  const sidebarMainNavIds = useMemo<Array<SidebarModule | "orders">>(() => {
+    const result: Array<SidebarModule | "orders"> = [];
+    let ordersAdded = false;
+    for (const id of filteredMainNavIds) {
+      if (id === "storeOrders" || id === "customerOrders") {
+        if (!ordersAdded) {
+          result.push("orders");
+          ordersAdded = true;
+        }
+      } else {
+        result.push(id);
+      }
+    }
+    return result;
+  }, [filteredMainNavIds]);
+
   const filteredSystemNavIds = useMemo(() => {
     return SIDEBAR_SYSTEM_IDS.filter((id) => {
       if (id === "settings" && moduleAccessSet) return false;
@@ -2391,18 +2407,10 @@ export default function App() {
       };
     }
     if (module === "storeOrders") {
-      if (storeOrderMode === "list") return { title: "Mağaza sifarişi", sub: MODULE_TAGLINE.storeOrders };
-      return {
-        title: storeOrderEditId ? "Mağaza sifarişi redaktəsi" : "Yeni mağaza sifarişi",
-        sub: storeOrderEditId ? "Mövcud sifarişi yeniləyin" : "Yeni mağaza sifarişi əlavə edin",
-      };
+      return { title: "Sifarişlər", sub: MODULE_TAGLINE.storeOrders };
     }
     if (module === "customerOrders") {
-      if (customerOrderMode === "list") return { title: "Müştəri sifarişi", sub: MODULE_TAGLINE.customerOrders };
-      return {
-        title: customerOrderEditId ? "Müştəri sifarişi redaktəsi" : "Yeni müştəri sifarişi",
-        sub: customerOrderEditId ? "Mövcud sifarişi yeniləyin" : "Yeni müştəri sifarişi əlavə edin",
-      };
+      return { title: "Sifarişlər", sub: MODULE_TAGLINE.customerOrders };
     }
     if (module === "priceCalculations") {
       return { title: "Qiymət hesablanması", sub: MODULE_TAGLINE.priceCalculations };
@@ -8315,17 +8323,27 @@ export default function App() {
             <div className="rb-sidebar-scroll">
               <p className="rb-menu-section">Modullar</p>
               <nav className="rb-menu" aria-label="Əsas modullar">
-                {filteredMainNavIds.map((id) => {
-                  const m = SIDEBAR_MODULES.find((x) => x.id === id)!;
+                {sidebarMainNavIds.map((id) => {
+                  const isOrders = id === "orders";
+                  const orderTarget: SidebarModule = filteredMainNavIds.includes("customerOrders")
+                    ? "customerOrders"
+                    : "storeOrders";
+                  const target = isOrders ? orderTarget : id;
+                  const m = isOrders
+                    ? { id: target, label: "Sifarişlər" }
+                    : SIDEBAR_MODULES.find((x) => x.id === id)!;
+                  const isActive = isOrders
+                    ? module === "storeOrders" || module === "customerOrders"
+                    : module === m.id;
                   return (
                     <button
-                      key={m.id}
+                      key={id}
                       type="button"
-                      className={`rb-menu-item ${module === m.id ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
-                      onClick={() => switchSidebarModule(m.id)}
+                      className={`rb-menu-item ${isActive ? "is-active" : ""}${m.id === "labels" ? " rb-menu-item--red" : ""}`}
+                      onClick={() => switchSidebarModule(target)}
                     >
                       <span className="rb-menu-icon">
-                        <SidebarNavIcon mod={m.id} />
+                        <SidebarNavIcon mod={isOrders ? "customerOrders" : m.id} />
                       </span>
                       <span>{m.label}</span>
                     </button>
@@ -8494,9 +8512,34 @@ export default function App() {
             <nav
               className="rb-module-tabs"
               aria-label={`${workspaceHeader.title} tabları`}
-              role={module === "priceCalculations" ? "tablist" : undefined}
+              role={module === "priceCalculations" || module === "storeOrders" || module === "customerOrders" ? "tablist" : undefined}
             >
-              {module === "priceCalculations" ? (
+              {module === "storeOrders" || module === "customerOrders" ? (
+                <>
+                  {filteredMainNavIds.includes("customerOrders") ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={module === "customerOrders"}
+                      className={`rb-module-tab${module === "customerOrders" ? " is-active" : ""}`}
+                      onClick={() => switchSidebarModule("customerOrders")}
+                    >
+                      Müştəri sifarişləri
+                    </button>
+                  ) : null}
+                  {filteredMainNavIds.includes("storeOrders") ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={module === "storeOrders"}
+                      className={`rb-module-tab${module === "storeOrders" ? " is-active" : ""}`}
+                      onClick={() => switchSidebarModule("storeOrders")}
+                    >
+                      Mağaza sifarişləri
+                    </button>
+                  ) : null}
+                </>
+              ) : module === "priceCalculations" ? (
                 <>
                   <button
                     type="button"
