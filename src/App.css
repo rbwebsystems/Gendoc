@@ -382,6 +382,18 @@ textarea.dg-input::placeholder {
   table-layout: fixed;
 }
 
+.dg-table--order-lines {
+  min-width: 820px;
+}
+
+.dg-table--order-summary {
+  min-width: 860px;
+}
+
+.dg-info-table--order-lines {
+  min-width: 760px;
+}
+
 .dg-table--order-lines .dg-order-col-product,
 .dg-table--order-lines .dg-order-col-supplier,
 .dg-info-table--order-lines td:nth-child(2),
@@ -402,6 +414,13 @@ textarea.dg-input::placeholder {
 .dg-table--order-lines .dg-order-col-total,
 .dg-table--order-summary .dg-order-col-total {
   width: 136px;
+}
+
+.dg-table--order-lines .dg-th-actions,
+.dg-table--order-lines .dg-td-actions {
+  width: 64px;
+  min-width: 64px;
+  text-align: center;
 }
 
 .dg-table--order-summary .dg-order-col-products {
@@ -426,6 +445,23 @@ textarea.dg-input::placeholder {
 .dg-info-table--order-lines tfoot td {
   background: #f3f4f6;
   border-top: 2px solid var(--win-border-strong);
+}
+
+.dg-table--projects-list,
+.dg-table--project-lines {
+  min-width: 760px;
+}
+
+.dg-table--users-list {
+  min-width: 720px;
+}
+
+.dg-table--permissions-list {
+  min-width: 640px;
+}
+
+.dg-table--leave-list {
+  min-width: 900px;
 }
 
 .dg-table tbody tr:nth-child(even) td {
@@ -711,8 +747,13 @@ textarea.dg-input::placeholder {
 .dg-td-actions {
   width: 1%;
   white-space: nowrap;
-  text-align: right;
+  text-align: center;
   vertical-align: middle;
+}
+
+.dg-th-center,
+.dg-td-center {
+  text-align: center;
 }
 
 .dg-th-num,
@@ -2257,7 +2298,7 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-table.dg-table--sales thead th.dg-th-actions {
-  text-align: right;
+  text-align: center;
 }
 
 .dg-table.dg-table--sales tbody td {
@@ -2360,6 +2401,7 @@ textarea.dg-input.dg-input-textarea-compact {
 .dg-table.dg-table--supplier-offers-list {
   table-layout: fixed;
   width: 100%;
+  min-width: 1080px;
 }
 
 .dg-table-wrap--supplier-offers {
@@ -2390,19 +2432,19 @@ textarea.dg-input.dg-input-textarea-compact {
 }
 
 .dg-table.dg-table--supplier-offers-list col.dg-so-col-date {
-  width: 12%;
+  width: 11rem;
 }
 
 .dg-table.dg-table--supplier-offers-list col.dg-so-col-company {
-  width: 22%;
+  width: 14rem;
 }
 
 .dg-table.dg-table--supplier-offers-list col.dg-so-col-amount {
-  width: 11%;
+  width: 8.25rem;
 }
 
 .dg-table.dg-table--supplier-offers-list col.dg-so-col-actions {
-  width: 10.5rem;
+  width: 6rem;
 }
 
 .dg-table.dg-table--supplier-offers-list thead th.dg-th-num,
@@ -2431,14 +2473,14 @@ textarea.dg-input.dg-input-textarea-compact {
 
 .dg-table.dg-table--supplier-offers-list thead th.dg-th-actions,
 .dg-table.dg-table--supplier-offers-list tbody td.dg-td-actions {
-  text-align: right;
+  text-align: center;
   overflow: visible;
   white-space: nowrap;
 }
 
 .dg-table.dg-table--supplier-offers-list .dg-td-actions .dg-icon-row {
   flex-wrap: nowrap;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 .dg-table.dg-table--supplier-offers-list .dg-offer-create-project-btn {
@@ -3471,6 +3513,14 @@ textarea.dg-input {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.dg-table.dg-table--instructions {
+  min-width: 680px;
+}
+
+.dg-table.dg-table--instructions-pos {
+  min-width: 620px;
 }
 
 .dg-table.dg-table--instructions tbody tr.is-inactive td {

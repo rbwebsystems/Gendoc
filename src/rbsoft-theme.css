@@ -1231,6 +1231,28 @@
   vertical-align: middle;
 }
 
+/* Cədvəlin ümumi mövzusu semantik sütun hizalamasını üstələməməlidir. */
+.rb-desktop .dg-table thead th.dg-th-amount,
+.rb-desktop .dg-table thead th.dg-num,
+.rb-desktop .dg-info-table thead th.dg-num {
+  text-align: right;
+}
+
+.rb-desktop .dg-table thead th.dg-th-num,
+.rb-desktop .dg-table thead th.dg-th-center,
+.rb-desktop .dg-table thead th.dg-th-actions,
+.rb-desktop .dg-table tbody td.dg-td-num,
+.rb-desktop .dg-table tbody td.dg-td-center,
+.rb-desktop .dg-table tbody td.dg-td-actions {
+  text-align: center;
+}
+
+.rb-desktop .dg-table tbody td.dg-td-amount,
+.rb-desktop .dg-table tbody td.dg-num,
+.rb-desktop .dg-info-table tbody td.dg-num {
+  text-align: right;
+}
+
 .rb-desktop .dg-table tbody tr:nth-child(even) td,
 .rb-desktop .dg-info-table tbody tr:nth-child(even) td {
   background: #ffffff;
@@ -1867,6 +1889,27 @@
 .biz-portal-modals .dg-table tbody td,
 .biz-portal-modals .dg-info-table tbody td {
   border-bottom-color: #dce2e6;
+}
+
+.biz-portal-modals .dg-table thead th:not(.dg-num),
+.biz-portal-modals .dg-info-table thead th:not(.dg-num),
+.biz-portal-modals .dg-table tbody td:not(.dg-num),
+.biz-portal-modals .dg-info-table tbody td:not(.dg-num) {
+  text-align: left;
+}
+
+.biz-portal-modals .dg-table thead th.dg-num,
+.biz-portal-modals .dg-info-table thead th.dg-num,
+.biz-portal-modals .dg-table tbody td.dg-num,
+.biz-portal-modals .dg-info-table tbody td.dg-num {
+  text-align: right;
+}
+
+.biz-portal-modals .dg-table thead th.dg-th-num,
+.biz-portal-modals .dg-info-table thead th.dg-th-num,
+.biz-portal-modals .dg-table tbody td.dg-td-num,
+.biz-portal-modals .dg-info-table tbody td.dg-td-num {
+  text-align: center;
 }
 
 @media (max-width: 560px) {

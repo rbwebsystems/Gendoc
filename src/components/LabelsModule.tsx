@@ -380,17 +380,17 @@ export function LabelsModule({ products, onSave }: LabelsModuleProps) {
             </colgroup>
             <thead>
               <tr>
-                <th>№</th>
+                <th className="dg-th-num">№</th>
                 <th>Məhsul adı</th>
-                <th className="dg-num">Say</th>
-                <th className="dg-num">Satış qiyməti</th>
+                <th className="dg-th-amount">Say</th>
+                <th className="dg-th-amount">Satış qiyməti</th>
                 {editing ? <th className="dg-labels-action-head">Əməliyyat</th> : null}
               </tr>
             </thead>
             <tbody>
               {(editing ? draft : products).map((row, index) => (
                 <tr key={row.id}>
-                  <td className="dg-labels-row-number">{index + 1}</td>
+                  <td className="dg-td-num dg-labels-row-number">{index + 1}</td>
                   <td>
                     {editing ? (
                       <input
@@ -404,7 +404,7 @@ export function LabelsModule({ products, onSave }: LabelsModuleProps) {
                       row.name
                     )}
                   </td>
-                  <td className="dg-num">
+                  <td className="dg-td-amount">
                     {editing ? (
                       <input
                         className="dg-input dg-input--table dg-labels-number-input"
@@ -417,7 +417,7 @@ export function LabelsModule({ products, onSave }: LabelsModuleProps) {
                       quantityFormatter.format(Number(row.qty))
                     )}
                   </td>
-                  <td className="dg-num">
+                  <td className="dg-td-amount">
                     {editing ? (
                       <input
                         className="dg-input dg-input--table dg-labels-number-input"

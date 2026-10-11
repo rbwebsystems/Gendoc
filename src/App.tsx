@@ -3379,7 +3379,7 @@ export default function App() {
               <p className="dg-muted dg-form-page-empty">Hələ şirkət yoxdur — «Yeni şirkət» ilə əlavə edin.</p>
             ) : (
               <div className="dg-table-wrap pg-grid-host">
-                <table className="dg-table dg-table--sales">
+                <table className="dg-table dg-table--sales dg-table--companies-list">
                   <thead>
                     <tr>
                       <th className="dg-th-num">№</th>
@@ -3512,7 +3512,7 @@ export default function App() {
               <p className="dg-muted dg-form-page-empty">Hələ təklif yoxdur — «Yeni təklif» ilə yaradın.</p>
             ) : (
               <div className="dg-table-wrap pg-grid-host">
-                <table className="dg-table dg-table--sales">
+                <table className="dg-table dg-table--sales dg-table--projects-list">
                   <thead>
                     <tr>
                       <th className="dg-th-num">№</th>
@@ -3787,15 +3787,15 @@ export default function App() {
                 </button>
               </div>
               <div className="dg-table-wrap pg-grid-host dg-project-lines-wrap">
-                <table className="dg-table dg-table--sales">
+                <table className="dg-table dg-table--sales dg-table--project-lines">
                   <thead>
                     <tr>
                       <th className="dg-th-num">№</th>
                       <th>Məhsul</th>
                       <th>Vahid</th>
-                      <th>Miqdar</th>
-                      <th>Vahid qiymət</th>
-                      <th>Məbləğ</th>
+                      <th className="dg-th-center">Miqdar</th>
+                      <th className="dg-th-amount">Vahid qiymət</th>
+                      <th className="dg-th-amount">Məbləğ</th>
                       <th className="dg-th-actions" title="Əməliyyatlar">
                         Sil
                       </th>
@@ -3826,7 +3826,7 @@ export default function App() {
                               onChange={(e) => updateDraftRow(r.id, { unit: e.target.value })}
                             />
                           </td>
-                          <td>
+                          <td className="dg-td-center">
                             <div className="dg-qty-wrap">
                               <button
                                 type="button"
@@ -3860,7 +3860,7 @@ export default function App() {
                               </button>
                             </div>
                           </td>
-                          <td>
+                          <td className="dg-td-amount">
                             <input
                               className="dg-input dg-input-table dg-input-num"
                               type="number"
@@ -3872,7 +3872,7 @@ export default function App() {
                               }
                             />
                           </td>
-                          <td className="dg-num">{formatMoney(r.qty * r.unitPrice)}</td>
+                          <td className="dg-td-amount">{formatMoney(r.qty * r.unitPrice)}</td>
                           <td className="dg-td-actions">
                             <TableActionMenu>
                               <button
@@ -5029,10 +5029,10 @@ export default function App() {
           <tr>
             <th className="dg-th-num">№</th>
               <th className="dg-order-col-product">Məhsul</th>
-              <th className="dg-order-col-qty">Miqdar</th>
-              <th className="dg-order-col-price">Alış qiyməti</th>
+              <th className="dg-th-amount dg-order-col-qty">Miqdar</th>
+              <th className="dg-th-amount dg-order-col-price">Alış qiyməti</th>
               <th className="dg-order-col-supplier">Təchizatçı</th>
-              <th className="dg-order-col-total">Cəm</th>
+              <th className="dg-th-amount dg-order-col-total">Cəm</th>
             <th className="dg-th-actions">Sil</th>
           </tr>
         </thead>
@@ -5054,7 +5054,7 @@ export default function App() {
                     onChange={(e) => onPatch(r.id, { name: e.target.value })}
                   />
                 </td>
-                <td className="dg-order-col-qty">
+                <td className="dg-td-amount dg-order-col-qty">
                   <input
                     className="dg-input dg-input-table dg-input-num"
                     type="number"
@@ -5064,7 +5064,7 @@ export default function App() {
                     onChange={(e) => onPatch(r.id, { qty: Number(e.target.value) || 0 })}
                   />
                 </td>
-                <td className="dg-order-col-price">
+                <td className="dg-td-amount dg-order-col-price">
                   <input
                     className="dg-input dg-input-table dg-input-num"
                     type="number"
@@ -5137,9 +5137,9 @@ export default function App() {
               {opts.showDate ? <th>Tarix</th> : null}
               {opts.showCustomer ? <th>Müştəri</th> : null}
               <th>Status</th>
-              <th className="dg-order-col-products">Məhsul sayı</th>
-              <th className="dg-order-col-qty">Ümumi miqdar</th>
-              <th className="dg-order-col-total">Cəm</th>
+              <th className="dg-th-amount dg-order-col-products">Məhsul sayı</th>
+              <th className="dg-th-amount dg-order-col-qty">Ümumi miqdar</th>
+              <th className="dg-th-amount dg-order-col-total">Cəm</th>
               <th className="dg-th-actions">Əməliyyatlar</th>
             </tr>
           </thead>
@@ -5218,7 +5218,7 @@ export default function App() {
         <table className="dg-info-table dg-info-table--order-lines">
           <thead>
             <tr>
-              <th style={{ width: 54 }} className="dg-num">
+              <th style={{ width: 54 }} className="dg-th-num">
                 №
               </th>
               <th>Məhsul</th>
@@ -5237,7 +5237,7 @@ export default function App() {
           <tbody>
             {rows.map((r, idx) => (
               <tr key={r.id}>
-                <td className="dg-num">{idx + 1}</td>
+                <td className="dg-td-num">{idx + 1}</td>
                 <td>{r.name || "—"}</td>
                 <td className="dg-num">{r.qty}</td>
                 <td className="dg-num">{formatMoney(r.purchasePrice)}</td>
@@ -5483,21 +5483,21 @@ export default function App() {
                       <th className="dg-offer-col-supplier">Təchizatçı</th>
                       <th className="dg-offer-col-product">Məhsul adı</th>
                       <th className="dg-offer-col-replacement">Əvəz məhsul</th>
-                      <th className="dg-th-num dg-offer-col-price" title="ƏDV-siz alış">
+                      <th className="dg-th-amount dg-offer-col-price" title="ƏDV-siz alış">
                         ƏDV-siz
                       </th>
-                      <th className="dg-th-num dg-offer-col-price" title="ƏDV daxil alış">
+                      <th className="dg-th-amount dg-offer-col-price" title="ƏDV daxil alış">
                         ƏDV daxil
                       </th>
-                      <th className="dg-th-num dg-offer-col-qty">Miqd.</th>
+                      <th className="dg-th-amount dg-offer-col-qty">Miqd.</th>
                       <th className="dg-offer-col-unit">Vahid</th>
-                      <th className="dg-th-num dg-offer-col-margin">Faiz %</th>
-                      <th className="dg-th-num dg-offer-col-price" title="Əl ilə satış (aktiv alış sütununa aiddir)">
+                      <th className="dg-th-amount dg-offer-col-margin">Faiz %</th>
+                      <th className="dg-th-amount dg-offer-col-price" title="Əl ilə satış (aktiv alış sütununa aiddir)">
                         Satış*
                       </th>
-                      <th className="dg-th-num dg-offer-col-total">Alış c.</th>
-                      <th className="dg-th-num dg-offer-col-sale-computed">Sat. rəsmi</th>
-                      <th className="dg-th-num dg-offer-col-sale-computed">Sat. nağd</th>
+                      <th className="dg-th-amount dg-offer-col-total">Alış c.</th>
+                      <th className="dg-th-amount dg-offer-col-sale-computed">Sat. rəsmi</th>
+                      <th className="dg-th-amount dg-offer-col-sale-computed">Sat. nağd</th>
                       <th className="dg-th-actions dg-offer-col-actions">Sil</th>
                     </tr>
                   </thead>
@@ -5546,7 +5546,7 @@ export default function App() {
                                 placeholder="Əvəz məhsul"
                               />
                             </td>
-                            <td className="dg-offer-col-price">
+                            <td className="dg-td-amount dg-offer-col-price">
                               <input
                                 className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
@@ -5557,7 +5557,7 @@ export default function App() {
                                 placeholder="ƏDV-siz"
                               />
                             </td>
-                            <td className="dg-offer-col-price">
+                            <td className="dg-td-amount dg-offer-col-price">
                               <input
                                 className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
@@ -5568,7 +5568,7 @@ export default function App() {
                                 placeholder="ƏDV daxil"
                               />
                             </td>
-                            <td className="dg-offer-col-qty">
+                            <td className="dg-td-amount dg-offer-col-qty">
                               <input
                                 className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
@@ -5586,7 +5586,7 @@ export default function App() {
                                 placeholder="ədəd"
                               />
                             </td>
-                            <td className="dg-offer-col-margin">
+                            <td className="dg-td-amount dg-offer-col-margin">
                               <input
                                 className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
@@ -5596,7 +5596,7 @@ export default function App() {
                                 placeholder="%"
                               />
                             </td>
-                            <td className="dg-offer-col-price">
+                            <td className="dg-td-amount dg-offer-col-price">
                               <input
                                 className="dg-input dg-input-table dg-input-num dg-input-offer-num"
                                 type="number"
@@ -5608,9 +5608,9 @@ export default function App() {
                                 title={saleSource === "inc" ? "Nağd satış (əl ilə)" : "Rəsmi satış (əl ilə)"}
                               />
                             </td>
-                            <td className="dg-td-num dg-offer-col-total">{formatMoney(purchaseLineTotal)}</td>
-                            <td className="dg-td-num dg-offer-col-sale-computed">{formatMoney(saleOfficial)}</td>
-                            <td className="dg-td-num dg-offer-col-sale-computed">{formatMoney(saleCash)}</td>
+                            <td className="dg-td-amount dg-offer-col-total">{formatMoney(purchaseLineTotal)}</td>
+                            <td className="dg-td-amount dg-offer-col-sale-computed">{formatMoney(saleOfficial)}</td>
+                            <td className="dg-td-amount dg-offer-col-sale-computed">{formatMoney(saleCash)}</td>
                             <td className="dg-td-actions">
                               <TableActionMenu>
                                 <button
@@ -6901,7 +6901,7 @@ export default function App() {
             </div>
           ) : (
             <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table">
+              <table className="dg-table dg-table--users-list">
                 <thead>
                   <tr>
                     <th className="dg-th-num">№</th>
@@ -7015,7 +7015,7 @@ export default function App() {
             </div>
           ) : (
             <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table">
+              <table className="dg-table dg-table--permissions-list">
                 <thead>
                   <tr>
                     <th className="dg-th-num">№</th>
@@ -7305,7 +7305,7 @@ export default function App() {
             </div>
           ) : (
             <div className="dg-table-wrap pg-grid-host">
-              <table className="dg-table">
+              <table className="dg-table dg-table--leave-list">
                 <thead>
                   <tr>
                     <th className="dg-th-num">№</th>
@@ -7743,7 +7743,7 @@ export default function App() {
                 <table className="dg-info-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 54 }} className="dg-num">
+                      <th style={{ width: 54 }} className="dg-th-num">
                         №
                       </th>
                       <th>Məhsul</th>
@@ -7762,7 +7762,7 @@ export default function App() {
                   <tbody>
                     {infoProject.rows.map((r, idx) => (
                       <tr key={r.id}>
-                        <td className="dg-num">{idx + 1}</td>
+                        <td className="dg-td-num">{idx + 1}</td>
                         <td>{r.name || "—"}</td>
                         <td>{r.unit || "—"}</td>
                         <td className="dg-num">{r.qty}</td>
@@ -7821,7 +7821,7 @@ export default function App() {
                 <table className="dg-info-table">
                   <thead>
                     <tr>
-                      <th style={{ width: 54 }} className="dg-num">
+                      <th style={{ width: 54 }} className="dg-th-num">
                         №
                       </th>
                       <th style={{ width: 140 }}>Təchizatçı</th>
@@ -7860,7 +7860,7 @@ export default function App() {
                   <tbody>
                     {infoOffer.rows.map((r, idx) => (
                       <tr key={r.id}>
-                        <td className="dg-num">{idx + 1}</td>
+                        <td className="dg-td-num">{idx + 1}</td>
                         <td>{r.supplierName || "—"}</td>
                         <td>{r.name || "—"}</td>
                         <td>{r.replacementName?.trim() || "—"}</td>
