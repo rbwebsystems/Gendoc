@@ -1442,52 +1442,189 @@
 
 /* Dialoqlar */
 .biz-portal-modals .dg-modal {
-  border-radius: 5px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  color: var(--rb-text);
+  border-radius: 10px;
+  border: 1px solid #c7d4db;
+  border-top: 3px solid var(--rb-accent);
+  background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  box-shadow:
+    0 30px 86px rgba(15, 23, 42, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.72);
 }
 
 .biz-portal-modals .dg-modal::backdrop {
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: none;
+  background: rgba(26, 32, 45, 0.48);
+  backdrop-filter: blur(3px);
 }
 
 .biz-portal-modals .dg-modal-title {
-  margin: 0 0 12px;
-  padding: 10px 14px;
-  font-size: var(--font-size-base);
+  position: relative;
+  margin: 0 -18px 15px;
+  padding: 12px 18px 11px 31px;
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--rb-text);
-  background: rgba(255, 255, 255, 0.9);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, #fbfdfe 0%, #edf3f6 100%);
+  border-bottom: 1px solid #d0dce2;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.biz-portal-modals .dg-modal-title::before {
+  content: "";
+  position: absolute;
+  left: 18px;
+  top: 12px;
+  bottom: 11px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--rb-accent);
 }
 
 .biz-portal-modals .dg-modal-body {
-  padding: 14px 16px 16px;
-  background: rgba(255, 255, 255, 0.92);
+  padding: 0 18px 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafb 100%);
+}
+
+.biz-portal-modals .dg-modal:not(.dg-modal-info) .dg-modal-body {
+  max-height: min(88vh, 820px);
+  overflow-y: auto;
+}
+
+.biz-portal-modals .dg-modal.dg-modal-info .dg-modal-body {
+  padding: 0 18px 18px;
+}
+
+.biz-portal-modals .dg-modal.dg-modal-info .dg-modal-title {
+  margin: 0 -18px 15px;
+  padding: 12px 18px 11px 31px;
+  font-size: 0.9375rem;
+}
+
+.biz-portal-modals .dg-modal-hint {
+  margin-bottom: 14px;
+  color: #5b6c76;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.biz-portal-modals .dg-label {
+  color: #354852;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.biz-portal-modals .dg-input,
+.biz-portal-modals textarea.dg-input,
+.biz-portal-modals select.dg-input {
+  min-height: 34px;
+  border-radius: 6px;
+  border-color: #c4d1d8;
+  background-color: #ffffff;
+  color: #243640;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.035);
+}
+
+.biz-portal-modals .dg-input:focus,
+.biz-portal-modals textarea.dg-input:focus,
+.biz-portal-modals select.dg-input:focus {
+  border-color: var(--rb-accent);
+  box-shadow: 0 0 0 3px rgba(19, 167, 189, 0.12);
+  outline: none;
+}
+
+.biz-portal-modals .dg-modal-actions {
+  margin: 16px -18px -18px;
+  padding: 11px 18px 12px;
+  border-top: 1px solid #d7e0e5;
+  background: #f2f6f8;
 }
 
 .biz-portal-modals .dg-btn {
-  height: 32px;
+  height: 34px;
   padding: 0 14px;
-  border-radius: 4px;
-  border: 1px solid rgba(15, 23, 42, 0.12);
-  background: rgba(255, 255, 255, 0.92);
-  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #c5d1d8;
+  background: #ffffff;
+  font-weight: 700;
   font-size: var(--font-size-sm);
   color: var(--rb-text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.biz-portal-modals .dg-btn:hover:not(:disabled) {
+  border-color: #9fb2bc;
+  background: #f7fafb;
 }
 
 .biz-portal-modals .dg-btn-primary {
   color: #ffffff;
-  border-color: #1198ad;
-  background: #13a7bd;
+  border-color: #108fa3;
+  background: linear-gradient(180deg, #20b3c8 0%, #1197ac 100%);
+  box-shadow: 0 2px 5px rgba(17, 151, 172, 0.2);
+}
+
+.biz-portal-modals .dg-btn-primary:hover:not(:disabled) {
+  border-color: #0d8295;
+  background: linear-gradient(180deg, #1ba7bb 0%, #0f8da1 100%);
 }
 
 .biz-portal-modals .dg-btn-danger {
   color: #ffffff;
-  border-color: rgba(220, 38, 38, 0.55);
-  background: #ef4444;
+  border-color: #c93737;
+  background: linear-gradient(180deg, #ef5555 0%, #d93f3f 100%);
+}
+
+.biz-portal-modals .dg-btn-danger:hover:not(:disabled) {
+  border-color: #b92f2f;
+  background: linear-gradient(180deg, #e74747 0%, #ca3535 100%);
+}
+
+.biz-portal-modals .dg-modal-close {
+  margin-top: 14px;
+}
+
+.biz-portal-modals .dg-info-table-wrap,
+.biz-portal-modals .dg-print-picker {
+  border-color: #cbd7dd;
+  border-radius: 7px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+}
+
+@media (max-width: 560px) {
+  .biz-portal-modals .dg-modal {
+    max-width: calc(100vw - 20px);
+    width: calc(100vw - 20px);
+    border-radius: 9px;
+  }
+
+  .biz-portal-modals .dg-modal-body,
+  .biz-portal-modals .dg-modal.dg-modal-info .dg-modal-body {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .biz-portal-modals .dg-modal-title,
+  .biz-portal-modals .dg-modal.dg-modal-info .dg-modal-title {
+    margin-right: -14px;
+    margin-left: -14px;
+    padding-left: 27px;
+  }
+
+  .biz-portal-modals .dg-modal-title::before {
+    left: 14px;
+  }
+
+  .biz-portal-modals .dg-modal-actions {
+    margin-right: -14px;
+    margin-left: -14px;
+    padding-right: 14px;
+    padding-left: 14px;
+  }
 }
 
 .rb-desktop .rb-company-form-caption {
