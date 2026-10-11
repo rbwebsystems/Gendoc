@@ -380,9 +380,9 @@
   min-height: 52px;
   position: relative;
   z-index: 2;
-  border-bottom: 0;
+  border-bottom: 3px solid #f1f4f6;
   background: #ffffff;
-  box-shadow: 0 3px 8px -5px rgba(15, 23, 42, 0.42);
+  box-shadow: none;
   flex-wrap: nowrap;
 }
 
@@ -479,9 +479,9 @@
   border-top: 0;
   position: relative;
   z-index: 1;
-  border-bottom: 0;
+  border-bottom: 3px solid #f1f4f6;
   background: #ffffff;
-  box-shadow: 0 4px 9px -7px rgba(15, 23, 42, 0.58);
+  box-shadow: none;
   scrollbar-width: thin;
   scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
 }
