@@ -167,7 +167,8 @@
 .rb-menu {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 4px;
+  padding: 2px 0;
 }
 
 .rb-menu-item {
@@ -843,7 +844,7 @@
   }
 
   .rb-menu {
-    gap: 2px;
+    gap: 4px;
   }
 
   .rb-menu-item {
