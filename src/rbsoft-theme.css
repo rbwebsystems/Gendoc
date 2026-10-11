@@ -1971,8 +1971,8 @@
 .rb-desktop .dg-info-table thead th,
 .biz-portal-modals .dg-table thead th,
 .biz-portal-modals .dg-info-table thead th {
-  border-bottom: 1px solid var(--rb-accent);
-  box-shadow: none;
+  border-bottom: 0;
+  box-shadow: inset 0 -1px 0 var(--rb-accent);
 }
 
 #root {
