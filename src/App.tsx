@@ -4,7 +4,11 @@ import { createPortal } from "react-dom";
 import "./App.css";
 import "./rbsoft-theme.css";
 import gendocMarkUrl from "./assets/gendoc-mark.svg";
-import { InstructionsModule } from "./components/InstructionsModule";
+import {
+  INSTRUCTION_TABS,
+  InstructionsModule,
+  type InstructionTab,
+} from "./components/InstructionsModule";
 import { LabelsModule } from "./components/LabelsModule";
 import { TableActionMenu } from "./components/TableActionMenu";
 import { rebaseCashReport } from "./lib/cashSync";
@@ -1495,6 +1499,7 @@ export default function App() {
   const [priceCalcSaleInput, setPriceCalcSaleInput] = useState("");
   const [priceCalcInitialPaymentInput, setPriceCalcInitialPaymentInput] = useState("");
   const [priceCalcTab, setPriceCalcTab] = useState<"price" | "credit">("price");
+  const [instructionsTab, setInstructionsTab] = useState<InstructionTab>("cash");
   const [priceCalcSelectedMonths, setPriceCalcSelectedMonths] = useState<number[]>([]);
   const priceCalcShareDialogRef = useRef<HTMLDialogElement>(null);
   const [creditAssessmentDraft, setCreditAssessmentDraft] = useState({
@@ -8852,7 +8857,7 @@ export default function App() {
             <nav
               className="rb-module-tabs"
               aria-label={`${workspaceHeader.title} tabları`}
-              role={module === "companies" || module === "projects" || module === "suppliers" || module === "priceCalculations" || module === "storeOrders" || module === "customerOrders" ? "tablist" : undefined}
+              role={module === "companies" || module === "projects" || module === "suppliers" || module === "priceCalculations" || module === "storeOrders" || module === "customerOrders" || module === "instructions" ? "tablist" : undefined}
             >
               {module === "companies" || module === "projects" || module === "suppliers" ? (
                 <>
@@ -8936,6 +8941,19 @@ export default function App() {
                     Kredit uyğunluğu
                   </button>
                 </>
+              ) : module === "instructions" ? (
+                INSTRUCTION_TABS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={instructionsTab === item.id}
+                    className={`rb-module-tab${instructionsTab === item.id ? " is-active" : ""}`}
+                    onClick={() => setInstructionsTab(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))
               ) : null}
             </nav>
 
@@ -8965,6 +8983,7 @@ export default function App() {
                 <InstructionsModule
                   state={workspace.instructions!}
                   onChange={(instructions) => setWorkspace((w) => ({ ...w, instructions }))}
+                  activeTab={instructionsTab}
                 />
               ) : null}
               {module === "labels" ? (

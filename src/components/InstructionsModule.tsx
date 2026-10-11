@@ -17,10 +17,10 @@ import {
 } from "../lib/instructions";
 import { TableActionMenu } from "./TableActionMenu";
 
-type InstructionTab = "cash" | "credit" | "corporate" | "pos";
+export type InstructionTab = "cash" | "credit" | "corporate" | "pos";
 type StatusFilter = "all" | InstructionRowStatus;
 
-const TABS: { id: InstructionTab; label: string }[] = [
+export const INSTRUCTION_TABS: { id: InstructionTab; label: string }[] = [
   { id: "cash", label: "Nəğd satış" },
   { id: "credit", label: "Kredit satış" },
   { id: "corporate", label: "Korporativ satış" },
@@ -41,6 +41,7 @@ const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
 type Props = {
   state: InstructionsState;
   onChange: (next: InstructionsState) => void;
+  activeTab: InstructionTab;
 };
 
 function matchesSearch(values: string[], query: string): boolean {
@@ -81,8 +82,7 @@ function DeleteButton(props: { onClick: () => void }) {
   );
 }
 
-export function InstructionsModule({ state, onChange }: Props) {
-  const [tab, setTab] = useState<InstructionTab>("cash");
+export function InstructionsModule({ state, onChange, activeTab: tab }: Props) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
@@ -204,22 +204,35 @@ export function InstructionsModule({ state, onChange }: Props) {
     }
   };
 
+  const activeTabLabel = INSTRUCTION_TABS.find((item) => item.id === tab)?.label ?? "Təlimat";
+  const visibleRowCount =
+    tab === "cash"
+      ? cashRows.length
+      : tab === "credit"
+        ? creditRows.length
+        : tab === "corporate"
+          ? corporateRows.length
+          : posRows.length;
+  const totalRowCount =
+    tab === "cash"
+      ? state.cashSales.length
+      : tab === "credit"
+        ? state.creditSales.length
+        : tab === "corporate"
+          ? state.corporateSales.length
+          : state.posFees.length;
+
   const renderToolbar = () => (
     <div className="dg-instructions-toolbar" aria-label="Təlimat alətləri">
-      <div className="dg-instructions-toolbar-left">
-        <div className="dg-instructions-tabs" role="tablist" aria-label="Təlimat bölmələri">
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === item.id}
-              className={`dg-instructions-tab ${tab === item.id ? "is-active" : ""}`}
-              onClick={() => setTab(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
+      <div className="dg-instructions-toolbar-summary">
+        <span className="dg-instructions-toolbar-mark" aria-hidden="true" />
+        <div>
+          <strong>{activeTabLabel}</strong>
+          <span>
+            {visibleRowCount === totalRowCount
+              ? `${totalRowCount} qayda`
+              : `${visibleRowCount} / ${totalRowCount} qayda`}
+          </span>
         </div>
       </div>
       <div className="dg-instructions-toolbar-right">
