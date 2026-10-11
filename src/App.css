@@ -2856,8 +2856,9 @@ textarea.dg-input {
   gap: 0.72rem;
   margin: -1.15rem -1.35rem 1rem;
   padding: 0.82rem 1rem;
-  border-bottom: 1px solid #d8e2e7;
-  background: linear-gradient(180deg, #fbfdfe 0%, #f0f5f7 100%);
+  border-bottom: 1px solid #13a7bd;
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .dg-pricecalc-pane-title {
