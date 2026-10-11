@@ -475,7 +475,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   border-top: 0;
-  border-bottom: 1px solid var(--rb-accent);
+  border-bottom: 1px solid #cfd7dd;
   background: #ffffff;
   box-shadow: none;
   scrollbar-width: thin;
