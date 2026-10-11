@@ -26,7 +26,6 @@ import {
   clearLocalWorkspace,
   clearWorkspaceLiveCache,
   hasLocalWorkspace,
-  hasLocalWorkspaceBackup,
   loadLocalWorkspaceBackup,
   loadWorkspaceLiveCache,
   loadWorkspaceLocal,
@@ -2979,50 +2978,6 @@ export default function App() {
     [askConfirm, cashReportRows, patchCashReport],
   );
 
-  const restoreFromLocalBackup = useCallback(async () => {
-    const backup = loadLocalWorkspaceBackup();
-    const local = hasLocalWorkspace() ? loadWorkspaceLocal() : null;
-    const source = pickPreferredWorkspace(local, backup);
-    if (!workspaceHasUserData(source)) {
-      flash(setToast, "Bərpa ediləcək lokal məlumat tapılmadı.", "error");
-      return;
-    }
-    const ok = await askConfirm({
-      title: "Lokal məlumatları bərpa et",
-      message: "Brauzerdə saxlanmış köhnə məlumatlar cari hesaba yazılacaq. Davam edilsin?",
-      confirmLabel: "Bərpa et",
-      cancelLabel: "Ləğv et",
-    });
-    if (!ok) return;
-    const merged = normalizeWorkspace(source);
-    if (firebaseEnabled && authState.status === "signedIn") {
-      try {
-        await writeOrgWorkspace(merged);
-        syncedCashRef.current = merged.cashReport;
-        lastSyncedJsonRef.current = workspaceFingerprint(merged);
-        pendingLocalWriteRef.current = false;
-        remoteReadyRef.current = true;
-      } catch {
-        flash(setToast, "Firestore-a yazılmadı", "error");
-        return;
-      }
-    } else if (authState.status === "signedIn") {
-      try {
-        await writeWorkspace(authState.user.uid, merged);
-        lastSyncedJsonRef.current = workspaceFingerprint(merged);
-        pendingLocalWriteRef.current = false;
-        remoteReadyRef.current = true;
-      } catch {
-        flash(setToast, "Firestore-a yazılmadı", "error");
-        return;
-      }
-    } else {
-      saveWorkspaceLocal(merged);
-    }
-    setWorkspace(merged);
-    flash(setToast, "Məlumatlar bərpa olundu");
-  }, [askConfirm, authState]);
-
   const resolveConfirm = (v: boolean) => {
     confirmResolverRef.current?.(v);
     confirmResolverRef.current = null;
@@ -3952,17 +3907,6 @@ export default function App() {
         </div>
       </header>
       <div className="dg-form-page-body">
-        {hasLocalWorkspaceBackup() || hasLocalWorkspace() ? (
-          <section className="dg-form-inner-panel" style={{ marginBottom: 16 }}>
-            <h2 className="dg-form-inner-panel-title">Məlumat bərpası</h2>
-            <p className="dg-muted" style={{ marginBottom: 12, fontSize: 13 }}>
-              Firebase-ə keçid zamanı köhnə brauzer məlumatları itibsə, lokal backup-dan bərpa edə bilərsiniz.
-            </p>
-            <button type="button" className="dg-btn dg-btn-secondary" onClick={() => restoreFromLocalBackup()}>
-              Lokal məlumatları bərpa et
-            </button>
-          </section>
-        ) : null}
         <h2 className="dg-form-inner-panel-title">Satıcı rekvizitləri</h2>
         <div className="rb-company-form-grid">
           <section className="dg-form-inner-panel rb-company-form-card" aria-label="Satıcı rekvizitləri 1">
