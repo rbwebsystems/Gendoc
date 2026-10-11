@@ -6124,8 +6124,15 @@ export default function App() {
     const patch = (next: Partial<typeof draft>) => setCreditAssessmentDraft((current) => ({ ...current, ...next }));
     return (
       <>
-        <section className="dg-form-inner-panel" aria-label="Kredit uyğunluğu girişləri">
-          <h2 className="dg-panel-section-title">Kredit məlumatları</h2>
+        <div className="dg-pricecalc-split dg-credit-assessment-split">
+        <section className="dg-form-inner-panel dg-pricecalc-pane dg-credit-pane--inputs" aria-label="Kredit uyğunluğu girişləri">
+          <header className="dg-pricecalc-pane-head">
+            <span className="dg-pricecalc-step" aria-hidden="true">1</span>
+            <div>
+              <h2>Kredit məlumatları</h2>
+              <p>Müştərinin ödəniş imkanlarını və kredit şərtlərini daxil edin.</p>
+            </div>
+          </header>
           <div className="dg-form-meta-grid dg-credit-assessment-grid">
             <label className="dg-field">
               <span className="dg-label">Məhsul dəyəri (AZN)</span>
@@ -6202,9 +6209,16 @@ export default function App() {
           </div>
         </section>
 
-        {creditAssessmentResult ? (
-          <section className="dg-form-inner-panel dg-credit-results" aria-label="Kredit uyğunluğu nəticəsi">
-            <h2 className="dg-panel-section-title">Nəticə</h2>
+        <section className="dg-form-inner-panel dg-pricecalc-pane dg-pricecalc-pane--results dg-credit-results" aria-label="Kredit uyğunluğu nəticəsi">
+          <header className="dg-pricecalc-pane-head">
+            <span className="dg-pricecalc-step" aria-hidden="true">2</span>
+            <div>
+              <h2>Uyğunluq nəticələri</h2>
+              <p>İlkin ödəniş, kredit məbləği və aylıq limit burada göstərilir.</p>
+            </div>
+          </header>
+          {creditAssessmentResult ? (
+            <>
             {creditAssessmentResult.obligationWarning ? (
               <div className="dg-credit-warning" role="status">Diqqət: digər öhdəliklər ümumi gəlirin 50%-ni keçir.</div>
             ) : null}
@@ -6215,8 +6229,16 @@ export default function App() {
               <article className="dg-pricecalc-card"><div className="dg-pricecalc-card-label">Maksimum aylıq (DSR 40%)</div><div className="dg-pricecalc-card-value">{formatMoney(creditAssessmentResult.maxMonthlyPayment)}</div><div className="dg-pricecalc-card-monthly">Net gəlir: {formatMoney(creditAssessmentResult.netIncome)}</div></article>
             </div>
             {creditAssessmentResult.autoAdjusted ? <p className="dg-credit-adjusted">İlkin ödəniş aylıq ödənişi DSR 40% həddinə uyğunlaşdırmaq üçün avtomatik artırıldı.</p> : null}
-          </section>
-        ) : null}
+            </>
+          ) : (
+            <div className="dg-credit-empty" role="status">
+              <span className="dg-credit-empty-mark" aria-hidden="true">%</span>
+              <strong>Nəticə hesablanmayıb</strong>
+              <p>Soldakı məlumatları doldurun və “Hesabla” düyməsinə basın.</p>
+            </div>
+          )}
+        </section>
+        </div>
 
         <section className="dg-form-inner-panel dg-credit-risk-info" aria-label="Risk kateqoriyaları">
           <h2 className="dg-panel-section-title">Risk kateqoriyaları</h2>

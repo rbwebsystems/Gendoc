@@ -3052,7 +3052,12 @@ textarea.dg-input {
 }
 
 .dg-credit-assessment-grid {
-  margin-top: 0.75rem;
+  margin-top: 0;
+}
+
+.dg-credit-pane--inputs .dg-credit-assessment-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 
 .dg-credit-options {
@@ -3089,10 +3094,52 @@ textarea.dg-input {
 
 .dg-credit-actions {
   margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #dce5e9;
 }
 
 .dg-credit-results {
-  margin-top: 1rem;
+  margin-top: 0;
+}
+
+.dg-credit-empty {
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 1.5rem;
+  border: 1px dashed #cbd8de;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fbfdfe 0%, #f5f9fa 100%);
+  color: #667883;
+  text-align: center;
+}
+
+.dg-credit-empty-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  border: 1px solid rgba(8, 127, 145, 0.2);
+  background: rgba(8, 127, 145, 0.08);
+  color: #087f91;
+  font-size: 1rem;
+  font-weight: 850;
+}
+
+.dg-credit-empty strong {
+  color: #293b45;
+  font-size: 0.92rem;
+}
+
+.dg-credit-empty p {
+  max-width: 30ch;
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .dg-credit-warning,
@@ -3118,7 +3165,7 @@ textarea.dg-input {
 }
 
 .dg-credit-risk-info {
-  margin-top: 1rem;
+  margin-top: 0;
 }
 
 .dg-credit-risk-grid {
@@ -3285,6 +3332,10 @@ textarea.dg-input {
   }
 
   .dg-credit-extra-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .dg-credit-pane--inputs .dg-credit-assessment-grid {
     grid-template-columns: 1fr;
   }
 
