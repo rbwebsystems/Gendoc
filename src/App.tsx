@@ -6244,8 +6244,15 @@ export default function App() {
       <div className="dg-form-page-body">
         {priceCalcTab === "price" ? (
           <>
-        <section className="dg-form-inner-panel">
-          <h2 className="dg-panel-section-title">Hesablama girişləri</h2>
+        <div className="dg-pricecalc-split">
+        <section className="dg-form-inner-panel dg-pricecalc-pane dg-pricecalc-pane--inputs">
+          <header className="dg-pricecalc-pane-head">
+            <span className="dg-pricecalc-step" aria-hidden="true">1</span>
+            <div>
+              <h2>Hesablama məlumatları</h2>
+              <p>Məhsul və qiymət məlumatlarını daxil edin.</p>
+            </div>
+          </header>
           <div className="dg-form-meta-grid">
             <label className="dg-field dg-field-span-full">
               <span className="dg-label">Məhsul adı</span>
@@ -6313,14 +6320,20 @@ export default function App() {
               />
             </label>
           </div>
-          <p className="dg-muted" style={{ marginTop: "0.75rem" }}>
+          <p className="dg-pricecalc-input-hint">
             Maya və ya satış qiyməti yazıldıqca nəticələr avtomatik yenilənir. İlkin ödəniş nağd satış qiymətindən çıxılır və kredit faizi qalan məbləğə tətbiq olunur.
           </p>
         </section>
 
-        <section className="dg-form-inner-panel" style={{ marginTop: "1rem" }}>
-          <div className="dg-pricecalc-results-head">
-            <h2 className="dg-panel-section-title">Nəticələr</h2>
+        <section className="dg-form-inner-panel dg-pricecalc-pane dg-pricecalc-pane--results">
+          <header className="dg-pricecalc-pane-head dg-pricecalc-results-head">
+            <div className="dg-pricecalc-pane-title">
+              <span className="dg-pricecalc-step" aria-hidden="true">2</span>
+              <div>
+                <h2>Qiymət nəticələri</h2>
+                <p>Nağd və kredit hesablamaları avtomatik yenilənir.</p>
+              </div>
+            </div>
             <button
               type="button"
               className="dg-btn dg-btn-primary"
@@ -6330,8 +6343,8 @@ export default function App() {
             >
               Müştəri kartını aç
             </button>
-          </div>
-          <div className="dg-pricecalc-card-grid" style={{ marginTop: "0.5rem" }}>
+          </header>
+          <div className="dg-pricecalc-card-grid dg-pricecalc-summary-grid">
             <article className="dg-pricecalc-card" aria-label="Nağd satış qiyməti kartı">
               <div className="dg-pricecalc-card-label">Nağd satış qiyməti</div>
               <div className="dg-pricecalc-card-value">{formatMoney(priceCalcResult.cashPrice)}</div>
@@ -6342,8 +6355,8 @@ export default function App() {
             </article>
           </div>
 
-          <h3 className="dg-panel-section-title dg-panel-section-title--sub">Kredit qiymətləri</h3>
-          <div className="dg-pricecalc-card-grid">
+          <h3 className="dg-pricecalc-group-title">Kredit qiymətləri</h3>
+          <div className="dg-pricecalc-card-grid dg-pricecalc-credit-grid">
             {priceCalcResult.creditLines.map((line) => (
               <article key={line.key} className="dg-pricecalc-card" aria-label={`${line.label} kredit kartı`}>
                 <div className="dg-pricecalc-card-label">{line.label} ({line.percent}%)</div>
@@ -6355,8 +6368,10 @@ export default function App() {
             ))}
           </div>
         </section>
+        </div>
 
         <section className="dg-pricecalc-notes" aria-label="Kredit qeydləri">
+          <h2 className="dg-pricecalc-notes-title">Vacib kredit qeydləri</h2>
           <ol className="dg-pricecalc-notes-list">
             <li>
               Müştərinin kredit öhdəliyi 5000 AZN-i keçdiyi halda kreditin rəsmiləşdirilməsi rəhbərliyin icazəsi və təsdiqi əsasında rəsmiləşdirilməlidir.
