@@ -324,7 +324,8 @@ textarea.dg-input::placeholder {
 .dg-table-wrap {
   max-height: max(280px, calc(100dvh - 190px));
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
+  overflow-anchor: none;
   border: 1px solid var(--win-border);
   border-radius: var(--win-radius-2xl);
   background: var(--win-surface);
@@ -1711,7 +1712,8 @@ select.dg-input:focus {
   border-radius: var(--win-radius-lg);
   max-height: min(56vh, 560px);
   overflow: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior: none;
+  overflow-anchor: none;
   background: #fff;
 }
 
@@ -3884,6 +3886,8 @@ textarea.dg-input {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: none;
+  overflow-anchor: none;
   scrollbar-gutter: stable;
   background: #fff;
 }
