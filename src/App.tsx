@@ -7753,12 +7753,6 @@ export default function App() {
                   <dt>Təchizatçılar</dt>
                   <dd>{offerSuppliersLabel(infoOffer.rows)}</dd>
                 </div>
-                {infoOffer.note?.trim() ? (
-                  <div className="dg-info-row">
-                    <dt>Qeyd</dt>
-                    <dd>{infoOffer.note.trim()}</dd>
-                  </div>
-                ) : null}
               </dl>
               <div className="dg-info-section-title">Məhsullar</div>
               <div className="dg-info-table-wrap">
