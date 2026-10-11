@@ -322,7 +322,9 @@ textarea.dg-input::placeholder {
 }
 
 .dg-table-wrap {
-  overflow-x: auto;
+  max-height: max(280px, calc(100dvh - 190px));
+  overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--win-border);
   border-radius: var(--win-radius-2xl);
   background: var(--win-surface);
@@ -358,6 +360,9 @@ textarea.dg-input::placeholder {
 /* Bütün bölmələrdə cədvəl başlıqları — eyni qırmızı rəng və ölçü */
 .dg-table thead th,
 .dg-info-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   background: var(--table-header-bg);
   color: var(--table-header-fg);
   font-size: var(--table-header-font-size);
@@ -369,6 +374,7 @@ textarea.dg-input::placeholder {
   padding: var(--table-header-padding-y) var(--table-header-padding-x);
   vertical-align: middle;
   box-sizing: border-box;
+  box-shadow: inset 0 -1px 0 var(--win-border-strong);
 }
 
 .dg-table td {
@@ -1703,7 +1709,9 @@ select.dg-input:focus {
 .dg-info-table-wrap {
   border: 1px solid var(--win-border);
   border-radius: var(--win-radius-lg);
+  max-height: min(56vh, 560px);
   overflow: auto;
+  overscroll-behavior: contain;
   background: #fff;
 }
 
