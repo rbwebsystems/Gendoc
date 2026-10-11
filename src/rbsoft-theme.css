@@ -479,7 +479,7 @@
   border-top: 0;
   position: relative;
   z-index: 1;
-  border-bottom: 3px solid #f1f4f6;
+  border-bottom: 2px solid var(--rb-sidebar-modules);
   background: #ffffff;
   box-shadow: none;
   scrollbar-width: thin;
@@ -520,7 +520,7 @@
   left: 12px;
   height: 3px;
   border-radius: 999px 999px 0 0;
-  background: var(--rb-sidebar-modules);
+  background: var(--rb-accent);
   box-shadow: none;
 }
 
@@ -529,7 +529,7 @@
 }
 
 .rb-module-tab--red.is-active::after {
-  background: var(--rb-sidebar-modules);
+  background: var(--rb-accent);
 }
 
 .rb-desktop .dg-suppliers-tab.is-active,
