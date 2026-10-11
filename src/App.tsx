@@ -6276,15 +6276,6 @@ export default function App() {
             </div>
           </header>
           <div className="dg-form-meta-grid">
-            <label className="dg-field dg-field-span-full">
-              <span className="dg-label">Məhsul adı</span>
-              <input
-                className="dg-input"
-                value={priceCalcProductName}
-                onChange={(e) => setPriceCalcProductName(e.target.value)}
-                placeholder="Məsələn: 18 Pro 256GB Burgundy"
-              />
-            </label>
             <label className="dg-field">
               <span className="dg-label">Məhsul növü</span>
               <select
@@ -6341,6 +6332,15 @@ export default function App() {
                 placeholder="0.00"
               />
             </label>
+            <label className="dg-field dg-field-span-full">
+              <span className="dg-label">Məhsul adı <span className="dg-label-optional">(istəyə bağlı)</span></span>
+              <input
+                className="dg-input"
+                value={priceCalcProductName}
+                onChange={(e) => setPriceCalcProductName(e.target.value)}
+                placeholder="Məsələn: 18 Pro 256GB Burgundy"
+              />
+            </label>
           </div>
           <p className="dg-pricecalc-input-hint">
             Maya və ya satış qiyməti yazıldıqca nəticələr avtomatik yenilənir. İlkin ödəniş nağd satış qiymətindən çıxılır və kredit faizi qalan məbləğə tətbiq olunur.
@@ -6359,8 +6359,8 @@ export default function App() {
             <button
               type="button"
               className="dg-btn dg-btn-primary"
-              disabled={priceCalcResult.cashPrice <= 0 || !priceCalcProductName.trim()}
-              title={!priceCalcProductName.trim() ? "Əvvəlcə məhsul adını yazın" : "Müştəriyə göndəriləcək kartı aç"}
+              disabled={priceCalcResult.cashPrice <= 0}
+              title={priceCalcResult.cashPrice <= 0 ? "Əvvəlcə qiymət daxil edin" : "Müştəriyə göndəriləcək kartı aç"}
               onClick={openPriceCalcCustomerCard}
             >
               Müştəri kartını aç

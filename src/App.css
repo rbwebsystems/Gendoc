@@ -2855,6 +2855,12 @@ textarea.dg-input {
   line-height: 1.5;
 }
 
+.dg-label-optional {
+  color: #82919a;
+  font-size: 0.72rem;
+  font-weight: 550;
+}
+
 .dg-pricecalc-results-head {
   display: flex;
   align-items: center;

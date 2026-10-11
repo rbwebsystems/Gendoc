@@ -33,6 +33,14 @@ test("customer share text contains product, down payment, and every monthly opti
   assert.match(text, /24 ay — aylıq 75,63 AZN/);
 });
 
+test("customer card uses a generic title when product name is optional", () => {
+  const result = imported.calculatePricePlanFromSalePrice(2000, 500);
+  const text = imported.buildCustomerCreditShareText("", 500, result, [3]);
+
+  assert.match(text, /^Məhsul\n/);
+  assert.match(text, /3 ay — aylıq 500 AZN/);
+});
+
 test("WhatsApp Web URL contains the complete encoded customer offer", () => {
   const result = imported.calculatePricePlanFromSalePrice(2000, 500);
   const text = imported.buildCustomerCreditShareText("18 Pro 256GB Burgundy", 500, result);
