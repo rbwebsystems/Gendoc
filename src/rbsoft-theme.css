@@ -378,9 +378,11 @@
   gap: 10px;
   padding: 8px 14px;
   min-height: 52px;
-  border-bottom: 1px solid #cfd7dd;
+  position: relative;
+  z-index: 2;
+  border-bottom: 0;
   background: #ffffff;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 3px 8px -5px rgba(15, 23, 42, 0.42);
   flex-wrap: nowrap;
 }
 
@@ -475,9 +477,11 @@
   overflow-x: auto;
   overflow-y: hidden;
   border-top: 0;
-  border-bottom: 1px solid #cfd7dd;
+  position: relative;
+  z-index: 1;
+  border-bottom: 0;
   background: #ffffff;
-  box-shadow: none;
+  box-shadow: 0 4px 9px -7px rgba(15, 23, 42, 0.58);
   scrollbar-width: thin;
   scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
 }
@@ -502,23 +506,22 @@
 }
 
 .rb-module-tab.is-active {
-  color: #ffffff;
-  background: var(--rb-sidebar-modules);
-  box-shadow:
-    inset 1px 0 0 rgba(255, 255, 255, 0.06),
-    inset -1px 0 0 rgba(255, 255, 255, 0.06),
-    0 2px 5px rgba(15, 23, 42, 0.16);
+  color: var(--rb-sidebar-modules);
+  background: transparent;
+  box-shadow: none;
+  font-weight: 700;
 }
 
 .rb-module-tab.is-active::after {
   content: "";
   position: absolute;
-  right: 0;
+  right: 12px;
   bottom: 0;
-  left: 0;
-  height: 2px;
-  background: var(--rb-accent);
-  box-shadow: 0 0 5px rgba(19, 167, 189, 0.42);
+  left: 12px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: var(--rb-sidebar-modules);
+  box-shadow: none;
 }
 
 .rb-module-tab--red {
@@ -526,7 +529,7 @@
 }
 
 .rb-module-tab--red.is-active::after {
-  background: var(--rb-accent);
+  background: var(--rb-sidebar-modules);
 }
 
 .rb-desktop .dg-suppliers-tab.is-active,
