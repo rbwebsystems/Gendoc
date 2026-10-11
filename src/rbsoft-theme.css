@@ -380,8 +380,8 @@
   min-height: 52px;
   position: relative;
   z-index: 2;
-  border-bottom: 3px solid #f1f4f6;
-  background: #ffffff;
+  border-bottom: 0;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fdfe 100%);
   box-shadow: none;
   flex-wrap: nowrap;
 }
@@ -479,8 +479,8 @@
   border-top: 0;
   position: relative;
   z-index: 1;
-  border-bottom: 2px solid var(--rb-sidebar-modules);
-  background: #ffffff;
+  border-bottom: 0;
+  background: linear-gradient(180deg, #f7fdfe 0%, #eefafb 100%);
   box-shadow: none;
   scrollbar-width: thin;
   scrollbar-color: rgba(15, 23, 42, 0.18) transparent;
@@ -536,10 +536,10 @@
 .rb-desktop .dg-pricecalc-tab.is-active,
 .rb-desktop .dg-instructions-tab.is-active {
   position: relative;
-  color: #ffffff;
-  border-color: var(--rb-sidebar-modules);
-  background: var(--rb-sidebar-modules);
-  box-shadow: 0 2px 5px rgba(15, 23, 42, 0.16);
+  color: var(--rb-sidebar-modules);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 .rb-desktop .dg-suppliers-tab.is-active::after,
@@ -547,11 +547,11 @@
 .rb-desktop .dg-instructions-tab.is-active::after {
   content: "";
   position: absolute;
-  right: 0;
+  right: 12px;
   bottom: 0;
-  left: 0;
-  height: 2px;
-  border-radius: 999px;
+  left: 12px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
   background: var(--rb-accent);
 }
 
