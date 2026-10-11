@@ -1183,15 +1183,15 @@
 
 .rb-desktop .dg-table thead th,
 .rb-desktop .dg-info-table thead th {
-  height: 39px;
-  padding: 9px 12px;
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  line-height: 1.25;
-  color: #303e4a;
-  background: #fafbfc;
+  height: 42px;
+  padding: 10px 12px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  color: #18222a;
+  background: #ffffff;
   border: 0;
-  border-bottom: 1px solid #d2d9df;
+  border-bottom: 1px solid #aeb8bf;
   text-transform: none;
   letter-spacing: 0;
   white-space: nowrap;
@@ -1264,7 +1264,7 @@
 
 .rb-desktop .dg-table.dg-table--cash-report thead th {
   border: 0;
-  border-bottom: 1px solid #d2d9df;
+  border-bottom: 1px solid #aeb8bf;
 }
 
 .rb-desktop .dg-table.dg-table--cash-report tbody td {
@@ -1294,7 +1294,7 @@
 
 .rb-desktop .dg-table thead th:not(:last-child),
 .rb-desktop .dg-info-table thead th:not(:last-child) {
-  border-right: 1px solid #d8dee3;
+  border-right: 1px solid #d5dce1;
 }
 
 .rb-desktop .dg-table tbody td:not(:last-child),
@@ -1533,11 +1533,14 @@
 }
 
 .rb-desktop .dg-table.dg-table--instructions thead th {
-  height: 39px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-  color: #344751;
-  background: linear-gradient(180deg, #f8fafb 0%, #edf2f4 100%);
+  height: 42px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  color: #18222a;
+  background: #ffffff;
+  border-bottom-color: #aeb8bf;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
 }
 
 .rb-desktop .dg-table.dg-table--instructions tbody td {
@@ -1827,6 +1830,45 @@
   border-color: #cbd7dd;
   border-radius: 7px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+}
+
+.biz-portal-modals .dg-table,
+.biz-portal-modals .dg-info-table {
+  color: #293946;
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+
+.biz-portal-modals .dg-table thead th,
+.biz-portal-modals .dg-info-table thead th {
+  height: 42px;
+  padding: 10px 12px;
+  color: #18222a;
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid #aeb8bf;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.biz-portal-modals .dg-table thead th:not(:last-child),
+.biz-portal-modals .dg-info-table thead th:not(:last-child) {
+  border-right: 1px solid #d5dce1;
+}
+
+.biz-portal-modals .dg-table tbody td,
+.biz-portal-modals .dg-info-table tbody td {
+  border-bottom-color: #dce2e6;
+}
+
+.biz-portal-modals .dg-table tbody td:not(:last-child),
+.biz-portal-modals .dg-info-table tbody td:not(:last-child) {
+  border-right: 1px solid #e0e5e9;
 }
 
 @media (max-width: 560px) {
