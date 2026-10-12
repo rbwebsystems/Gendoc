@@ -3996,19 +3996,6 @@ textarea.dg-input {
   color: #1e293b;
 }
 
-.dg-cash-account-name {
-  display: block;
-  min-width: 0;
-  padding: 0.35rem 0.5rem;
-  overflow: hidden;
-  color: #1e293b;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  line-height: 1.4;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .dg-cash-name-input:hover,
 .dg-cash-name-input:focus {
   background: #fff;
@@ -4028,24 +4015,6 @@ textarea.dg-input {
   border: none;
   border-radius: 0;
   box-shadow: none;
-}
-
-.dg-cash-slot-value {
-  display: block;
-  min-width: 0;
-  min-height: 30px;
-  padding: 0.35rem 0.4rem;
-  color: #111827;
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  line-height: 1.4;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.dg-cash-slot-value.dg-cash-amount--neg {
-  color: #dc2626;
 }
 
 .dg-cash-slot-input:hover {
