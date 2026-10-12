@@ -4100,11 +4100,12 @@ textarea.dg-input {
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-balance {
   text-align: center;
   text-transform: none;
-  font-size: 1.0625rem;
-  font-weight: 700;
+  font-size: clamp(1.35rem, 1.8vw, 1.55rem);
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  line-height: 1.15;
   letter-spacing: normal;
-  padding: 0.55rem 0.4rem;
+  padding: 0.7rem 0.5rem;
 }
 
 .dg-table.dg-table--cash-report tfoot .dg-cash-foot-spacer {

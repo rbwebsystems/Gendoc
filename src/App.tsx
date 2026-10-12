@@ -6574,10 +6574,10 @@ export default function App() {
                     <td colSpan={2} className="dg-cash-foot-label">
                       Ümumi balans
                     </td>
-                    <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
+                    <td colSpan={2} className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
                       {formatCashAmount(cashReportBalance)}
                     </td>
-                    <td colSpan={CASH_REPORT_SLOT_COUNT - 1} className="dg-cash-foot-spacer" />
+                    <td colSpan={CASH_REPORT_SLOT_COUNT - 2} className="dg-cash-foot-spacer" />
                     <td className="dg-cash-col-actions dg-cash-foot-spacer" />
                   </tr>
                 </tfoot>
