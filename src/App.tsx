@@ -6424,6 +6424,17 @@ export default function App() {
       );
     }
 
+    const cashColGroup = (
+      <colgroup>
+        <col className="dg-cash-col-idx" />
+        <col className="dg-cash-col-name" />
+        {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, index) => (
+          <col key={index} className="dg-cash-col-slot" />
+        ))}
+        <col className="dg-cash-col-actions" />
+      </colgroup>
+    );
+
     return (
       <div className="dg-cash-report pg-panel" aria-label="Kassa hesabatı">
         {cashReportRows.length === 0 ? (
@@ -6432,63 +6443,86 @@ export default function App() {
             <div className="dg-empty-state-desc">“Hesab əlavə et” düyməsi ilə yeni hesab yaradın.</div>
           </div>
         ) : (
-          <>
-            <section className="dg-cash-total" aria-label="Ümumi balans">
-              <div className="dg-cash-total-label">Ümumi balans</div>
-              <div className={`dg-cash-total-value ${cashAmountClass(cashReportBalance)}`}>
-                <span>{formatCashAmount(cashReportBalance)}</span>
-                <span className="dg-cash-total-currency">AZN</span>
-              </div>
-            </section>
-            <div className="dg-cash-card-grid" role="list" aria-label="Kassa hesabları">
-              {cashReportRows.map((row) => {
-                const balance = rowDisplayTotal(row);
-                return (
-                  <article key={row.id} className="dg-cash-card" role="listitem">
-                    <header className="dg-cash-card-head">
-                      <h2 className="dg-cash-card-name" title={row.name || "Hesab"}>
-                        {row.name || "Hesab"}
-                      </h2>
-                    </header>
-                    <div className={`dg-cash-card-balance ${cashAmountClass(balance)}`}>
-                      <span>{formatCashAmount(balance)}</span>
-                      <span className="dg-cash-card-currency">AZN</span>
-                    </div>
-                    <div className="dg-cash-card-menu">
-                      <TableActionMenu label={`${row.name || "Hesab"} əməliyyatları`}>
-                        <button type="button" className="dg-btn" onClick={() => openCashMovement(row.id, "income")}>
-                          Mədaxil
-                        </button>
-                        <button type="button" className="dg-btn" onClick={() => openCashMovement(row.id, "expense")}>
-                          Məxaric
-                        </button>
-                        <button
-                          type="button"
-                          className="dg-btn"
-                          disabled={cashReportRows.length < 2}
-                          onClick={() => openCashTransfer(row.id)}
-                        >
-                          Transfer
-                        </button>
-                        <button type="button" className="dg-btn" onClick={() => setCashAccountHistoryId(row.id)}>
-                          Tarixçə
-                        </button>
-                        <button type="button" className="dg-btn" onClick={() => void renameCashReportRow(row.id)}>
-                          Adı dəyiş
-                        </button>
-                        <button type="button" className="dg-btn" onClick={() => undoCashReportRow(row.id)}>
-                          Geri al
-                        </button>
-                        <button type="button" className="dg-btn dg-btn-danger" onClick={() => void deleteCashReportRow(row.id)}>
-                          Sil
-                        </button>
-                      </TableActionMenu>
-                    </div>
-                  </article>
-                );
-              })}
+          <div className="dg-cash-table-shell">
+            <div className="dg-cash-table-scroll dg-table-wrap">
+              <table className="dg-table dg-table--cash-report">
+                {cashColGroup}
+                <thead>
+                  <tr>
+                    <th className="dg-cash-col-idx">#</th>
+                    <th className="dg-cash-col-name">Hesab</th>
+                    {Array.from({ length: CASH_REPORT_SLOT_COUNT }, (_, index) => (
+                      <th key={index} className="dg-cash-col-slot">
+                        {index + 1}
+                      </th>
+                    ))}
+                    <th className="dg-cash-col-actions">Əməliyyat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {cashReportRows.map((row, rowIndex) => (
+                    <tr key={row.id}>
+                      <td className="dg-cash-col-idx">{rowIndex + 1}</td>
+                      <td className="dg-cash-col-name">
+                        <span className="dg-cash-account-name" title={row.name || "Hesab"}>
+                          {row.name || "Hesab"}
+                        </span>
+                      </td>
+                      {row.slots.map((value, slotIndex) => (
+                        <td key={slotIndex} className="dg-cash-col-slot">
+                          <span className={`dg-cash-slot-value ${cashAmountClass(value)}`}>
+                            {value === 0 && slotIndex > 0 ? "" : formatCashAmount(value)}
+                          </span>
+                        </td>
+                      ))}
+                      <td className="dg-cash-col-actions">
+                        <TableActionMenu label={`${row.name || "Hesab"} əməliyyatları`}>
+                          <button type="button" className="dg-btn" onClick={() => openCashMovement(row.id, "income")}>
+                            Mədaxil
+                          </button>
+                          <button type="button" className="dg-btn" onClick={() => openCashMovement(row.id, "expense")}>
+                            Məxaric
+                          </button>
+                          <button
+                            type="button"
+                            className="dg-btn"
+                            disabled={cashReportRows.length < 2}
+                            onClick={() => openCashTransfer(row.id)}
+                          >
+                            Transfer
+                          </button>
+                          <button type="button" className="dg-btn" onClick={() => setCashAccountHistoryId(row.id)}>
+                            Tarixçə
+                          </button>
+                          <button type="button" className="dg-btn" onClick={() => void renameCashReportRow(row.id)}>
+                            Adı dəyiş
+                          </button>
+                          <button type="button" className="dg-btn" onClick={() => undoCashReportRow(row.id)}>
+                            Geri al
+                          </button>
+                          <button type="button" className="dg-btn dg-btn-danger" onClick={() => void deleteCashReportRow(row.id)}>
+                            Sil
+                          </button>
+                        </TableActionMenu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="dg-cash-foot-row">
+                    <td colSpan={2} className="dg-cash-foot-label">
+                      Ümumi balans
+                    </td>
+                    <td className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
+                      {formatCashAmount(cashReportBalance)}
+                    </td>
+                    <td colSpan={CASH_REPORT_SLOT_COUNT - 1} className="dg-cash-foot-spacer" />
+                    <td className="dg-cash-col-actions dg-cash-foot-spacer" />
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-          </>
+          </div>
         )}
       </div>
     );
