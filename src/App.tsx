@@ -6445,9 +6445,17 @@ export default function App() {
             <div className="dg-empty-state-desc">“Hesab əlavə et” düyməsi ilə yeni hesab yaradın.</div>
           </div>
         ) : (
-          <div className="dg-cash-table-shell">
-            <div className="dg-cash-table-scroll dg-table-wrap">
-              <table className="dg-table dg-table--cash-report">
+          <>
+            <section className="dg-cash-total" aria-label="Ümumi balans">
+              <div className="dg-cash-total-label">Ümumi balans</div>
+              <div className={`dg-cash-total-value ${cashAmountClass(cashReportBalance)}`}>
+                <span>{formatCashAmount(cashReportBalance)}</span>
+                <span className="dg-cash-total-currency">AZN</span>
+              </div>
+            </section>
+            <div className="dg-cash-table-shell">
+              <div className="dg-cash-table-scroll dg-table-wrap">
+                <table className="dg-table dg-table--cash-report">
                 {cashColGroup}
                 <thead>
                   <tr>
@@ -6569,21 +6577,10 @@ export default function App() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="dg-cash-foot-row">
-                    <td colSpan={2} className="dg-cash-foot-label">
-                      Ümumi balans
-                    </td>
-                    <td colSpan={2} className={`dg-cash-col-slot dg-cash-foot-balance ${cashAmountClass(cashReportBalance)}`}>
-                      {formatCashAmount(cashReportBalance)}
-                    </td>
-                    <td colSpan={CASH_REPORT_SLOT_COUNT - 2} className="dg-cash-foot-spacer" />
-                    <td className="dg-cash-col-actions dg-cash-foot-spacer" />
-                  </tr>
-                </tfoot>
-              </table>
+                </table>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     );
