@@ -139,6 +139,7 @@ import {
   writeOrgMember,
   setMemberMustChangePassword,
   writeOrgWorkspace,
+  MassDeletionError,
 } from "./lib/orgSync";
 import {
   onAuthStateChanged,
@@ -1727,6 +1728,8 @@ export default function App() {
   const flushRemoteWrite = useCallback(
     async (opts?: { retryMs?: number }) => {
       if (!firebaseEnabled || authState.status !== "signedIn" || !remoteReadyRef.current) return;
+      // İlk oxuma/birləşdirmə bitməyibsə yazma: boş lokal nüsxə serverin üzərinə düşə bilər
+      if (!workspaceSyncReadyRef.current) return;
       if (remoteWriteInFlightRef.current) return;
 
       const uid = authState.user.uid;
@@ -1763,6 +1766,18 @@ export default function App() {
           remoteWriteRetryTimerRef.current = null;
         }
       } catch (e: unknown) {
+        if (e instanceof MassDeletionError) {
+          // Lokal nüsxə serverdəki məlumatın əksəriyyətini silərdi — serverdəki vəziyyətə qayıt
+          const remoteWs = e.remote;
+          lastSyncedJsonRef.current = workspaceFingerprint(remoteWs);
+          syncedCashRef.current = remoteWs.cashReport;
+          pendingLocalWriteRef.current = false;
+          cashReportDirtyRef.current = false;
+          workspaceRef.current = remoteWs;
+          setWorkspace(remoteWs);
+          flash(setToast, e.message, "error");
+          return;
+        }
         pendingLocalWriteRef.current = true;
         const msg =
           e instanceof Error && e.message.includes("Workspace çox böyükdür")
@@ -1792,8 +1807,9 @@ export default function App() {
     let cancelled = false;
     workspaceSyncReadyRef.current = false;
     setCashReportHydrated(false);
+    let retryTimer: number | null = null;
 
-    (async () => {
+    const loadInitial = async (attempt: number) => {
       try {
         const remote = firebaseEnabled ? await fetchOrgWorkspaceOnce() : await fetchWorkspaceOnce(uid);
         if (cancelled) return;
@@ -1831,8 +1847,15 @@ export default function App() {
           workspaceFingerprint(merged) !== workspaceFingerprint(remoteNorm);
 
         if (needsUpload) {
-          if (firebaseEnabled) merged = await writeOrgWorkspace(merged, remoteCash ?? { rows: [], history: [] });
-          else await writeWorkspace(uid, merged);
+          if (firebaseEnabled) {
+            try {
+              merged = await writeOrgWorkspace(merged, remoteCash ?? { rows: [], history: [] });
+            } catch (e: unknown) {
+              if (!(e instanceof MassDeletionError)) throw e;
+              // Lokal nüsxə serverdəkini silərdi — serverdəki vəziyyəti götür
+              merged = e.remote;
+            }
+          } else await writeWorkspace(uid, merged);
         }
 
         backupLocalWorkspace();
@@ -1872,12 +1895,18 @@ export default function App() {
           setRemoteSyncEpoch((e) => e + 1);
         }
       } catch {
-        if (!cancelled) {
-          workspaceSyncReadyRef.current = true;
-          setCashReportHydrated(true);
-        }
+        // Server oxunmadısa "hazır" sayma: əks halda boş lokal nüsxə serverə yazıla bilər.
+        // Bir az sonra yenidən cəhd et.
+        if (cancelled) return;
+        if (attempt === 0) flash(setToast, "Məlumatlar serverdən yüklənmədi, yenidən cəhd edilir…", "error");
+        const delay = Math.min(2_000 * 2 ** attempt, 30_000);
+        retryTimer = window.setTimeout(() => {
+          retryTimer = null;
+          void loadInitial(attempt + 1);
+        }, delay);
       }
-    })();
+    };
+    void loadInitial(0);
 
     const onRemoteWorkspace = ({
       exists,
@@ -1890,10 +1919,8 @@ export default function App() {
       if (!exists || !remoteWs) {
         return;
       }
-      if (!workspaceSyncReadyRef.current) {
-        remoteReadyRef.current = true;
-        return;
-      }
+      // İlk birləşdirmə bitənə qədər snapshot-a görə yazışa icazə vermə (remoteReady ilk yükləmədə qoyulur)
+      if (!workspaceSyncReadyRef.current) return;
       // Transaction completion acknowledges the exact saved version. A snapshot
       // must never acknowledge a newer local edit or clear an active input.
       if (pendingLocalWriteRef.current || remoteWriteInFlightRef.current || cashReportDirtyRef.current) {
@@ -1921,6 +1948,7 @@ export default function App() {
 
     return () => {
       cancelled = true;
+      if (retryTimer != null) window.clearTimeout(retryTimer);
       unsub();
     };
   }, [authState]);

@@ -240,6 +240,50 @@ export async function fetchOrgWorkspaceOnce(): Promise<DocWorkspace | null> {
   return (data?.workspace ?? null) as DocWorkspace | null;
 }
 
+/** Bir yazışla serverdəki qeydlərin çoxu birdən silinirsə, yazı rədd edilir. */
+export class MassDeletionError extends Error {
+  constructor(
+    readonly removed: number,
+    readonly total: number,
+    readonly remote: DocWorkspace,
+  ) {
+    super(
+      `Təhlükəsizlik: bu yadda saxlama ${total} qeyddən ${removed}-ni birdən silərdi, ona görə dayandırıldı. Səhifə serverdəki son vəziyyətə qaytarıldı.`,
+    );
+    this.name = "MassDeletionError";
+  }
+}
+
+const MASS_DELETION_MIN_REMOVED = 5;
+const MASS_DELETION_MIN_SHARE = 0.6;
+
+function recordIds(w: DocWorkspace): string[] {
+  const ids: string[] = [];
+  for (const c of w.companies ?? []) ids.push(`company:${c.id}`);
+  for (const p of w.projects ?? []) ids.push(`project:${p.id}`);
+  for (const s of w.suppliers ?? []) ids.push(`supplier:${s.id}`);
+  for (const o of w.supplierOffers ?? []) ids.push(`offer:${o.id}`);
+  for (const o of w.corporateOrders ?? []) ids.push(`corporateOrder:${o.id}`);
+  for (const n of w.notes ?? []) ids.push(`note:${n.id}`);
+  for (const o of w.storeOrders ?? []) ids.push(`storeOrder:${o.id}`);
+  for (const o of w.customerOrders ?? []) ids.push(`customerOrder:${o.id}`);
+  for (const r of w.labelProducts ?? []) ids.push(`label:${r.id}`);
+  return ids;
+}
+
+/** Serverdəki qeydlərin əksəriyyətini bir anda silən yazını (məs. boş lokal nüsxə) bloklayır. */
+export function assertNoMassDeletion(remote: DocWorkspace | null | undefined, payload: DocWorkspace): void {
+  if (!remote) return;
+  const remoteNorm = normalizeWorkspace(remote);
+  const remoteIds = recordIds(remoteNorm);
+  if (remoteIds.length === 0) return;
+  const kept = new Set(recordIds(payload));
+  const removed = remoteIds.filter((id) => !kept.has(id)).length;
+  if (removed >= MASS_DELETION_MIN_REMOVED && removed / remoteIds.length >= MASS_DELETION_MIN_SHARE) {
+    throw new MassDeletionError(removed, remoteIds.length, remoteNorm);
+  }
+}
+
 export async function writeOrgWorkspace(
   workspace: DocWorkspace,
   cashBase?: DocWorkspace["cashReport"],
@@ -253,6 +297,7 @@ export async function writeOrgWorkspace(
         ...workspace,
         cashReport: rebaseCashReport(cashBase, workspace.cashReport, remote?.cashReport),
       });
+      assertNoMassDeletion(remote, payload);
       assertFirestorePayloadSize(payload);
       transaction.set(ref, {
         workspace: payload,
