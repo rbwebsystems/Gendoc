@@ -120,6 +120,7 @@ const VALID_PERMISSION_MODULES = new Set<PermissionModuleId>([
   "folders",
   "notes",
   "suppliers",
+  "corporateOrders",
   "storeOrders",
   "customerOrders",
   "priceCalculations",

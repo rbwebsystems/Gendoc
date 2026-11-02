@@ -271,6 +271,7 @@ type SidebarModule =
   | "folders"
   | "notes"
   | "suppliers"
+  | "corporateOrders"
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"
@@ -634,6 +635,7 @@ const SIDEBAR_MODULES: { id: SidebarModule; label: string }[] = [
   { id: "folders", label: "Qovluqlar" },
   { id: "notes", label: "Qeydlər" },
   { id: "suppliers", label: "Təchizatçı təklifləri" },
+  { id: "corporateOrders", label: "Korporativ sifarişlər" },
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
@@ -654,6 +656,7 @@ const SIDEBAR_MAIN_IDS: SidebarModule[] = [
   "folders",
   "notes",
   "suppliers",
+  "corporateOrders",
   "storeOrders",
   "customerOrders",
   "priceCalculations",
@@ -667,6 +670,7 @@ const MODULE_TAGLINE: Record<SidebarModule, string> = {
   folders: "",
   notes: "",
   suppliers: "Təchizatçı qiymət təklifləri",
+  corporateOrders: "Şirkətlərin korporativ sifarişləri",
   storeOrders: "Digər modullardan asılı olmayan mağaza sifarişləri",
   customerOrders: "Digər modullardan asılı olmayan müştəri sifarişləri",
   priceCalculations: "Qiymət hesablanması — tezliklə",
@@ -2288,7 +2292,7 @@ export default function App() {
     let companyGroupAdded = false;
     let ordersAdded = false;
     for (const id of filteredMainNavIds) {
-      if (id === "companies" || id === "projects" || id === "suppliers") {
+      if (id === "companies" || id === "projects" || id === "suppliers" || id === "corporateOrders") {
         if (!companyGroupAdded) {
           result.push("companyGroup");
           companyGroupAdded = true;
@@ -2413,6 +2417,9 @@ export default function App() {
     }
     if (module === "suppliers") {
       return { title: "Şirkətlər", sub: MODULE_TAGLINE.suppliers };
+    }
+    if (module === "corporateOrders") {
+      return { title: "Şirkətlər", sub: MODULE_TAGLINE.corporateOrders };
     }
     if (module === "storeOrders") {
       return { title: "Sifarişlər", sub: MODULE_TAGLINE.storeOrders };
@@ -5321,6 +5328,17 @@ export default function App() {
     const offerDate = offerDraft.offerDate.trim() || new Date().toISOString().slice(0, 10);
     appendProjectFromOfferData(companyId, offerDate, officialRows, cashRows);
   };
+
+  const renderCorporateOrdersModule = () => (
+    <div className="dg-form-page pg-panel" aria-label="Korporativ sifarişlər">
+      <div className="dg-form-page-body">
+        <div className="dg-empty-state-card" role="status" aria-label="Boş vəziyyət">
+          <div className="dg-empty-state-title">Hələ korporativ sifariş yoxdur</div>
+          <div className="dg-empty-state-desc">Bu bölmə hazırlanır.</div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderSuppliersModule = () => {
     const offers = sortedSupplierOffers;
@@ -8689,7 +8707,9 @@ export default function App() {
                     ? "companies"
                     : filteredMainNavIds.includes("projects")
                       ? "projects"
-                      : "suppliers";
+                      : filteredMainNavIds.includes("suppliers")
+                        ? "suppliers"
+                        : "corporateOrders";
                   const orderTarget: SidebarModule = filteredMainNavIds.includes("customerOrders")
                     ? "customerOrders"
                     : "storeOrders";
@@ -8700,7 +8720,7 @@ export default function App() {
                       ? { id: target, label: "Sifarişlər" }
                     : SIDEBAR_MODULES.find((x) => x.id === id)!;
                   const isActive = isCompanyGroup
-                    ? module === "companies" || module === "projects" || module === "suppliers"
+                    ? module === "companies" || module === "projects" || module === "suppliers" || module === "corporateOrders"
                     : isOrders
                       ? module === "storeOrders" || module === "customerOrders"
                       : module === m.id;
@@ -8881,9 +8901,9 @@ export default function App() {
             <nav
               className="rb-module-tabs"
               aria-label={`${workspaceHeader.title} tabları`}
-              role={module === "companies" || module === "projects" || module === "suppliers" || module === "priceCalculations" || module === "storeOrders" || module === "customerOrders" || module === "instructions" ? "tablist" : undefined}
+              role={module === "companies" || module === "projects" || module === "suppliers" || module === "corporateOrders" || module === "priceCalculations" || module === "storeOrders" || module === "customerOrders" || module === "instructions" ? "tablist" : undefined}
             >
-              {module === "companies" || module === "projects" || module === "suppliers" ? (
+              {module === "companies" || module === "projects" || module === "suppliers" || module === "corporateOrders" ? (
                 <>
                   {filteredMainNavIds.includes("companies") ? (
                     <button
@@ -8916,6 +8936,17 @@ export default function App() {
                       onClick={() => switchSidebarModule("suppliers")}
                     >
                       Təchizatçı təklifləri
+                    </button>
+                  ) : null}
+                  {filteredMainNavIds.includes("corporateOrders") ? (
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={module === "corporateOrders"}
+                      className={`rb-module-tab${module === "corporateOrders" ? " is-active" : ""}`}
+                      onClick={() => switchSidebarModule("corporateOrders")}
+                    >
+                      Korporativ sifarişlər
                     </button>
                   ) : null}
                 </>
@@ -9000,6 +9031,7 @@ export default function App() {
               {module === "folders" ? renderFoldersModule() : null}
               {module === "notes" ? renderNotesModule() : null}
               {module === "suppliers" ? renderSuppliersModule() : null}
+              {module === "corporateOrders" ? renderCorporateOrdersModule() : null}
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
               {module === "priceCalculations" ? renderPriceCalculationsModule() : null}

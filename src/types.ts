@@ -238,6 +238,7 @@ export type PermissionModuleId =
   | "folders"
   | "notes"
   | "suppliers"
+  | "corporateOrders"
   | "storeOrders"
   | "customerOrders"
   | "priceCalculations"

@@ -76,6 +76,7 @@ export const PERMISSION_MODULE_OPTIONS: { id: PermissionModuleId; label: string 
   { id: "folders", label: "Qovluqlar" },
   { id: "notes", label: "Qeydlər" },
   { id: "suppliers", label: "Təchizatçı təklifləri" },
+  { id: "corporateOrders", label: "Korporativ sifarişlər" },
   { id: "storeOrders", label: "Mağaza sifarişi" },
   { id: "customerOrders", label: "Müştəri sifarişi" },
   { id: "priceCalculations", label: "Qiymət hesablanması" },
