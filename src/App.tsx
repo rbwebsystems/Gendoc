@@ -8550,10 +8550,7 @@ export default function App() {
           <div className="rb-auth-card" role="status" aria-live="polite">
             <div className="rb-auth-brand">
               <div className="rb-auth-logo" aria-hidden>
-                <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false">
-                  <circle cx="20" cy="20" r="20" fill="rgba(15,23,42,0.06)" />
-                  <path d="M11 14h12M11 20h12M11 26h8" stroke="rgba(15,23,42,0.7)" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <img src={gendocMarkUrl} alt="" />
               </div>
               <div className="rb-auth-title">GenDoc</div>
             </div>
@@ -8578,10 +8575,7 @@ export default function App() {
           >
             <div className="rb-auth-brand">
               <div className="rb-auth-logo" aria-hidden>
-                <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" focusable="false">
-                  <circle cx="20" cy="20" r="20" fill="rgba(15,23,42,0.06)" />
-                  <path d="M11 14h12M11 20h12M11 26h8" stroke="rgba(15,23,42,0.7)" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <img src={gendocMarkUrl} alt="" />
               </div>
               <div className="rb-auth-title">GenDoc</div>
             </div>
