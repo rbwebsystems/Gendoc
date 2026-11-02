@@ -532,9 +532,8 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
         })
         .filter(
           (r) =>
-            (r.name.length > 0 || (r.replacementName?.length ?? 0) > 0) &&
-            r.supplierName.length > 0 &&
-            r.qty > 0,
+            // Təchizatçısı hələ bilinməyən (qiymətsiz) sətirlər də saxlanılır
+            (r.name.length > 0 || (r.replacementName?.length ?? 0) > 0) && r.qty > 0,
         );
       return {
         id: String((o as { id: string }).id),

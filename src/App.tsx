@@ -4556,13 +4556,7 @@ export default function App() {
     const salePrice = Number(String(r.salePrice).replace(",", "."));
     const hasEx = Number.isFinite(purchasePrice) && purchasePrice > 0;
     const hasInc = Number.isFinite(purchasePriceWithVat) && purchasePriceWithVat > 0;
-    if (
-      !supplierName ||
-      (!name && !replacementName) ||
-      !Number.isFinite(qty) ||
-      qty <= 0
-    )
-      return null;
+    if ((!name && !replacementName) || !Number.isFinite(qty) || qty <= 0) return null;
     const row: SupplierOfferRow = {
       id: r.id,
       supplierName,
@@ -4663,7 +4657,7 @@ export default function App() {
     }
     const rows = offerDraft.rows.map(rowDraftToRecord).filter((r): r is SupplierOfferRow => Boolean(r));
     if (rows.length === 0) {
-      flash(setToast, "Hər sətirdə təchizatçı, məhsul və ya əvəz məhsul, miqdar və ölçü vahidi daxil edin.", "error");
+      flash(setToast, "Hər sətirdə məhsul və ya əvəz məhsul, miqdar və ölçü vahidi daxil edin.", "error");
       return;
     }
     const offerDate = offerDraft.offerDate.trim() || new Date().toISOString().slice(0, 10);
