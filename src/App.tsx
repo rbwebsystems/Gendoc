@@ -10,6 +10,7 @@ import {
   type InstructionTab,
 } from "./components/InstructionsModule";
 import { LabelsModule } from "./components/LabelsModule";
+import { CorporateOrdersModule } from "./components/CorporateOrdersModule";
 import { TableActionMenu } from "./components/TableActionMenu";
 import { rebaseCashReport } from "./lib/cashSync";
 import {
@@ -5329,17 +5330,6 @@ export default function App() {
     appendProjectFromOfferData(companyId, offerDate, officialRows, cashRows);
   };
 
-  const renderCorporateOrdersModule = () => (
-    <div className="dg-form-page pg-panel" aria-label="Korporativ sifarişlər">
-      <div className="dg-form-page-body">
-        <div className="dg-empty-state-card" role="status" aria-label="Boş vəziyyət">
-          <div className="dg-empty-state-title">Hələ korporativ sifariş yoxdur</div>
-          <div className="dg-empty-state-desc">Bu bölmə hazırlanır.</div>
-        </div>
-      </div>
-    </div>
-  );
-
   const renderSuppliersModule = () => {
     const offers = sortedSupplierOffers;
 
@@ -9031,7 +9021,14 @@ export default function App() {
               {module === "folders" ? renderFoldersModule() : null}
               {module === "notes" ? renderNotesModule() : null}
               {module === "suppliers" ? renderSuppliersModule() : null}
-              {module === "corporateOrders" ? renderCorporateOrdersModule() : null}
+              {module === "corporateOrders" ? (
+                <CorporateOrdersModule
+                  orders={workspace.corporateOrders ?? []}
+                  companies={workspace.companies}
+                  suppliers={workspace.suppliers ?? []}
+                  onChange={(corporateOrders) => setWorkspace((current) => ({ ...current, corporateOrders }))}
+                />
+              ) : null}
               {module === "storeOrders" ? renderStoreOrdersModule() : null}
               {module === "customerOrders" ? renderCustomerOrdersModule() : null}
               {module === "priceCalculations" ? renderPriceCalculationsModule() : null}

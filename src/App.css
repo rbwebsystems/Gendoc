@@ -4359,3 +4359,280 @@ textarea.dg-input {
     width: 4.75rem;
   }
 }
+
+/* Korporativ sifarişlər */
+.dg-corp-fields {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr) 180px;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.dg-corp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--win-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.dg-corp-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.dg-corp-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--win-text);
+}
+
+.dg-corp-file {
+  margin-left: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--win-text-secondary);
+}
+
+.dg-corp-busy {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dg-corp-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(30, 58, 138, 0.25);
+  border-top-color: #1e3a8a;
+  border-radius: 50%;
+  animation: dg-corp-spin 0.8s linear infinite;
+}
+
+@keyframes dg-corp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dg-corp-table .dg-corp-col-qty {
+  width: 110px;
+}
+
+.dg-corp-table .dg-corp-col-unit,
+.dg-corp-table .dg-corp-col-date {
+  width: 120px;
+}
+
+.dg-corp-table .dg-corp-col-price {
+  width: 130px;
+}
+
+.dg-corp-table .dg-corp-col-match,
+.dg-corp-table .dg-corp-col-status {
+  width: 150px;
+}
+
+.dg-corp-table .dg-corp-col-actions {
+  width: 80px;
+  text-align: center;
+}
+
+.dg-corp-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dg-corp-row-link {
+  cursor: pointer;
+}
+
+.dg-corp-row-link:hover td {
+  background: rgba(19, 167, 189, 0.06);
+}
+
+.dg-corp-link,
+.dg-corp-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dg-corp-back {
+  margin-bottom: 0.35rem;
+  color: #0e7f99;
+  font-size: 0.8rem;
+}
+
+.dg-corp-status {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.dg-corp-status--new {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1e40af;
+}
+
+.dg-corp-status--collecting {
+  background: rgba(245, 158, 11, 0.16);
+  color: #92400e;
+}
+
+.dg-corp-status--done {
+  background: rgba(22, 163, 74, 0.14);
+  color: #166534;
+}
+
+.dg-corp .dg-input.dg-corp-status-select {
+  min-height: 2.25rem;
+  width: auto;
+  min-width: 160px;
+}
+
+.dg-corp-compare-wrap {
+  overflow-x: auto;
+}
+
+.dg-corp-compare th,
+.dg-corp-compare td {
+  vertical-align: top;
+}
+
+.dg-corp-compare .dg-corp-group-start {
+  border-left: 2px solid rgba(19, 167, 189, 0.35);
+}
+
+.dg-corp-supplier-head {
+  border-left: 2px solid rgba(19, 167, 189, 0.35);
+  background: rgba(19, 167, 189, 0.08);
+}
+
+.dg-corp-supplier-name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.dg-corp-item-name {
+  min-width: 220px;
+}
+
+.dg-corp-note {
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+}
+
+.dg-corp-empty-cell {
+  color: var(--win-text-secondary);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.dg-corp-offered {
+  min-width: 200px;
+}
+
+.dg-corp-offered .dg-muted {
+  font-size: 0.8rem;
+}
+
+.dg-corp-table--quote {
+  min-width: 1100px;
+}
+
+.dg-corp-table--quote th:nth-child(2),
+.dg-corp-table--quote th:nth-child(3) {
+  width: 22%;
+}
+
+.dg-corp-table--quote th:nth-child(8) {
+  width: 14%;
+}
+
+.dg-corp-stack + .dg-corp-stack {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px dashed rgba(15, 23, 42, 0.12);
+}
+
+.dg-corp-stack.dg-corp-price.is-best {
+  color: #166534;
+  font-weight: 700;
+}
+
+.dg-corp-badge {
+  display: inline-block;
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.dg-corp-badge--alternative {
+  background: rgba(245, 158, 11, 0.18);
+  color: #92400e;
+}
+
+.dg-corp-badge--uncertain {
+  background: rgba(220, 38, 38, 0.12);
+  color: #991b1b;
+}
+
+.dg-corp-match-row--alternative td {
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.dg-corp-match-row--uncertain td,
+.dg-corp-match-row--unmatched td {
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.dg-corp-total-label {
+  text-align: right;
+  font-weight: 700;
+}
+
+.dg-corp-total {
+  font-weight: 700;
+}
+
+.dg-corp-unmatched {
+  margin-top: 1.25rem;
+}
+
+.dg-corp-unmatched ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.85rem;
+  color: var(--win-text-secondary);
+}
+
+@media (max-width: 720px) {
+  .dg-corp-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .dg-corp-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dg-corp-table {
+    min-width: 680px;
+  }
+}

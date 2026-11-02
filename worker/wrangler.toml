@@ -1,0 +1,10 @@
+name = "gendoc-extract"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_ID = "gendoc-3ee7c"
+ALLOWED_ORIGINS = "https://rbwebsystems.github.io,http://localhost:5173"
+
+# ANTHROPIC_API_KEY gizli dəyərdir: `npx wrangler secret put ANTHROPIC_API_KEY`

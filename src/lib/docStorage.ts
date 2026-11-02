@@ -8,6 +8,10 @@ import type {
   StoreOrderRecord,
   CustomerOrderRecord,
   LabelProductRecord,
+  CorporateOrderRecord,
+  CorporateOrderItem,
+  CorporateQuoteLine,
+  CorporateSupplierQuote,
   SystemUserRecord,
   LeaveRequestRecord,
   PermissionModuleId,
@@ -59,6 +63,74 @@ function normalizeOrderLines(raw: unknown): OrderLineRow[] {
           : "",
     }))
     .filter((r) => r.name.length > 0 && r.qty > 0 && r.supplierName.length > 0 && r.purchasePrice > 0);
+}
+
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+const numOrNull = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const ts = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : Date.now());
+
+function normalizeCorporateOrders(raw: unknown): CorporateOrderRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((o): o is Record<string, unknown> => Boolean(o) && typeof (o as { id?: unknown }).id === "string")
+    .map((o) => {
+      const items: CorporateOrderItem[] = (Array.isArray(o.items) ? o.items : [])
+        .filter((it): it is Record<string, unknown> => Boolean(it) && typeof (it as { id?: unknown }).id === "string")
+        .map((it) => {
+          const note = str(it.note);
+          return { id: String(it.id), name: str(it.name), qty: numOrNull(it.qty), unit: str(it.unit), ...(note ? { note } : {}) };
+        })
+        .filter((it) => it.name.length > 0);
+      const itemIds = new Set(items.map((it) => it.id));
+      const quotes: CorporateSupplierQuote[] = (Array.isArray(o.quotes) ? o.quotes : [])
+        .filter((q): q is Record<string, unknown> => Boolean(q) && typeof (q as { id?: unknown }).id === "string")
+        .map((q) => {
+          const lines: CorporateQuoteLine[] = (Array.isArray(q.lines) ? q.lines : [])
+            .filter((l): l is Record<string, unknown> => Boolean(l) && typeof (l as { id?: unknown }).id === "string")
+            .map((l) => {
+              const orderItemId = typeof l.orderItemId === "string" && itemIds.has(l.orderItemId) ? l.orderItemId : null;
+              const matchType =
+                l.matchType === "exact" || l.matchType === "alternative" || l.matchType === "uncertain"
+                  ? l.matchType
+                  : "unmatched";
+              const note = str(l.note);
+              return {
+                id: String(l.id),
+                orderItemId,
+                matchType: orderItemId ? matchType : "unmatched",
+                offeredName: str(l.offeredName),
+                qty: numOrNull(l.qty),
+                unitPrice: numOrNull(l.unitPrice),
+                totalPrice: numOrNull(l.totalPrice),
+                ...(note ? { note } : {}),
+              };
+            });
+          const sourceFileName = str(q.sourceFileName);
+          return {
+            id: String(q.id),
+            supplierName: str(q.supplierName) || "Təchizatçı",
+            currency: str(q.currency) || "AZN",
+            ...(sourceFileName ? { sourceFileName } : {}),
+            lines,
+            createdAt: ts(q.createdAt),
+          };
+        });
+      const orderDateRaw = str(o.orderDate);
+      const sourceFileName = str(o.sourceFileName);
+      const status = o.status === "collecting" || o.status === "done" ? o.status : "new";
+      return {
+        id: String(o.id),
+        title: str(o.title) || "Sifariş",
+        companyId: str(o.companyId),
+        orderDate: /^\d{4}-\d{2}-\d{2}$/.test(orderDateRaw) ? orderDateRaw : new Date().toISOString().slice(0, 10),
+        status,
+        ...(sourceFileName ? { sourceFileName } : {}),
+        items,
+        quotes,
+        createdAt: ts(o.createdAt),
+        updatedAt: ts(o.updatedAt),
+      };
+    });
 }
 
 function normalizeStoreOrders(raw: unknown): StoreOrderRecord[] {
@@ -537,6 +609,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
           : Date.now(),
     }))
     .filter((row) => row.name.length > 0 && row.qty > 0);
+  const corporateOrders = normalizeCorporateOrders(w.corporateOrders);
   const cashReport = w.cashReport != null ? normalizeCashReportState(w.cashReport) : undefined;
   const instructions = normalizeInstructionsState(w.instructions);
   const systemUsers = normalizeSystemUsers(w.systemUsers);
@@ -579,6 +652,7 @@ export function normalizeWorkspace(w: DocWorkspace): DocWorkspace {
     storeOrders,
     customerOrders,
     labelProducts,
+    corporateOrders,
     ...(cashReport ? { cashReport } : {}),
     instructions,
     systemUsers,
@@ -800,6 +874,7 @@ export function workspaceHasUserData(w: DocWorkspace): boolean {
     (ws.storeOrders?.length ?? 0) > 0 ||
     (ws.customerOrders?.length ?? 0) > 0 ||
     (ws.labelProducts?.length ?? 0) > 0 ||
+    (ws.corporateOrders?.length ?? 0) > 0 ||
     (ws.systemUsers?.length ?? 0) > 0 ||
     (ws.leaveRequests?.length ?? 0) > 0 ||
     (ws.cashReport?.rows?.length ?? 0) > 0 ||
@@ -820,6 +895,7 @@ function workspaceLatestTouch(w: DocWorkspace): number {
   for (const s of ws.suppliers ?? []) bump(s.updatedAt);
   for (const o of ws.supplierOffers ?? []) bump(o.updatedAt);
   for (const row of ws.labelProducts ?? []) bump(row.updatedAt);
+  for (const o of ws.corporateOrders ?? []) bump(o.updatedAt);
   for (const f of ws.folders ?? []) bump(f.updatedAt);
   for (const row of ws.cashReport?.rows ?? []) bump(row.updatedAt);
   for (const entry of ws.cashReport?.history ?? []) bump(entry.savedAt);

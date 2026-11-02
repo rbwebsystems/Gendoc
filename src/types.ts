@@ -227,6 +227,58 @@ export interface LabelProductRecord {
   updatedAt: number;
 }
 
+/** Korporativ sifarişin məhsul sətri (müştəri faylından oxunur) */
+export interface CorporateOrderItem {
+  id: string;
+  name: string;
+  qty: number | null;
+  unit: string;
+  note?: string;
+}
+
+export type CorporateQuoteMatchType = "exact" | "alternative" | "uncertain" | "unmatched";
+
+/** Təchizatçı təklifinin bir sətri — sifariş sətrinə bağlanır */
+export interface CorporateQuoteLine {
+  id: string;
+  /** Uyğun sifariş sətri; tapılmayıbsa boş */
+  orderItemId: string | null;
+  matchType: CorporateQuoteMatchType;
+  /** Təchizatçının yazdığı məhsul adı (əvəz məhsul ola bilər) */
+  offeredName: string;
+  qty: number | null;
+  unitPrice: number | null;
+  totalPrice: number | null;
+  note?: string;
+}
+
+/** Bir təchizatçının sifarişə verdiyi qiymət təklifi */
+export interface CorporateSupplierQuote {
+  id: string;
+  supplierName: string;
+  currency: string;
+  sourceFileName?: string;
+  lines: CorporateQuoteLine[];
+  createdAt: number;
+}
+
+export type CorporateOrderStatus = "new" | "collecting" | "done";
+
+/** Şirkətlər → Korporativ sifarişlər */
+export interface CorporateOrderRecord {
+  id: string;
+  title: string;
+  /** Şirkətlər siyahısından FK (boş ola bilər) */
+  companyId: string;
+  orderDate: string;
+  status: CorporateOrderStatus;
+  sourceFileName?: string;
+  items: CorporateOrderItem[];
+  quotes: CorporateSupplierQuote[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 export type LeaveRequestStatus = "pending" | "approved" | "rejected";
 
 export type AppUserRole = "employee" | "director" | "admin";
@@ -389,6 +441,7 @@ export interface DocWorkspace {
   storeOrders?: StoreOrderRecord[];
   customerOrders?: CustomerOrderRecord[];
   labelProducts?: LabelProductRecord[];
+  corporateOrders?: CorporateOrderRecord[];
   cashReport?: CashReportState;
   instructions?: InstructionsState;
   systemUsers?: SystemUserRecord[];
